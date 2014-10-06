@@ -12,7 +12,7 @@
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib</artifactId>
     <packaging>jar</packaging>
-    <version>0.9.B-SNAPSHOT</version>
+    <version>0.9.B</version>
     <name>bitcoin-lib</name>
 
     <properties>
