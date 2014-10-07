@@ -12,13 +12,36 @@
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib</artifactId>
     <packaging>jar</packaging>
-    <version>0.9.C-SNAPSHOT</version>
+    <version>0.9.1-SNAPSHOT</version>
     <name>bitcoin-lib</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.version>2.11.2</scala.version>
     </properties>
+
+    <licenses>
+        <license>
+            <url>https://raw.github.com/ACINQ/bitcoin-lib/master/LICENSE</url>
+            <name>Apache License</name>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:git@github.com:ACINQ/bitcoin-lib.git</connection>
+        <developerConnection>scm:git:git@github.com:ACINQ/bitcoin-lib.git</developerConnection>
+        <url>git@github.com:ACINQ/bitcoin-lib.git</url>
+    </scm>
+
+    <developers>
+        <developer>
+            <id>sstone</id>
+        </developer>
+        <developer>
+            <id>pm47</id>
+        </developer>
+    </developers>
 
     <build>
         <plugins>
@@ -60,6 +83,12 @@
                         <goals>
                             <goal>compile</goal>
                             <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>doc-jar</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -147,6 +176,36 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <profile>
+            <id>release-sign-artifacts</id>
+            <activation>
+                <property>
+                    <name>performRelease</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
 
 
