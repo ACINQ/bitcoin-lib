@@ -96,4 +96,45 @@ Please have a look at unit tests, more samples will be added soon.
   println(s"json tx: ${Json.toJson(tx2, testnet = true)}")
 ```
 
+### Pay to Script: multisig transactions
+
+```scala
+
+  val pub1 = fromHexString("0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A")
+  val key1 = fromHexString("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA")
+  val pub2 = fromHexString("032C58BC9615A6FF24E9132CEF33F1EF373D97DC6DA7933755BC8BB86DBEE9F55C")
+  val key2 = fromHexString("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C")
+  val pub3 = fromHexString("02C4D72D99CA5AD12C17C9CFE043DC4E777075E8835AF96F46D8E3CCD929FE1926")
+  val key3 = fromHexString("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C")
+
+  // create a "2 out of 3" multisig script
+  val redeemScript = Script.createMultiSigMofN(2, List(pub1, pub2, pub3))
+
+  // the multisig adress is just that hash of this script
+  val multisigAddress = Crypto.hash160(redeemScript)
+
+  // we want to send money to our multisig adress by redeeming the first output
+  // of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
+  // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
+  val txIn = TxIn(
+    OutPoint(fromHexString("41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea").reverse, 0),
+    signatureScript = Array(), // empy signature script
+    sequence = 0xFFFFFFFFL)
+
+  // and we want to sent the output to our multisig address
+  val txOut = TxOut(
+    amount = 900000, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
+    publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil))
+
+  // create a tx with empty input signature scripts
+  val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
+
+  // and sign it
+  val signData = SignData(
+    fromHexString("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
+    Address.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
+
+  val signedTx = Transaction.sign(tx, List(signData))
+
+```
 

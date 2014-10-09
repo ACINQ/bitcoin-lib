@@ -28,34 +28,26 @@ class MultisigSpec extends FlatSpec with Matchers {
     // 196 = prefix for P2SH adress on testnet
     Address.encode(Address.TestnetScriptVersion, multisigAddress) should equal("2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
 
-    val previousTx = List(
-      PreviousTransaction(// 0.01 BTC
-        txid = "41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea",
-        vout = 0,
-        publicKeyScript = fromHexString("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"),
-        privateKey = Address.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
-    )
+    // we want to redeem the first output of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
+    // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
+    val txIn = TxIn(
+      OutPoint(fromHexString("41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea").reverse, 0),
+      signatureScript = Array(), // empy signature script
+      sequence = 0xFFFFFFFFL)
 
-    // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
-    val amount = 900000
-
-    // convert a previous tx to an tx input with an empty signature script
-    def toTxIn(ptx: PreviousTransaction) = TxIn(outPoint = OutPoint(fromHexString(ptx.txid).reverse, ptx.vout), signatureScript = Array.empty[Byte], sequence = 0xFFFFFFFFL)
-
-    // extracts data required from signature
-    def toSignData(ptx: PreviousTransaction) = SignData(prevPubKeyScript = ptx.publicKeyScript, privateKey = ptx.privateKey)
+    // and we want to sent the output to our multisig address
+    val txOut = TxOut(
+      amount = 900000, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
+      publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil))
 
     // create a tx with empty input signature scripts
-    val tx = Transaction(
-      version = 1L,
-      txIn = previousTx.map(toTxIn),
-      txOut = List(TxOut(
-        amount = amount,
-        publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil))),
-      lockTime = 0L
-    )
+    val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
 
-    val signedTx = Transaction.sign(tx, previousTx.map(toSignData), randomize = false)
+    val signData = SignData(
+      fromHexString("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
+      Address.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
+
+    val signedTx = Transaction.sign(tx, List(signData), randomize = false)
 
     //this works because signature is not randomized
     toHexString(Transaction.write(signedTx)) should equal("0100000001ea1df27ca8a897c985f163407e2c20cbc310ca891ca361c207ba8f4b7073e541000000008b483045022100940f7bcb380fb6db698f71928bda8926f76305ff868919e8ef7729647606bf7702200d32f1231860cb7e6777447c4038627bee7f47bc54005f681b62ce71d4a6a7f10141042adeabf9817a4d34adf1fe8e0fd457a3c0c6378afd63325dbaaaccd4f254002f9cc4148f603beb0e874facd3a3e68f5d002a65c0d3658452a4e55a57f5c3b768ffffffff01a0bb0d000000000017a914a90003b4ddef4be46fc61e7f2167da9d234944e28700000000")
@@ -116,7 +108,7 @@ class MultisigSpec extends FlatSpec with Matchers {
     def execute = Script.execute(ctx) _
     val stack = execute(Script.parse(signedTx.txIn(0).signatureScript), List())
     val stack1 = execute(Script.parse(previousTx(0).publicKeyScript), stack)
-    val Array(1) :: tail  = stack1
+    val Array(1) :: tail = stack1
     val stack2 = execute(Script.parse(redeemScript), tail)
     val List(Array(check)) = stack2
     assert(check === 1)
