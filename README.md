@@ -2,6 +2,8 @@
 
 Simple bitcoin library written in Scala.
 
+[![Build Status](https://travis-ci.org/ACINQ/bitcoin-lib.png)](https://travis-ci.org/ACINQ/bitcoin-lib)
+
 ## Overview
 
 This is a simple scala library which implements some (most ?) of the bitcoin protocol:
