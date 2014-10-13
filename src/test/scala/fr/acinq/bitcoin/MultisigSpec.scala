@@ -105,11 +105,16 @@ class MultisigSpec extends FlatSpec with Matchers {
     // the id of this tx on testnet is f137884feb9a951bf9b159432ebb771ec76fa6e7332c06cb8a6b718148f101af
     // redeem the tx
     val ctx = Script.Context(signedTx, 0, redeemScript)
-    def execute = Script.execute(ctx) _
-    val stack = execute(Script.parse(signedTx.txIn(0).signatureScript), List())
-    val stack1 = execute(Script.parse(previousTx(0).publicKeyScript), stack)
+    val runner = new Script.Runner(ctx)
+
+    // start as usual: run the input sig script
+    val stack = runner.run(signedTx.txIn(0).signatureScript)
+    // then the output pk script
+    val stack1 = runner.run(previousTx(0).publicKeyScript, stack)
+    // if it worked, we should have a single 1 on top of our stack
     val Array(1) :: tail = stack1
-    val stack2 = execute(Script.parse(redeemScript), tail)
+    // now run the multisig redeem script against the stack tail
+    val stack2 = runner.run(redeemScript, tail)
     val List(Array(check)) = stack2
     assert(check === 1)
   }

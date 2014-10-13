@@ -7,18 +7,49 @@ import java.util
 
 import scala.collection.mutable.ArrayBuffer
 
+/**
+ * see https://en.bitcoin.it/wiki/Protocol_specification
+ */
+
 trait BtcMessage[T] {
+  /**
+   * write a message to a stream
+   * @param t message
+   * @param out output stream
+   */
   def write(t: T, out: OutputStream): Unit
 
+  /**
+   * write a message to a byte array
+   * @param t message
+   * @return a serialized message
+   */
   def write(t: T): Array[Byte] = {
     val out = new ByteArrayOutputStream()
     write(t, out)
     out.toByteArray
   }
 
+  /**
+   * read a message from a stream
+   * @param in input stream
+   * @return a deserialized message
+   */
   def read(in: InputStream): T
 
+  /**
+   * read a message from a byte array
+   * @param in serialized message
+   * @return a deserialized message
+   */
   def read(in: Array[Byte]): T = read(new ByteArrayInputStream(in))
+
+  /**
+   * read a message from a hex string
+   * @param in message binary data in hex format
+   * @return a deserialized message of type T
+   */
+  def read(in: String): T = read(fromHexString(in))
 }
 
 object BlockHeader extends BtcMessage[BlockHeader] {
@@ -50,6 +81,15 @@ object BlockHeader extends BtcMessage[BlockHeader] {
   }
 }
 
+/**
+ *
+ * @param version Block version information, based upon the software version creating this block
+ * @param hashPreviousBlock The hash value of the previous block this particular block references
+ * @param hashMerkleRoot The reference to a Merkle tree collection which is a hash of all transactions related to this block
+ * @param time A timestamp recording when this block was created (Will overflow in 2106[2])
+ * @param bits The calculated difficulty target being used for this block
+ * @param nonce The nonce used to generate this block… to allow variations of the header and compute different hashes
+ */
 case class BlockHeader(version: Long, hashPreviousBlock: Array[Byte], hashMerkleRoot: Array[Byte], time: Long, bits: Long, nonce: Long) {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
@@ -62,8 +102,6 @@ object OutPoint extends BtcMessage[OutPoint] {
     out.write(input.hash)
     writeUInt32(input.index, out)
   }
-
-  def txid(input: OutPoint): String = toHexString(input.hash.reverse)
 }
 
 /**
@@ -78,6 +116,12 @@ case class OutPoint(hash: Array[Byte], index: Long) {
   override def toString = s"OutPoint(${toHexString(hash)}, $index)"
 
   def isCoinbaseOutPoint = index == 0xffffffffL && hash.find(_ != 0).isEmpty
+
+  /**
+   *
+   * @return the id of the transaction this output belongs to
+   */
+  def txid = toHexString(hash.reverse)
 }
 
 object TxIn extends BtcMessage[TxIn] {
@@ -95,6 +139,13 @@ object TxIn extends BtcMessage[TxIn] {
   }
 }
 
+/**
+ * Transaction input
+ * @param outPoint Previous output transaction reference
+ * @param signatureScript Computational Script for confirming transaction authorization
+ * @param sequence Transaction version as defined by the sender. Intended for "replacement" of transactions when
+ *                 information is updated before inclusion into a block. Unused for now.
+ */
 case class TxIn(outPoint: OutPoint, signatureScript: Array[Byte], sequence: Long) {
   require(signatureScript.size < MaxScriptElementSize, s"signature script is ${signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
   override def toString = s"TxIn($outPoint, ${toHexString(signatureScript)}, $sequence)"
@@ -109,6 +160,11 @@ object TxOut extends BtcMessage[TxOut] {
   }
 }
 
+/**
+ * Transaction output
+ * @param amount amount in Satoshis
+ * @param publicKeyScript Usually contains the public key as a Bitcoin script setting up conditions to claim this output.
+ */
 case class TxOut(amount: Long, publicKeyScript: Array[Byte]) {
   require(amount >= 0, s"invalid txout amount: $amount")
   require(amount < MaxMoney, s"invalid txout amount: $amount")
@@ -188,6 +244,13 @@ object Transaction extends BtcMessage[Transaction] {
  */
 case class SignData(prevPubKeyScript: Array[Byte], privateKey: Array[Byte])
 
+/**
+ * Transaction
+ * @param version Transaction data format version
+ * @param txIn Transaction inputs
+ * @param txOut Transaction outputs
+ * @param lockTime The block number or timestamp at which this transaction is locked
+ */
 case class Transaction(version: Long, txIn: List[TxIn], txOut: List[TxOut], lockTime: Long) {
   require(txIn.nonEmpty, "input list cannot be empty")
   require(txOut.nonEmpty, "output list cannot be empty")
@@ -242,6 +305,11 @@ object Block extends BtcMessage[Block] {
   val TestnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
 }
 
+/**
+ * Bitcoin block
+ * @param header block header
+ * @param tx transactions
+ */
 case class Block(header: BlockHeader, tx: Seq[Transaction]) {
   require(util.Arrays.equals(header.hashMerkleRoot, MerkleTree.computeRoot(tx)), "invalid block:  merkle root mismatch")
   require(tx.map(Transaction.txid).toSet.size == tx.size, "invalid block: duplicate transactions")

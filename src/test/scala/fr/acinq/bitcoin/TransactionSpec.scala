@@ -131,9 +131,9 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // check script
     val ctx = Script.Context(tx2, 0, previousTx.publicKeyScript)
-    def execute = Script.execute(ctx) _
-    val stack = execute(Script.parse(tx2.txIn(0).signatureScript), List())
-    val stack1 = execute(Script.parse(previousTx.publicKeyScript), stack)
+    val executor = new Script.Runner(ctx)
+    val stack = executor.run(tx2.txIn(0).signatureScript)
+    val stack1 = executor.run(previousTx.publicKeyScript, stack)
     val List(Array(check)) = stack1
     assert(check === 1)
   }
@@ -174,9 +174,9 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // redeem the tx
     val ctx = Script.Context(tx2, 0, previousTx.publicKeyScript)
-    def execute = Script.execute(ctx) _
-    val stack = execute(Script.parse(tx2.txIn(0).signatureScript), List())
-    val stack1 = execute(Script.parse(previousTx.publicKeyScript), stack)
+    val executor = new Script.Runner(ctx)
+    val stack = executor.run(tx2.txIn(0).signatureScript)
+    val stack1 = executor.run(previousTx.publicKeyScript, stack)
     val List(Array(check)) = stack1
     assert(check === 1)
   }
@@ -286,9 +286,9 @@ class TransactionSpec extends FlatSpec with Matchers {
     signedTx.txIn.zipWithIndex.map {
       case (txin, index) =>
         val ctx = Script.Context(signedTx, index, previousTx(index).publicKeyScript)
-        def execute = Script.execute(ctx) _
-        val stack = execute(Script.parse(txin.signatureScript), List())
-        val stack1 = execute(Script.parse(previousTx(index).publicKeyScript), stack)
+        val executor = new Script.Runner(ctx)
+        val stack = executor.run(txin.signatureScript)
+        val stack1 = executor.run(previousTx(index).publicKeyScript, stack)
         val List(Array(check)) = stack1
         assert(check === 1)
     }
