@@ -52,48 +52,6 @@ trait BtcMessage[T] {
   def read(in: String): T = read(fromHexString(in))
 }
 
-object BlockHeader extends BtcMessage[BlockHeader] {
-  def read(input: InputStream): BlockHeader = {
-    val version = uint32(input)
-    val hashPreviousBlock = hash(input)
-    val hashMerkleRoot = hash(input)
-    val time = uint32(input)
-    val bits = uint32(input)
-    val nonce = uint32(input)
-    BlockHeader(version, hashPreviousBlock, hashMerkleRoot, time, bits, nonce)
-  }
-
-  def write(input: BlockHeader, out: OutputStream) = {
-    writeUInt32(input.version, out)
-    out.write(input.hashPreviousBlock)
-    out.write(input.hashMerkleRoot)
-    writeUInt32(input.time, out)
-    writeUInt32(input.bits, out)
-    writeUInt32(input.nonce, out)
-  }
-
-  def getDifficulty(header: BlockHeader) : BigInteger = {
-    val nsize = header.bits >> 24
-    val isneg = header.bits & 0x00800000
-    val nword = header.bits & 0x007fffff
-    val result = BigInteger.valueOf(nword).shiftLeft(8 * (nsize.toInt - 3))
-    if (isneg != 0) result.negate() else result
-  }
-}
-
-/**
- *
- * @param version Block version information, based upon the software version creating this block
- * @param hashPreviousBlock The hash value of the previous block this particular block references
- * @param hashMerkleRoot The reference to a Merkle tree collection which is a hash of all transactions related to this block
- * @param time A timestamp recording when this block was created (Will overflow in 2106[2])
- * @param bits The calculated difficulty target being used for this block
- * @param nonce The nonce used to generate this block… to allow variations of the header and compute different hashes
- */
-case class BlockHeader(version: Long, hashPreviousBlock: Array[Byte], hashMerkleRoot: Array[Byte], time: Long, bits: Long, nonce: Long) {
-  require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
-  require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
-}
 
 object OutPoint extends BtcMessage[OutPoint] {
   def read(input: InputStream): OutPoint = OutPoint(hash(input), uint32(input))
@@ -260,13 +218,65 @@ case class Transaction(version: Long, txIn: List[TxIn], txOut: List[TxOut], lock
   lazy val txid = Transaction.txid(this)
 }
 
+object BlockHeader extends BtcMessage[BlockHeader] {
+  def read(input: InputStream): BlockHeader = {
+    val version = uint32(input)
+    val hashPreviousBlock = hash(input)
+    val hashMerkleRoot = hash(input)
+    val time = uint32(input)
+    val bits = uint32(input)
+    val nonce = uint32(input)
+    BlockHeader(version, hashPreviousBlock, hashMerkleRoot, time, bits, nonce)
+  }
+
+  def write(input: BlockHeader, out: OutputStream) = {
+    writeUInt32(input.version, out)
+    out.write(input.hashPreviousBlock)
+    out.write(input.hashMerkleRoot)
+    writeUInt32(input.time, out)
+    writeUInt32(input.bits, out)
+    writeUInt32(input.nonce, out)
+  }
+
+  def getDifficulty(header: BlockHeader) : BigInteger = {
+    val nsize = header.bits >> 24
+    val isneg = header.bits & 0x00800000
+    val nword = header.bits & 0x007fffff
+    val result = BigInteger.valueOf(nword).shiftLeft(8 * (nsize.toInt - 3))
+    if (isneg != 0) result.negate() else result
+  }
+}
+
+/**
+ *
+ * @param version Block version information, based upon the software version creating this block
+ * @param hashPreviousBlock The hash value of the previous block this particular block references
+ * @param hashMerkleRoot The reference to a Merkle tree collection which is a hash of all transactions related to this block
+ * @param time A timestamp recording when this block was created (Will overflow in 2106[2])
+ * @param bits The calculated difficulty target being used for this block
+ * @param nonce The nonce used to generate this block… to allow variations of the header and compute different hashes
+ */
+case class BlockHeader(version: Long, hashPreviousBlock: Array[Byte], hashMerkleRoot: Array[Byte], time: Long, bits: Long, nonce: Long) {
+  require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
+  require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
+}
+
+/**
+ * see https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
+ */
 object MerkleTree {
   def computeRootRaw(tree: Seq[Array[Byte]]): Array[Byte] = tree.length match {
     case 1 => tree(0)
     case n if n % 2 != 0 => computeRootRaw(tree :+ tree.last) // append last element again
     case _ =>  computeRootRaw(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1))).toSeq)
   }
-  def computeRoot(tree: Seq[Transaction]): Array[Byte] = computeRootRaw(tree.map(t => Crypto.hash256(Transaction.write(t))))
+
+  /**
+   * 
+   * @param transactions list of transactions
+   * @return the Merkle root of the treed built from the input transactions
+   */
+  def computeRoot(transactions: Seq[Transaction]): Array[Byte] = computeRootRaw(transactions.map(t => Crypto.hash256(Transaction.write(t))))
 }
 
 object Block extends BtcMessage[Block] {
@@ -290,7 +300,7 @@ object Block extends BtcMessage[Block] {
   // genesis block
   val LivenetGenesisBlock = {
     val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(writeUInt8(4)) :: OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8")) :: Nil
-    val scriptPubKey = OP_PUSHDATA(fromHexString("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f")) :: OP_CHECKSIG :: Nil
+    val scriptPubKey = OP_PUSHDATA("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") :: OP_CHECKSIG :: Nil
     Block(
       BlockHeader(version = 1, hashPreviousBlock = new Array[Byte](32), hashMerkleRoot = fromHexString("3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"), time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
       List(
@@ -353,6 +363,11 @@ object Address {
 }
 
 object Message extends BtcMessage[Message] {
+  val MagicMain = 0xD9B4BEF9L
+  val MagicTestNet =	0xDAB5BFFAL
+  val MagicTestnet3 =	0x0709110BL
+  val MagicNamecoin =	0xFEB4BEF9L
+
   def read(in: InputStream): Message = {
     val magic = uint32(in)
     val buffer = new Array[Byte](12)
@@ -380,6 +395,12 @@ object Message extends BtcMessage[Message] {
   }
 }
 
+/**
+ * Bitcoin message exchanged by nodes over the network
+ * @param magic Magic value indicating message origin network, and used to seek to next message when stream state is unknown
+ * @param command ASCII string identifying the packet content, NULL padded (non-NULL padding results in packet rejected)
+ * @param payload The actual data
+ */
 case class Message(magic: Long, command: String, payload: Array[Byte]) {
   require(command.length <= 12)
 }
@@ -459,6 +480,20 @@ object Version extends BtcMessage[Version] {
   }
 }
 
+/**
+ *
+ * @param version Identifies protocol version being used by the node
+ * @param services bitfield of features to be enabled for this connection
+ * @param timestamp standard UNIX timestamp in seconds
+ * @param addr_recv The network address of the node receiving this message
+ * @param addr_from The network address of the node emitting this message
+ * @param nonce Node random nonce, randomly generated every time a version packet is sent. This nonce is used to detect
+ *              connections to self.
+ * @param user_agent User Agent
+ * @param start_height The last block received by the emitting node
+ * @param relay Whether the remote peer should announce relayed transactions or not, see BIP 0037,
+ *              since version >= 70001
+ */
 case class Version(version: Long, services: Long, timestamp: Long, addr_recv: NetworkAddress, addr_from: NetworkAddress, nonce: Long, user_agent: String, start_height: Long, relay: Boolean)
 
 object Addr extends BtcMessage[Addr] {
@@ -495,6 +530,7 @@ object InventoryVector extends BtcMessage[InventoryVector] {
 
 case class InventoryVector(`type`: Long, hash: Array[Byte]) {
   require(hash.length == 32, "invalid hash length")
+  override def toString = s"InventoryVector(${`type`}, ${toHexString(hash)})"
 }
 
 object Inventory extends BtcMessage[Inventory] {

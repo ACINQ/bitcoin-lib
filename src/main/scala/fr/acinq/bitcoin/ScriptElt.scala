@@ -114,6 +114,9 @@ case object OP_NOP9 extends ScriptElt
 case object OP_NOP10 extends ScriptElt
 case object OP_SMALLINTEGER extends ScriptElt
 case object OP_INVALIDOPCODE extends ScriptElt
+object OP_PUSHDATA {
+  def apply(data:String) : OP_PUSHDATA = new OP_PUSHDATA(fromHexString(data))
+}
 case class OP_PUSHDATA(data: Array[Byte]) extends ScriptElt {
   require(data.size < MaxScriptElementSize, s"data is ${data.length} bytes, limit is $MaxScriptElementSize bytes")
   override def toString = s"OP_PUSHDATA(${toHexString(data)})"

@@ -43,7 +43,7 @@ class ProtocolSpec extends FlatSpec {
   }
   it should "decode transactions" in {
     // data copied from https://people.xiph.org/~greg/signdemo.txt
-    val tx = Transaction.read(new ByteArrayInputStream(fromHexString("01000000010c432f4fb3e871a8bda638350b3d5c698cf431db8d6031b53e3fb5159e59d4a90000000000ffffffff0100f2052a010000001976a9143744841e13b90b4aca16fe793a7f88da3a23cc7188ac00000000")))
+    val tx = Transaction.read("01000000010c432f4fb3e871a8bda638350b3d5c698cf431db8d6031b53e3fb5159e59d4a90000000000ffffffff0100f2052a010000001976a9143744841e13b90b4aca16fe793a7f88da3a23cc7188ac00000000")
     val script = Script.parse(tx.txOut(0).publicKeyScript)
     val publicKeyHash = Script.publicKeyHash(script)
     assert(Address.encode(0x6f, publicKeyHash) === "mkZBYBiq6DNoQEKakpMJegyDbw2YiNQnHT")
@@ -75,7 +75,7 @@ class ProtocolSpec extends FlatSpec {
     assert(version1 === version)
   }
   it should "read and write verack messages" in {
-    val message = Message.read(fromHexString("0b11090776657261636b000000000000000000005df6e0e2"))
+    val message = Message.read("0b11090776657261636b000000000000000000005df6e0e2")
     assert(message.command === "verack")
     assert(message.payload.isEmpty)
 
@@ -84,7 +84,7 @@ class ProtocolSpec extends FlatSpec {
   }
   it should "read and write addr messages" in {
     // example take from https://en.bitcoin.it/wiki/Protocol_specification#addr
-    val message = Message.read(fromHexString("f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d"))
+    val message = Message.read("f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d")
     assert(message.command === "addr")
     val addr = Addr.read(message.payload)
     assert(addr.addresses.length === 1)
@@ -96,7 +96,7 @@ class ProtocolSpec extends FlatSpec {
     assert(toHexString(Message.write(message1)) === "f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d")
   }
   it should "read and write inventory messages" in {
-    val inventory = Inventory.read(fromHexString("01010000004d43a12ddedc1638542a4c5a5dff3fc5daa9bd543ecccbe8c7eed8648044668f"))
+    val inventory = Inventory.read("01010000004d43a12ddedc1638542a4c5a5dff3fc5daa9bd543ecccbe8c7eed8648044668f")
     assert(inventory.inventory.length === 1)
     assert(inventory.inventory(0).`type` === InventoryVector.MSG_TX)
   }

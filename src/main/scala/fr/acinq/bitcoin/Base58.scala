@@ -2,11 +2,27 @@ package fr.acinq.bitcoin
 
 import java.math.BigInteger
 
+/*
+ * see https://en.bitcoin.it/wiki/Base58Check_encoding
+ *
+ * Why base-58 instead of standard base-64 encoding?
+ * <ul>
+ * <li>Don't want 0OIl characters that look the same in some fonts and could be used to create visually identical
+ * looking account numbers.</li>
+ * <li>A string with non-alphanumeric characters is not as easily accepted as an account number.</li>
+ * <li>E-mail usually won't line-break if there's no punctuation to break at.</li>
+ * <li>Doubleclicking selects the whole number as one word if it's all alphanumeric.</li>
+ */
 object Base58 {
   val alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   // char -> value
   val map = alphabet.zipWithIndex.toMap
 
+  /**
+   *
+   * @param input binary data
+   * @return the base-58 representation of input
+   */
   def encode(input: Array[Byte]): String = {
     if (input.isEmpty) ""
     else {
@@ -26,6 +42,11 @@ object Base58 {
     }
   }
 
+  /**
+   *
+   * @param input base-58 encoded data
+   * @return the decoded data
+   */
   def decode(input: String) : Array[Byte] = {
     def decode1(in: List[Char], current: BigInteger = BigInteger.ZERO) : BigInteger = in match {
       case Nil => current
