@@ -100,4 +100,21 @@ class ProtocolSpec extends FlatSpec {
     assert(inventory.inventory.length === 1)
     assert(inventory.inventory(0).`type` === InventoryVector.MSG_TX)
   }
+  it should "read and write inventory messages 2" in {
+    val stream = classOf[ProtocolSpec].getResourceAsStream("/inv.dat")
+    val bytes = ByteStreams.toByteArray(stream)
+    val message = Message.read(bytes)
+    assert(message.command === "inv")
+    val inv = Inventory.read(message.payload)
+    assert(inv.inventory.size === 500)
+    assert(util.Arrays.equals(message.payload, Inventory.write(inv)))
+  }
+  it should "read and write getblocks message" in {
+    val message = Message.read("f9beb4d9676574626c6f636b7300000045000000f5fcbcad72110100016fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d61900000000000000000000000000000000000000000000000000000000000000000000000000")
+    assert(message.command == "getblocks")
+    val getblocks = Getblocks.read(message.payload)
+    assert(getblocks.version === 70002)
+    assert(toHexString(getblocks.locatorHashes(0)) === "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000")
+    assert(toHexString(Getblocks.write(getblocks)) === toHexString(message.payload))
+  }
 }

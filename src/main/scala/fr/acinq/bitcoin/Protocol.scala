@@ -552,4 +552,27 @@ object Inventory extends BtcMessage[Inventory] {
 
 case class Inventory(inventory: Seq[InventoryVector])
 
-case class Getblocks()
+object Getblocks extends BtcMessage[Getblocks] {
+  override def write(t: Getblocks, out: OutputStream): Unit = {
+    writeUInt32(t.version, out)
+    writeVarint(t.locatorHashes.size, out)
+    t.locatorHashes.map(h => out.write(h))
+    out.write(t.stopHash)
+  }
+
+  override def read(in: InputStream): Getblocks = {
+    val version = uint32(in)
+    val vector = ArrayBuffer.empty[Array[Byte]]
+    val count = varint(in)
+    for (i <- 1L to count) {
+      vector += hash(in)
+    }
+    val stopHash = hash(in)
+    Getblocks(version, vector.toSeq, stopHash)
+  }
+}
+
+case class Getblocks(version: Long, locatorHashes: Seq[Array[Byte]], stopHash: Array[Byte]) {
+  locatorHashes.map(h =>  require(h.size == 32))
+  require(stopHash.size == 32)
+}
