@@ -242,7 +242,10 @@ object BlockHeader extends BtcMessage[BlockHeader] {
     val nsize = header.bits >> 24
     val isneg = header.bits & 0x00800000
     val nword = header.bits & 0x007fffff
-    val result = BigInteger.valueOf(nword).shiftLeft(8 * (nsize.toInt - 3))
+    val result = if (nsize <= 3)
+      BigInteger.valueOf(nword).shiftRight(8 * (3 - nsize.toInt))
+    else
+      BigInteger.valueOf(nword).shiftLeft(8 * (nsize.toInt - 3))
     if (isneg != 0) result.negate() else result
   }
 }
@@ -259,6 +262,7 @@ object BlockHeader extends BtcMessage[BlockHeader] {
 case class BlockHeader(version: Long, hashPreviousBlock: Array[Byte], hashMerkleRoot: Array[Byte], time: Long, bits: Long, nonce: Long) {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
+  override def toString = s"BlockHeader($version, ${toHexString(hashPreviousBlock)}, ${toHexString(hashMerkleRoot)}, $time, $bits, $nonce)"
 }
 
 /**
@@ -576,3 +580,21 @@ case class Getblocks(version: Long, locatorHashes: Seq[Array[Byte]], stopHash: A
   locatorHashes.map(h =>  require(h.size == 32))
   require(stopHash.size == 32)
 }
+
+object Getdata extends BtcMessage[Getdata] {
+  override def write(t: Getdata, out: OutputStream): Unit = {
+    writeVarint(t.inventory.size, out)
+    t.inventory.map(i => InventoryVector.write(i))
+  }
+
+  override def read(in: InputStream): Getdata = {
+    val vector = ArrayBuffer.empty[InventoryVector]
+    val count = varint(in)
+    for (i <- 1L to count) {
+      vector += InventoryVector.read(in)
+    }
+    Getdata(vector.toSeq)
+  }
+}
+
+case class Getdata(inventory: Seq[InventoryVector])

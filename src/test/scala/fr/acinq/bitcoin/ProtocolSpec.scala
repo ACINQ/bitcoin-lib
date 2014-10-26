@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.math.BigInteger
 import java.net.InetAddress
 import java.util
 
@@ -102,19 +103,33 @@ class ProtocolSpec extends FlatSpec {
   }
   it should "read and write inventory messages 2" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/inv.dat")
-    val bytes = ByteStreams.toByteArray(stream)
-    val message = Message.read(bytes)
+    val message = Message.read(stream)
     assert(message.command === "inv")
     val inv = Inventory.read(message.payload)
     assert(inv.inventory.size === 500)
     assert(util.Arrays.equals(message.payload, Inventory.write(inv)))
   }
-  it should "read and write getblocks message" in {
+  it should "read and write getblocks messages" in {
     val message = Message.read("f9beb4d9676574626c6f636b7300000045000000f5fcbcad72110100016fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d61900000000000000000000000000000000000000000000000000000000000000000000000000")
     assert(message.command == "getblocks")
     val getblocks = Getblocks.read(message.payload)
     assert(getblocks.version === 70002)
     assert(toHexString(getblocks.locatorHashes(0)) === "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000")
     assert(toHexString(Getblocks.write(getblocks)) === toHexString(message.payload))
+  }
+  it should "read and write getdata messages"in {
+    val stream = classOf[ProtocolSpec].getResourceAsStream("/getdata.dat")
+    val message = Message.read(stream)
+    assert(message.command === "getdata")
+    val getdata = Getdata.read(message.payload)
+    assert(getdata.inventory.size === 128)
+    assert(toHexString(getdata.inventory(0).hash) === "4860eb18bf1b1620e37e9490fc8a427514416fd75159ab86688e9a8300000000")
+  }
+  it should "read and write block messages"in {
+    val message = Message.read("f9beb4d9626c6f636b00000000000000d7000000934d270a010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000")
+    assert(message.command === "block")
+    val block = Block.read(message.payload)
+    assert(util.Arrays.equals(block.header.hashPreviousBlock, Block.LivenetGenesisBlock.hash))
+    assert(block.tx(0).txIn(0).outPoint.isCoinbaseOutPoint)
   }
 }
