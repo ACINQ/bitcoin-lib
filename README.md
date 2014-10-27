@@ -20,7 +20,7 @@ This is a simple scala library which implements some (most ?) of the bitcoin pro
 ## Limitations and compatibility issues
 
 This is a very early beta release and should not be used in production. If you're looking for a mature bitcoin library for the JVM you should
-have a look at bitcoinj instead.
+have a look at [bitcoinj](https://github.com/bitcoinj/bitcoinj) instead.
 
 Not all script instructions have been implemented, but as is the library should be able to parse and validate the entire blockchain.
 
