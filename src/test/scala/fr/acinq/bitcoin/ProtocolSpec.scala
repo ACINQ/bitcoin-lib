@@ -15,6 +15,7 @@ class ProtocolSpec extends FlatSpec {
   "Protocol" should "parse blochain blocks" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/block1.dat")
     val block = Block.read(stream)
+    assert(Block.checkProofOfWork(block))
     // check that we can deserialize and re-serialize scripts
     block.tx.map(tx => {
       tx.txIn.map(txin => {
@@ -51,7 +52,29 @@ class ProtocolSpec extends FlatSpec {
   }
   it should "generate genesis block" in {
     assert(toHexString(Block.write(Block.LivenetGenesisBlock)) === "0100000000000000000000000000000000000000000000000000000000000000000000003BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A29AB5F49FFFF001D1DAC2B7C0101000000010000000000000000000000000000000000000000000000000000000000000000FFFFFFFF4D04FFFF001D0104455468652054696D65732030332F4A616E2F32303039204368616E63656C6C6F72206F6E206272696E6B206F66207365636F6E64206261696C6F757420666F722062616E6B73FFFFFFFF0100F2052A01000000434104678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5FAC00000000".toLowerCase)
-    assert(toHexString(Block.TestnetGenesisBlock.hash) === "43497fd7f826957108f4a30fd9cec3aeba79972084e90ead01ea330900000000")
+    assert(toHexString(Block.TestnetGenesisBlock.hash) === "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943")
+  }
+  it should "decode proof-of-work difficulty" in {
+    assert(decodeCompact(0) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x00123456) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x01003456) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x02000056) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x03000000) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x04000000) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x00923456) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x01803456) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x02800056) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x03800000) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x04800000) === (BigInteger.ZERO, false, false))
+    assert(decodeCompact(0x01123456) === (BigInteger.valueOf(0x12), false, false))
+    assert(decodeCompact(0x01fedcba) === (BigInteger.valueOf(0x7e), true, false))
+    assert(decodeCompact(0x02123456) === (BigInteger.valueOf(0x1234), false, false))
+    assert(decodeCompact(0x03123456) === (BigInteger.valueOf(0x123456), false, false))
+    assert(decodeCompact(0x04123456) === (BigInteger.valueOf(0x12345600), false, false))
+    assert(decodeCompact(0x04923456) === (BigInteger.valueOf(0x12345600), true, false))
+    assert(decodeCompact(0x05009234) === (new BigInteger(1, fromHexString("92340000")), false, false))
+    assert(decodeCompact(0x20123456) === (new BigInteger(1, fromHexString("1234560000000000000000000000000000000000000000000000000000000000")), false, false))
+    val (_, false, true) = decodeCompact(0xff123456L)
   }
   it should "read and write version messages" in {
     val version = Version(
@@ -129,7 +152,7 @@ class ProtocolSpec extends FlatSpec {
     val message = Message.read("f9beb4d9626c6f636b00000000000000d7000000934d270a010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000")
     assert(message.command === "block")
     val block = Block.read(message.payload)
-    assert(util.Arrays.equals(block.header.hashPreviousBlock, Block.LivenetGenesisBlock.hash))
+    assert(util.Arrays.equals(block.header.hashPreviousBlock.reverse, Block.LivenetGenesisBlock.hash))
     assert(block.tx(0).txIn(0).outPoint.isCoinbaseOutPoint)
   }
 }

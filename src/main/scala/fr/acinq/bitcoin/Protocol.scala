@@ -253,7 +253,8 @@ object BlockHeader extends BtcMessage[BlockHeader] {
 /**
  *
  * @param version Block version information, based upon the software version creating this block
- * @param hashPreviousBlock The hash value of the previous block this particular block references
+ * @param hashPreviousBlock The hash value of the previous block this particular block references. Please not that
+ *                          this hash is not reversed (as opposed to Block.hash)
  * @param hashMerkleRoot The reference to a Merkle tree collection which is a hash of all transactions related to this block
  * @param time A timestamp recording when this block was created (Will overflow in 2106[2])
  * @param bits The calculated difficulty target being used for this block
@@ -317,6 +318,17 @@ object Block extends BtcMessage[Block] {
 
   // testnet genesis block
   val TestnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
+
+  /**
+   * Proof of work: hash(block) <= target difficulty
+   * @param block
+   * @return true if the input block validates its expected proof of work
+   */
+  def checkProofOfWork(block: Block) : Boolean = {
+    val (target, _, _) = decodeCompact(block.header.bits)
+    val hash = new BigInteger(1, block.hash)
+    hash.compareTo(target) <= 0
+  }
 }
 
 /**
@@ -327,7 +339,8 @@ object Block extends BtcMessage[Block] {
 case class Block(header: BlockHeader, tx: Seq[Transaction]) {
   require(util.Arrays.equals(header.hashMerkleRoot, MerkleTree.computeRoot(tx)), "invalid block:  merkle root mismatch")
   require(tx.map(Transaction.txid).toSet.size == tx.size, "invalid block: duplicate transactions")
-  val hash = Crypto.hash256(BlockHeader.write(header))
+  // hash is reversed here (same as tx id)
+  lazy val hash = Crypto.hash256(BlockHeader.write(header)).reverse
 }
 
 object Address {

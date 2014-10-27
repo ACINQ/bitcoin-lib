@@ -1,6 +1,7 @@
 package fr.acinq
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
+import java.math.BigInteger
 
 /**
  * see https://en.bitcoin.it/wiki/Protocol_specification
@@ -164,4 +165,23 @@ package object bitcoin {
   def toHexString(blob: Array[Byte]) = blob.map("%02x".format(_)).mkString
 
   def fromHexString(hex: String): Array[Byte] = hex.sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)
+
+  /**
+   *
+   * @param input compact size encoded integer as used to encode proof-of-work difficulty target
+   * @return a (result, isNegative, overflow) tuple were result is the decoded integer
+   */
+  def decodeCompact(input: Long) : (BigInteger, Boolean, Boolean) = {
+    val nSize = (input >> 24).toInt
+    val (nWord, result) = if (nSize <= 3) {
+      val nWord1 = (input & 0x007fffffL) >> 8*(3 - nSize)
+      (nWord1, BigInteger.valueOf(nWord1))
+    } else {
+      val nWord1 = (input & 0x007fffffL)
+      (nWord1, BigInteger.valueOf(nWord1).shiftLeft(8 * (nSize - 3)))
+    }
+    val isNegative = nWord != 0 && (input & 0x00800000) != 0
+    val overflow = nWord != 0 && ((nSize > 34) || (nWord > 0xff && nSize > 33) || (nWord > 0xffff && nSize > 32))
+    (result, isNegative, overflow)
+  }
 }
