@@ -5,6 +5,7 @@ import java.math.BigInteger
 
 import org.bouncycastle.asn1.sec.SECNamedCurves
 import org.bouncycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
+import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.{GeneralDigest, RIPEMD160Digest, SHA256Digest}
 import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters}
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
@@ -29,7 +30,7 @@ object Crypto {
     val SIGHASH_ANYONECANPAY = 0x80.toByte
   }
 
-  def hash(digest: GeneralDigest)(input: Array[Byte]): Array[Byte] = {
+  def hash(digest: Digest)(input: Array[Byte]): Array[Byte] = {
     digest.update(input, 0, input.length)
     val out = new Array[Byte](digest.getDigestSize)
     digest.doFinal(out, 0)
