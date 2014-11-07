@@ -119,6 +119,13 @@ class ProtocolSpec extends FlatSpec {
     val message1 = Message(magic = 0xd9b4bef9, command = "addr", payload = Addr.write(addr1))
     assert(toHexString(Message.write(message1)) === "f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d")
   }
+  it should "read and write addr messages 2" in {
+    val stream = classOf[ProtocolSpec].getResourceAsStream("/addr.dat")
+    val message = Message.read(stream)
+    assert(message.command === "addr")
+    val addr = Addr.read(message.payload)
+    assert(addr.addresses.length === 1000)
+  }
   it should "read and write inventory messages" in {
     val inventory = Inventory.read("01010000004d43a12ddedc1638542a4c5a5dff3fc5daa9bd543ecccbe8c7eed8648044668f")
     assert(inventory.inventory.length === 1)

@@ -521,7 +521,7 @@ object Addr extends BtcMessage[Addr] {
 
   override def read(in: InputStream): Addr = {
     val length = varint(in)
-    require(length < 1000, "invalid length")
+    require(length <= 1000, "invalid length")
     val addr = ArrayBuffer.empty[NetworkAddressWithTimestamp]
     for (i <- 1L to length) {
       addr += NetworkAddressWithTimestamp.read(in)
