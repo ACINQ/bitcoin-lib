@@ -11,6 +11,10 @@ package object bitcoin {
   val Cent = 1000000L
   val MaxMoney = 21000000 * Coin
   val MaxScriptElementSize = 520
+  val SIGHASH_ALL = 1
+  val SIGHASH_NONE = 2
+  val SIGHASH_SINGLE = 3
+  val SIGHASH_ANYONECANPAY = 0x80
 
   def uint8(blob: Array[Byte]) = blob(0) & 0xffl
 

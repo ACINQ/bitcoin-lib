@@ -19,17 +19,6 @@ object Crypto {
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
 
-  /**
-   * signature hash type
-   *
-   */
-  object SignatureHashType {
-    val SIGHASH_ALL = 1.toByte
-    val SIGHASH_NONE = 2.toByte
-    val SIGHASH_SINGLE = 3.toByte
-    val SIGHASH_ANYONECANPAY = 0x80.toByte
-  }
-
   def hash(digest: Digest)(input: Array[Byte]): Array[Byte] = {
     digest.update(input, 0, input.length)
     val out = new Array[Byte](digest.getDigestSize)

@@ -124,7 +124,7 @@ object TxOut extends BtcMessage[TxOut] {
  * @param publicKeyScript Usually contains the public key as a Bitcoin script setting up conditions to claim this output.
  */
 case class TxOut(amount: Long, publicKeyScript: Array[Byte]) {
-  require(amount >= 0, s"invalid txout amount: $amount")
+  //require(amount >= 0, s"invalid txout amount: $amount")
   require(amount < MaxMoney, s"invalid txout amount: $amount")
   require(publicKeyScript.size < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
 
@@ -158,7 +158,81 @@ object Transaction extends BtcMessage[Transaction] {
   }
 
   /**
-   * Sign a transaction. Cannot partially sign
+   * prepare a transaction for signing a specific input
+   * @param tx input transaction
+   * @param inputIndex index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType signature hash type
+   * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
+   */
+  def prepareForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Transaction = {
+    val anyoneCanPay = (sighashType & SIGHASH_ANYONECANPAY) != 0
+    val hashSingle = (sighashType & 0x1f) == SIGHASH_SINGLE
+    val hashNone = (sighashType & 0x1f) == SIGHASH_NONE
+
+    val filteredScript = Script.write(Script.parse(previousOutputScript).filterNot(_ == OP_CODESEPARATOR))
+
+    def removeSignatureScript(txin: TxIn) : TxIn = txin.copy(signatureScript = Array.empty[Byte])
+    def removeAllSignatureScripts(tx: Transaction) : Transaction = tx.copy(txIn = tx.txIn.map(removeSignatureScript))
+    def updateSignatureScript(tx: Transaction, index: Int, script: Array[Byte]): Transaction = tx.copy(txIn = tx.txIn.updated(index, tx.txIn(index).copy(signatureScript = script)))
+
+    val txCopy = {
+      val tx1 = removeAllSignatureScripts(tx)
+      val tx2 = updateSignatureScript(tx1, inputIndex, filteredScript)
+      val tx3 = if (hashNone) {
+        val inputs = for (i <- 0 until tx2.txIn.size) yield {
+          if (i == inputIndex) tx2.txIn(i)
+          else tx2.txIn(i).copy(sequence = 0)
+        }
+        tx2.copy(txIn = inputs.toList, txOut = List())
+      }
+      else if (hashSingle) {
+        val outputs = for (i <- 0 to inputIndex) yield TxOut(-1, Array())
+        val outputs1 = outputs.toList.updated(inputIndex, tx2.txOut(inputIndex))
+        val inputs = for (i <- 0 until tx2.txIn.size) yield {
+          if (i == inputIndex) tx2.txIn(i)
+          else tx2.txIn(i).copy(sequence = 0)
+        }
+        tx2.copy(txIn = inputs.toList, txOut = outputs1)
+      }
+      else tx2
+      val tx4 = if (anyoneCanPay) tx3.copy(txIn = List(tx3.txIn(inputIndex))) else tx3
+      tx4
+    }
+    txCopy
+  }
+
+  /**
+   * hash a tx for signing
+   * @param tx input transaction
+   * @param inputIndex index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType signature hash type
+   * @return a hash which can be used to signed the referenced tx input
+   */
+  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Array[Byte] = {
+    val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
+    Crypto.hash256(Transaction.write(txCopy) ++ writeUInt32(sighashType))
+  }
+
+  /**
+   *
+   * @param tx input transaction
+   * @param inputIndex index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType signature hash type
+   * @param privateKey private key
+   * @param randomize if false, the output signature will not be randomized (use for testing only)
+   * @return the encoded signature of this tx for this specific tx input
+   */
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int, privateKey: Array[Byte], randomize: Boolean = true) : Array[Byte] = {
+    val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
+    val (r, s) = Crypto.sign(hash, privateKey.take(32), randomize)
+    Crypto.encodeSignature(r, s)
+  }
+
+  /**
+   * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
    * @param input transaction to sign
    * @param signData list of data for signing: previous tx output script and associated private key
    * @param randomize if false, signature will not be randomized. Use for debugging purposes only!
@@ -170,11 +244,7 @@ object Transaction extends BtcMessage[Transaction] {
 
     // sign each input
     val signedInputs = for (i <- 0 until input.txIn.length) yield {
-      // replace the empty sig script by the public key script of the output this input refers to
-      val tmpTx = input.copy(txIn = input.txIn.updated(i, input.txIn(i).copy(signatureScript = signData(i).prevPubKeyScript)))
-      val hashed = Crypto.hash256(Transaction.write(tmpTx) ++ writeUInt32(1))
-      val (r, s) = Crypto.sign(hashed, signData(i).privateKey.take(32), randomize = randomize)
-      val sig = Crypto.encodeSignature(r, s) // DER encoded
+       val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey, randomize)
 
       // this is the public key that is associated with the private key we used for signing
       val publicKey = Crypto.publicKeyFromPrivateKey(signData(i).privateKey)
@@ -211,7 +281,7 @@ case class SignData(prevPubKeyScript: Array[Byte], privateKey: Array[Byte])
  */
 case class Transaction(version: Long, txIn: List[TxIn], txOut: List[TxOut], lockTime: Long) {
   require(txIn.nonEmpty, "input list cannot be empty")
-  require(txOut.nonEmpty, "output list cannot be empty")
+  //require(txOut.nonEmpty, "output list cannot be empty")
   require(txOut.map(_.amount).sum < MaxMoney, "sum of outputs amount is invalid")
   // TODO: check for duplicate inputs
   // TODO: check that first tx is a coinbase tx and all others are not
