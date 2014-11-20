@@ -11,6 +11,11 @@ object TransactionSpec {
 
   case class PreviousTransaction(txid: String, vout: Long, publicKeyScript: Array[Byte], privateKey: Array[Byte])
 
+  // convert a previous tx to an tx input with an empty signature script
+  def toTxIn(ptx: PreviousTransaction) = TxIn(outPoint = OutPoint(fromHexString(ptx.txid).reverse, ptx.vout), signatureScript = Array.empty[Byte], sequence = 0xFFFFFFFFL)
+
+  // extracts data required from signature
+  def toSignData(ptx: PreviousTransaction) = SignData(prevPubKeyScript = ptx.publicKeyScript, privateKey = ptx.privateKey)
 }
 
 @RunWith(classOf[JUnitRunner])
@@ -204,30 +209,25 @@ class TransactionSpec extends FlatSpec with Matchers {
     val tx = Transaction(
       version = 1L,
       txIn = previousTx.map(toTxIn),
-      txOut = List(TxOut(
-        amount = amount,
-        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
+      txOut = List(
+        TxOut(amount = amount - 10, publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+        TxOut(amount = 9, publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode("mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3")._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
+      ),
       lockTime = 0L
     )
 
-    // create a signature script for each input
-    val signatureScripts = for (i <- 0 until previousTx.length) yield {
-      // replace the empty sig script by the public key script of the output this input refers to
-      val tx1 = tx.copy(txIn = tx.txIn.updated(i, tx.txIn(i).copy(signatureScript = previousTx(i).publicKeyScript)))
-      val hashed = Crypto.hash256(Transaction.write(tx1) ++ writeUInt32(1))
-      val (r, s) = Crypto.sign(hashed, previousTx(i).privateKey.take(32), randomize = false)
-      val sig = Crypto.encodeSignature(r, s) // DER encoded
-      // this is the public key that is associated to the private key we used for signing
-      val publicKey = Crypto.publicKeyFromPrivateKey(previousTx(i).privateKey)
-      Script.write(OP_PUSHDATA(sig :+ 1.toByte) :: OP_PUSHDATA(publicKey) :: Nil)
-    }
+    val tx1 = Transaction.sign(tx, previousTx.map(toSignData), randomize = false)
+    assert(toHexString(Transaction.write(tx1)) === "0100000002a79b31b2f26ca4b14f74bb59e43100e96a322b1fbfb137803ed8532cf7e2afd8000000006b483045022100c487a06023a4900d9c05dd0f6326e3528cc0b5f8904fedc70e7f9d19a494e0ca02207427140a76bdc49760fb92fbb27711d60a2fc01b358c700e94b6d0e56db414c70121024df51eef1ad9c55629a10446684aa5b1841cc13550072f5a0906e8994335178dffffffffcfa11a6cc6e510cc7435f07ca0a4a65af30022313e84619844cebd82143397cc000000006b4830450221009a2d8bd1632d6c3a1dd401293ffcd9395890338aab529f39086fd2bff2ea4726022069884bec2b9c40abc308b271c97b4f58342190043e3d05bca415bc03207903d4012103144d434e85140d4109814ac78491ffeae384c18e2225ba109ad25ff0e46eef65ffffffff02164e0000000000001976a914f96989b054bebbe582cdce7ade128d34ce847f3988ac09000000000000001976a9141b5baab2482614451d010d998ad91dc8227b56da88ac00000000")
 
-    val inputs = for (i <- 0 until previousTx.length) yield {
-      tx.txIn(i).copy(signatureScript = signatureScripts(i))
+    // now check that we can redeem this tx
+    for (i <- 0 until tx1.txIn.length) {
+      val ctx = Script.Context(tx1, i, previousTx(i).publicKeyScript)
+      val runner = new Script.Runner(ctx)
+      val stack = runner.run(tx1.txIn(i).signatureScript)
+      val stack1 = runner.run(previousTx(i).publicKeyScript, stack)
+      val List(Array(check)) = stack1
+      assert(check === 1)
     }
-
-    val tx1 = tx.copy(txIn = inputs.toList)
-    assert(toHexString(Transaction.write(tx1)) === "0100000002a79b31b2f26ca4b14f74bb59e43100e96a322b1fbfb137803ed8532cf7e2afd8000000006a473044022004f0a91f258fd7a9024a40ccb2a81245c0dd3c64eb0b329f3fbb0a8d91dae89d0220776a2eac637771f016299879ceed6329d93b702f7f3973e88f4d01695203d1a90121024df51eef1ad9c55629a10446684aa5b1841cc13550072f5a0906e8994335178dffffffffcfa11a6cc6e510cc7435f07ca0a4a65af30022313e84619844cebd82143397cc000000006b483045022100e57cd92926acfe2ba6f1bfbd58b96b55678c0a5cee445240a4060eef4397c9cf02205bbe808d10375af87cd3353612450889fcb0b4a399d64fc79bb16853588b2413012103144d434e85140d4109814ac78491ffeae384c18e2225ba109ad25ff0e46eef65ffffffff01204e0000000000001976a914f96989b054bebbe582cdce7ade128d34ce847f3988ac00000000")
   }
 
   it should "sign a 3-to-2 transaction with helper method" in {
@@ -255,12 +255,6 @@ class TransactionSpec extends FlatSpec with Matchers {
     // 0.03 and 0.07 BTC in satoshi, meaning the fee will be (0.01+0.002+0.09)-(0.03+0.07) = 0.002
     val amount1 = 3000000
     val amount2 = 7000000
-
-    // convert a previous tx to an tx input with an empty signature script
-    def toTxIn(ptx: PreviousTransaction) = TxIn(outPoint = OutPoint(fromHexString(ptx.txid).reverse, ptx.vout), signatureScript = Array.empty[Byte], sequence = 0xFFFFFFFFL)
-
-    // extracts data required from signature
-    def toSignData(ptx: PreviousTransaction) = SignData(prevPubKeyScript = ptx.publicKeyScript, privateKey = ptx.privateKey)
 
     // create a tx with empty input signature scripts
     val tx = Transaction(

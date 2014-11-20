@@ -175,10 +175,10 @@ package object bitcoin {
    * @param input compact size encoded integer as used to encode proof-of-work difficulty target
    * @return a (result, isNegative, overflow) tuple were result is the decoded integer
    */
-  def decodeCompact(input: Long) : (BigInteger, Boolean, Boolean) = {
+  def decodeCompact(input: Long): (BigInteger, Boolean, Boolean) = {
     val nSize = (input >> 24).toInt
     val (nWord, result) = if (nSize <= 3) {
-      val nWord1 = (input & 0x007fffffL) >> 8*(3 - nSize)
+      val nWord1 = (input & 0x007fffffL) >> 8 * (3 - nSize)
       (nWord1, BigInteger.valueOf(nWord1))
     } else {
       val nWord1 = (input & 0x007fffffL)
@@ -188,4 +188,10 @@ package object bitcoin {
     val overflow = nWord != 0 && ((nSize > 34) || (nWord > 0xff && nSize > 33) || (nWord > 0xffff && nSize > 32))
     (result, isNegative, overflow)
   }
+
+  def isAnyoneCanPay(sighashType: Int): Boolean = (sighashType & SIGHASH_ANYONECANPAY) != 0
+
+  def isHashSingle(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_SINGLE
+
+  def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_NONE
 }

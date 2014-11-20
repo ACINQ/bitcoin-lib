@@ -106,6 +106,7 @@ object TxIn extends BtcMessage[TxIn] {
  */
 case class TxIn(outPoint: OutPoint, signatureScript: Array[Byte], sequence: Long) {
   require(signatureScript.size < MaxScriptElementSize, s"signature script is ${signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
+
   override def toString = s"TxIn($outPoint, ${toHexString(signatureScript)}, $sequence)"
 }
 
@@ -166,37 +167,39 @@ object Transaction extends BtcMessage[Transaction] {
    * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
    */
   def prepareForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Transaction = {
-    val anyoneCanPay = (sighashType & SIGHASH_ANYONECANPAY) != 0
-    val hashSingle = (sighashType & 0x1f) == SIGHASH_SINGLE
-    val hashNone = (sighashType & 0x1f) == SIGHASH_NONE
-
     val filteredScript = Script.write(Script.parse(previousOutputScript).filterNot(_ == OP_CODESEPARATOR))
 
-    def removeSignatureScript(txin: TxIn) : TxIn = txin.copy(signatureScript = Array.empty[Byte])
-    def removeAllSignatureScripts(tx: Transaction) : Transaction = tx.copy(txIn = tx.txIn.map(removeSignatureScript))
+    def removeSignatureScript(txin: TxIn): TxIn = txin.copy(signatureScript = Array.empty[Byte])
+    def removeAllSignatureScripts(tx: Transaction): Transaction = tx.copy(txIn = tx.txIn.map(removeSignatureScript))
     def updateSignatureScript(tx: Transaction, index: Int, script: Array[Byte]): Transaction = tx.copy(txIn = tx.txIn.updated(index, tx.txIn(index).copy(signatureScript = script)))
+    def resetSequence(txins: Seq[TxIn], inputIndex: Int): Seq[TxIn] = for (i <- 0 until txins.size) yield {
+      if (i == inputIndex) txins(i)
+      else txins(i).copy(sequence = 0)
+    }
 
     val txCopy = {
+      // remove all signature scripts, and replace the sig script for the input that we are processing with the
+      // pubkey script of the output that we are trying to claim
       val tx1 = removeAllSignatureScripts(tx)
       val tx2 = updateSignatureScript(tx1, inputIndex, filteredScript)
-      val tx3 = if (hashNone) {
-        val inputs = for (i <- 0 until tx2.txIn.size) yield {
-          if (i == inputIndex) tx2.txIn(i)
-          else tx2.txIn(i).copy(sequence = 0)
-        }
-        tx2.copy(txIn = inputs.toList, txOut = List())
+
+      val tx3 = if (isHashNone(sighashType)) {
+        // hash none: remove all outputs
+        val inputs = resetSequence(tx2.txIn, inputIndex)
+        tx2.copy(txIn = inputs, txOut = List())
       }
-      else if (hashSingle) {
-        val outputs = for (i <- 0 to inputIndex) yield TxOut(-1, Array())
-        val outputs1 = outputs.toList.updated(inputIndex, tx2.txOut(inputIndex))
-        val inputs = for (i <- 0 until tx2.txIn.size) yield {
-          if (i == inputIndex) tx2.txIn(i)
-          else tx2.txIn(i).copy(sequence = 0)
+      else if (isHashSingle(sighashType)) {
+        // hash single: remove all outputs but the one that we are trying to claim
+        val inputs = resetSequence(tx2.txIn, inputIndex)
+        val outputs = for (i <- 0 to inputIndex) yield {
+          if (i == inputIndex) tx2.txOut(inputIndex)
+          else TxOut(-1, Array())
         }
-        tx2.copy(txIn = inputs.toList, txOut = outputs1)
+        tx2.copy(txIn = inputs, txOut = outputs)
       }
       else tx2
-      val tx4 = if (anyoneCanPay) tx3.copy(txIn = List(tx3.txIn(inputIndex))) else tx3
+      // anyone can pay: remove all inputs but the one that we are processing
+      val tx4 = if (isAnyoneCanPay(sighashType)) tx3.copy(txIn = List(tx3.txIn(inputIndex))) else tx3
       tx4
     }
     txCopy
@@ -225,7 +228,7 @@ object Transaction extends BtcMessage[Transaction] {
    * @param randomize if false, the output signature will not be randomized (use for testing only)
    * @return the encoded signature of this tx for this specific tx input
    */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int, privateKey: Array[Byte], randomize: Boolean = true) : Array[Byte] = {
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int, privateKey: Array[Byte], randomize: Boolean = true): Array[Byte] = {
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
     val (r, s) = Crypto.sign(hash, privateKey.take(32), randomize)
     Crypto.encodeSignature(r, s)
@@ -238,13 +241,13 @@ object Transaction extends BtcMessage[Transaction] {
    * @param randomize if false, signature will not be randomized. Use for debugging purposes only!
    * @return a new signed transaction
    */
-  def sign(input: Transaction, signData: List[SignData], randomize: Boolean = true): Transaction = {
+  def sign(input: Transaction, signData: Seq[SignData], randomize: Boolean = true): Transaction = {
 
     require(signData.length == input.txIn.length, "There should be signing data for every transaction")
 
     // sign each input
     val signedInputs = for (i <- 0 until input.txIn.length) yield {
-       val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey, randomize)
+      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey, randomize)
 
       // this is the public key that is associated with the private key we used for signing
       val publicKey = Crypto.publicKeyFromPrivateKey(signData(i).privateKey)
@@ -254,7 +257,7 @@ object Transaction extends BtcMessage[Transaction] {
       input.txIn(i).copy(signatureScript = sigScript)
     }
 
-    input.copy(txIn = signedInputs.toList)
+    input.copy(txIn = signedInputs)
   }
 
   /**
@@ -279,7 +282,7 @@ case class SignData(prevPubKeyScript: Array[Byte], privateKey: Array[Byte])
  * @param txOut Transaction outputs
  * @param lockTime The block number or timestamp at which this transaction is locked
  */
-case class Transaction(version: Long, txIn: List[TxIn], txOut: List[TxOut], lockTime: Long) {
+case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
   require(txIn.nonEmpty, "input list cannot be empty")
   //require(txOut.nonEmpty, "output list cannot be empty")
   require(txOut.map(_.amount).sum < MaxMoney, "sum of outputs amount is invalid")
@@ -308,7 +311,7 @@ object BlockHeader extends BtcMessage[BlockHeader] {
     writeUInt32(input.nonce, out)
   }
 
-  def getDifficulty(header: BlockHeader) : BigInteger = {
+  def getDifficulty(header: BlockHeader): BigInteger = {
     val nsize = header.bits >> 24
     val isneg = header.bits & 0x00800000
     val nword = header.bits & 0x007fffff
@@ -333,6 +336,7 @@ object BlockHeader extends BtcMessage[BlockHeader] {
 case class BlockHeader(version: Long, hashPreviousBlock: Array[Byte], hashMerkleRoot: Array[Byte], time: Long, bits: Long, nonce: Long) {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
+
   override def toString = s"BlockHeader($version, ${toHexString(hashPreviousBlock)}, ${toHexString(hashMerkleRoot)}, $time, $bits, $nonce)"
 }
 
@@ -343,11 +347,11 @@ object MerkleTree {
   def computeRootRaw(tree: Seq[Array[Byte]]): Array[Byte] = tree.length match {
     case 1 => tree(0)
     case n if n % 2 != 0 => computeRootRaw(tree :+ tree.last) // append last element again
-    case _ =>  computeRootRaw(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1))).toSeq)
+    case _ => computeRootRaw(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1))).toSeq)
   }
 
   /**
-   * 
+   *
    * @param transactions list of transactions
    * @return the Merkle root of the treed built from the input transactions
    */
@@ -381,7 +385,7 @@ object Block extends BtcMessage[Block] {
       List(
         Transaction(version = 1,
           txIn = List(TxIn.coinbase(Script.write(script))),
-          txOut = List(TxOut(amount = 50*Coin, publicKeyScript = Script.write(scriptPubKey))),
+          txOut = List(TxOut(amount = 50 * Coin, publicKeyScript = Script.write(scriptPubKey))),
           lockTime = 0))
     )
   }
@@ -394,7 +398,7 @@ object Block extends BtcMessage[Block] {
    * @param block
    * @return true if the input block validates its expected proof of work
    */
-  def checkProofOfWork(block: Block) : Boolean = {
+  def checkProofOfWork(block: Block): Boolean = {
     val (target, _, _) = decodeCompact(block.header.bits)
     val hash = new BigInteger(1, block.hash)
     hash.compareTo(target) <= 0
@@ -451,9 +455,9 @@ object Address {
 
 object Message extends BtcMessage[Message] {
   val MagicMain = 0xD9B4BEF9L
-  val MagicTestNet =	0xDAB5BFFAL
-  val MagicTestnet3 =	0x0709110BL
-  val MagicNamecoin =	0xFEB4BEF9L
+  val MagicTestNet = 0xDAB5BFFAL
+  val MagicTestnet3 = 0x0709110BL
+  val MagicNamecoin = 0xFEB4BEF9L
 
   def read(in: InputStream): Message = {
     val magic = uint32(in)
@@ -617,6 +621,7 @@ object InventoryVector extends BtcMessage[InventoryVector] {
 
 case class InventoryVector(`type`: Long, hash: Array[Byte]) {
   require(hash.length == 32, "invalid hash length")
+
   override def toString = s"InventoryVector(${`type`}, ${toHexString(hash)})"
 }
 
@@ -660,7 +665,7 @@ object Getblocks extends BtcMessage[Getblocks] {
 }
 
 case class Getblocks(version: Long, locatorHashes: Seq[Array[Byte]], stopHash: Array[Byte]) {
-  locatorHashes.map(h =>  require(h.size == 32))
+  locatorHashes.map(h => require(h.size == 32))
   require(stopHash.size == 32)
 }
 
