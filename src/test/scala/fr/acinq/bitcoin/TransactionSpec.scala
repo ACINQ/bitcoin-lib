@@ -186,20 +186,23 @@ class TransactionSpec extends FlatSpec with Matchers {
     assert(check === 1)
   }
   it should "create and verify sign pay2pk transactions with multiple inputs and outputs" in {
-    val to = "n4FiyibS6hUPnsFx4zyUghgZ9Lc9k3QtuK"
-    val amount = 20000
+    val destAddress = "moKHwpsxovDtfBJyoXpof21vvWooBExutV"
+    val destAmount = 3000000
+
+    val changeAddress = "mvHPesWqLXXy7hntNa7vbAoVwqN5PnrwJd"
+    val changeAmount = 1700000
 
     val previousTx = List(
       PreviousTransaction(
-        txid = "d8afe2f72c53d83e8037b1bf1f2b326ae90031e459bb744fb1a46cf2b2319ba7",
+        txid = "020c725ba1b6a485086ee9942d0871a7e918a778650600985009f4feb40b8a6c",
         vout = 0,
-        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode("mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3")._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
-        privateKey = Address.decode("cSC2i7fW1oyKQVkG58nV5wBGocwaZrqJbhRzJxFYV3AoCXLeUTA5")._2),
+        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode("mp4eLFx7CpifAJxnvCZ3FmqKsh9dQmi5dA")._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
+        privateKey = Address.decode("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs")._2),
       PreviousTransaction(
-        txid = "cc97331482bdce449861843e312200f35aa6a4a07cf03574cc10e5c66c1aa1cf",
+        txid = "f137884feb9a951bf9b159432ebb771ec76fa6e7332c06cb8a6b718148f101af",
         vout = 0,
-        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
-        privateKey = Address.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")._2)
+        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode("msCMyGGJ5eRcUgM5SQkwirVQGbGcr9oaYv")._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
+        privateKey = Address.decode("93NJN4mhL21FxRbfHZJ2Cou1YnrJmWNkujmZxeT7CPKauJkGv5g")._2)
     )
 
     // convert a previous tx to an tx input with an empty signature script
@@ -210,14 +213,17 @@ class TransactionSpec extends FlatSpec with Matchers {
       version = 1L,
       txIn = previousTx.map(toTxIn),
       txOut = List(
-        TxOut(amount = amount - 10, publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
-        TxOut(amount = 9, publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode("mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3")._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
-      ),
+        TxOut(
+          amount = destAmount,
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(destAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+        TxOut(
+          amount = changeAmount,
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(changeAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
       lockTime = 0L
     )
 
     val tx1 = Transaction.sign(tx, previousTx.map(toSignData), randomize = false)
-    assert(toHexString(Transaction.write(tx1)) === "0100000002a79b31b2f26ca4b14f74bb59e43100e96a322b1fbfb137803ed8532cf7e2afd8000000006b483045022100c487a06023a4900d9c05dd0f6326e3528cc0b5f8904fedc70e7f9d19a494e0ca02207427140a76bdc49760fb92fbb27711d60a2fc01b358c700e94b6d0e56db414c70121024df51eef1ad9c55629a10446684aa5b1841cc13550072f5a0906e8994335178dffffffffcfa11a6cc6e510cc7435f07ca0a4a65af30022313e84619844cebd82143397cc000000006b4830450221009a2d8bd1632d6c3a1dd401293ffcd9395890338aab529f39086fd2bff2ea4726022069884bec2b9c40abc308b271c97b4f58342190043e3d05bca415bc03207903d4012103144d434e85140d4109814ac78491ffeae384c18e2225ba109ad25ff0e46eef65ffffffff02164e0000000000001976a914f96989b054bebbe582cdce7ade128d34ce847f3988ac09000000000000001976a9141b5baab2482614451d010d998ad91dc8227b56da88ac00000000")
+    assert(toHexString(Transaction.write(tx1)) === "01000000026c8a0bb4fef409509800066578a718e9a771082d94e96e0885a4b6a15b720c02000000006b483045022100e5510a2f15f03788ee2aeb2115edc96089596e3a0f0c1b1abfbbf069f4beedb802203faf6ec92a5a4ed2ce5fd42621be99746b57eca0eb46d322dc076080338b6c5a0121030533e1d2e9b7576fef26de1f34d67887158b7af1b040850aab6024b07925d70affffffffaf01f14881716b8acb062c33e7a66fc71e77bb2e4359b1f91b959aeb4f8837f1000000008b483045022100d3e5756f36e39a801c71c406124b3e0a66f0893a7fea46c69939b84715137c40022070a0e96e37c0a8e8c920e84fc63ed1914b4cef114a027f2d027d0a4a04b0b52d0141040081a4cce4c497d51d2f9be2d2109c00cbdef252185ca23074889604ace3504d73fd5f5aaac6423b04e776e467a948e1e79cb8793ded5f4b59c730c4460a0f86ffffffff02c0c62d00000000001976a914558c6b340f5abd22bf97b15cbc1483f8f1b54f5f88aca0f01900000000001976a914a1f93b5b00f9f5e8ade5549b58ed06cdc5c8203e88ac00000000")
 
     // now check that we can redeem this tx
     for (i <- 0 until tx1.txIn.length) {
@@ -228,6 +234,7 @@ class TransactionSpec extends FlatSpec with Matchers {
       val List(Array(check)) = stack1
       assert(check === 1)
     }
+    // the id of this tx on testnet is 882e971dbdb7b762cd07e5db016d3c81267ec5233186a31e6f40457a0a56a311
   }
 
   it should "sign a 3-to-2 transaction with helper method" in {
@@ -272,7 +279,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val signedTx = Transaction.sign(tx, previousTx.map(toSignData), randomize = false)
 
     //this works because signature is not randomized
-    toHexString(Transaction.write(signedTx)) should equal ("0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000")
+    toHexString(Transaction.write(signedTx)) should equal("0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000")
 
     // the id of this tx on testnet is e8570dd062de8e354b18f6308ff739a51f25db75563c4ee2bc5849281263528f
 
