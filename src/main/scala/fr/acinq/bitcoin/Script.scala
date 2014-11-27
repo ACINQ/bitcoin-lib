@@ -71,8 +71,8 @@ object Script {
    */
   class Runner(context: Context) {
     def run(script: Array[Byte]): List[Array[Byte]] = run(parse(script))
-    def run(script: Array[Byte], stack: List[Array[Byte]]): List[Array[Byte]] = run(parse(script), stack)
-    def run(script: List[ScriptElt]): List[Array[Byte]] = run(script, List.empty[Array[Byte]])
+    def run(script: Array[Byte], stack: List[Array[Byte]]): List[Array[Byte]] = run(parse(script), stack, List())
+    def run(script: List[ScriptElt]): List[Array[Byte]] = run(script, List.empty[Array[Byte]], List())
 
     /**
      * run a bitcoin script
@@ -80,21 +80,28 @@ object Script {
      * @param stack data stack
      * @return a updated data stack
      */
-    def run(script: List[ScriptElt], stack: List[Array[Byte]]): List[Array[Byte]] = script match {
+    def run(script: List[ScriptElt], stack: List[Array[Byte]], conditions: List[Boolean]): List[Array[Byte]] = script match {
       case Nil => stack
-      case OP_0 :: tail => run(tail, Array.empty[Byte] :: stack)
-      case op :: tail if isSimpleValue(op)=> run(tail, Array(simpleValue(op) : Byte) :: stack)
+      case OP_IF :: tail => stack match {
+        case Array(check) :: stacktail if check == 0 => run(tail, stacktail, false :: conditions)
+        case head :: stacktail => run(tail, stacktail, true :: conditions)
+      }
+      case OP_NOTIF :: tail => stack match {
+        case Array(check) :: stacktail if check == 0 => run(tail, stacktail, true :: conditions)
+        case head :: stacktail => run(tail, stacktail, false :: conditions)
+      }
+      case OP_ELSE :: tail => run(tail, stack, !conditions.head :: conditions.tail)
+      case OP_ENDIF :: tail => run(tail, stack, conditions.tail)
+      case head :: tail if conditions.exists(_ == false) => run(tail, stack, conditions)
+      case OP_0 :: tail => run(tail, Array.empty[Byte] :: stack, conditions)
+      case op :: tail if isSimpleValue(op)=> run(tail, Array(simpleValue(op) : Byte) :: stack, conditions)
       case OP_CHECKSIG :: tail => stack match {
         case pubKey :: sigBytes :: stacktail => {
           val (r, s) = Crypto.decodeSignature(sigBytes)
           val sigHashFlags = sigBytes.last
-          // replace signature script with pubkey script of the output we are trying to redeeem
-          val txin1 = context.tx.txIn(context.inputIndex).copy(signatureScript = context.previousOutputScript)
-          // remove all signature scripts except for the input that we are processing
-          val tx1 = context.tx.copy(txIn = context.tx.txIn.map(_.copy(signatureScript = Array())).updated(context.inputIndex, txin1))
-          val hash = Crypto.hash256(Transaction.write(tx1) ++ writeUInt32(sigHashFlags))
+          val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
           if (!Crypto.verifySignature(hash, (r, s), pubKey)) throw new RuntimeException("OP_CHECKSIG failed")
-          run(tail, Array(1: Byte) :: stacktail)
+          run(tail, Array(1: Byte) :: stacktail, conditions)
         }
         case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
       }
@@ -110,42 +117,36 @@ object Script {
         val stack3 = stack2.tail
         val sigs = stack3.take(n)
         val stack4 = stack3.drop(n + 1) // +1 because of a bug in the official client
-        val serializedTx = {
-          val txin1 = context.tx.txIn(context.inputIndex).copy(signatureScript = context.previousOutputScript)
-          // remove all signature scripts except for the input that we are processing
-          val tx1 = context.tx.copy(txIn = context.tx.txIn.map(_.copy(signatureScript = Array())).updated(context.inputIndex, txin1))
-          Transaction.write(tx1)
-        }
         var validCount = 0
         for (pubKey <- pubKeys) {
           for (sig <- sigs) {
             val (r, s) = Crypto.decodeSignature(sig)
             val sigHashFlags = sig.last
-            val hash = Crypto.hash256(serializedTx ++ writeUInt32(sigHashFlags))
+            val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
             if (Crypto.verifySignature(hash, (r, s), pubKey)) validCount = validCount + 1
           }
         }
         val result = if (validCount >= n) Array(1:Byte) else Array(0:Byte)
-        run(tail, result :: stack4)
+        run(tail, result :: stack4, conditions)
       }
-      case OP_CODESEPARATOR :: tail => run(tail, stack)
-      case OP_DROP :: tail => run(tail, stack.tail)
-      case OP_DUP :: tail => run(tail, stack.head :: stack)
+      case OP_CODESEPARATOR :: tail => run(tail, stack, conditions)
+      case OP_DROP :: tail => run(tail, stack.tail, conditions)
+      case OP_DUP :: tail => run(tail, stack.head :: stack, conditions)
       case OP_EQUAL :: tail => stack match {
-        case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => run(tail, Array(0:Byte) :: stacktail)
-        case a :: b :: stacktail => run(tail, Array(1:Byte) :: stacktail)
+        case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => run(tail, Array(0:Byte) :: stacktail, conditions)
+        case a :: b :: stacktail => run(tail, Array(1:Byte) :: stacktail, conditions)
         case _ => throw new RuntimeException("Cannot perform OP_EQUAL on a stack with less than 2 elements")
       }
       case OP_EQUALVERIFY :: tail => stack match {
         case a :: b :: _ if !java.util.Arrays.equals(a, b) => throw new RuntimeException("OP_EQUALVERIFY failed: elements are different")
-        case a :: b :: stacktail => run(tail, stacktail)
+        case a :: b :: stacktail => run(tail, stacktail, conditions)
         case _ => throw new RuntimeException("Cannot perform OP_EQUALVERIFY on a stack with less than 2 elements")
       }
-      case OP_HASH160 :: tail => run(tail, Crypto.hash160(stack.head) :: stack.tail)
-      case OP_HASH256 :: tail => run(tail, Crypto.hash256(stack.head) :: stack.tail)
-      case op :: tail if isNop(op) => run(tail, stack)
-      case OP_PUSHDATA(data) :: tail => run(tail, data :: stack)
-      case OP_SHA256 :: tail => run(tail, Crypto.sha256(stack.head) :: stack.tail)
+      case OP_HASH160 :: tail => run(tail, Crypto.hash160(stack.head) :: stack.tail, conditions)
+      case OP_HASH256 :: tail => run(tail, Crypto.hash256(stack.head) :: stack.tail, conditions)
+      case op :: tail if isNop(op) => run(tail, stack, conditions)
+      case OP_PUSHDATA(data) :: tail => run(tail, data :: stack, conditions)
+      case OP_SHA256 :: tail => run(tail, Crypto.sha256(stack.head) :: stack.tail, conditions)
     }
   }
 
