@@ -168,7 +168,7 @@ package object bitcoin {
 
   def toHexString(blob: Array[Byte]) = blob.map("%02x".format(_)).mkString
 
-  def fromHexString(hex: String): Array[Byte] = hex.sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)
+  def fromHexString(hex: String): Array[Byte] = hex.stripPrefix("0x").sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)
 
   /**
    *

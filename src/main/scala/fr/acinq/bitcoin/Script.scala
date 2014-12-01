@@ -2,9 +2,14 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+
 object Script {
 
   import fr.acinq.bitcoin.ScriptElt._
+
+  type Stack = List[Array[Byte]]
 
   /**
    * parse a script from a input stream of binary data
@@ -15,11 +20,13 @@ object Script {
   def parse(input: InputStream, stack: collection.immutable.Vector[ScriptElt] = Vector.empty[ScriptElt]): List[ScriptElt] = {
     input.read() match {
       case -1 => stack.toList
+      case 0 => parse(input, stack :+ OP_0)
       case opCode if opCode > 0 && opCode < 0x4c => parse(input, stack :+ OP_PUSHDATA(bytes(input, opCode)))
       case 0x4c => parse(input, stack :+ OP_PUSHDATA(bytes(input, uint8(input))))
       case 0x4d => parse(input, stack :+ OP_PUSHDATA(bytes(input, uint16(input))))
       case 0x4e => parse(input, stack :+ OP_PUSHDATA(bytes(input, uint32(input))))
-      case opCode if opCode == 0 || opCode > 0x4e => parse(input, stack :+ code2elt(opCode))
+      case opCode if code2elt.contains(opCode) => parse(input, stack :+ code2elt(opCode))
+      case opCode => parse(input, stack :+ OP_INVALID(opCode)) // unknown/invalid ops can be parsed but not executed
     }
   }
 
@@ -46,15 +53,67 @@ object Script {
   }
 
   def isSimpleValue(op: ScriptElt) = op match {
-    case OP_1 | OP_2 | OP_3 | OP_4 | OP_5 | OP_6 | OP_7 | OP_8 | OP_9 | OP_10 | OP_11 | OP_12 | OP_13 | OP_15 | OP_16 => true
+    case OP_1NEGATE | OP_1 | OP_2 | OP_3 | OP_4 | OP_5 | OP_6 | OP_7 | OP_8 | OP_9 | OP_10 | OP_11 | OP_12 | OP_13 | OP_14 | OP_15 | OP_16 => true
     case _ => false
   }
 
-  def simpleValue(op: ScriptElt) : Byte = {
+  def simpleValue(op: ScriptElt): Byte = {
     require(isSimpleValue(op))
     (elt2code(op) - 0x50).toByte
   }
 
+  def encodeNumber(value: Long): Array[Byte] = if (value == 0) Array.empty[Byte]
+  else {
+    val result = ArrayBuffer.empty[Byte]
+    val neg = value < 0
+    var absvalue = if (neg) -value else value
+
+    while (absvalue > 0) {
+      result += (absvalue & 0xff).toByte
+      absvalue >>= 8
+    }
+
+    //    - If the most significant byte is >= 0x80 and the value is positive, push a
+    //    new zero-byte to make the significant byte < 0x80 again.
+
+    //    - If the most significant byte is >= 0x80 and the value is negative, push a
+    //    new 0x80 byte that will be popped off when converting to an integral.
+
+    //    - If the most significant byte is < 0x80 and the value is negative, add
+    //    0x80 to it, since it will be subtracted and interpreted as a negative when
+    //    converting to an integral.
+
+    if ((result.last & 0x80) != 0) {
+      result += {
+        if (neg) 0x80.toByte else 0
+      }
+    }
+    else if (neg) {
+      result(result.length - 1) = (result(result.length - 1) | 0x80).toByte
+    }
+    result.toArray
+  }
+
+  def decodeNumber(input: Array[Byte]): Long = if (input.isEmpty) 0
+  else {
+    var result = 0L
+    for (i <- 0 until input.size) {
+      result |= (input(i) & 0xffL) << (8 * i)
+    }
+
+    // If the input vector's most significant byte is 0x80, remove it from
+    // the result's msb and return a negative.
+    if ((input.last & 0x80) != 0)
+      -((result & ~(0x80L << (8 * (input.size - 1)))))
+    else
+      result
+  }
+
+  def castToBoolean(input: Array[Byte]) : Boolean = input.reverse.toList match {
+    case head :: tail if head == 0x80.toByte && tail.find(_ != 0).isEmpty => false
+    case something if something.find(_ != 0).isDefined => true
+    case _ => false
+  }
   /**
    * execution context of a tx script
    * @param tx current transaction
@@ -70,9 +129,13 @@ object Script {
    * @param context script execution context
    */
   class Runner(context: Context) {
-    def run(script: Array[Byte]): List[Array[Byte]] = run(parse(script))
-    def run(script: Array[Byte], stack: List[Array[Byte]]): List[Array[Byte]] = run(parse(script), stack, List())
-    def run(script: List[ScriptElt]): List[Array[Byte]] = run(script, List.empty[Array[Byte]], List())
+    def run(script: Array[Byte]): Stack = run(parse(script))
+
+    def run(script: List[ScriptElt]): Stack = run(script, List.empty[Array[Byte]])
+
+    def run(script: Array[Byte], stack: Stack): Stack = run(parse(script), stack)
+
+    def run(script: List[ScriptElt], stack: Stack): Stack = run(script, stack, List(), List())
 
     /**
      * run a bitcoin script
@@ -80,40 +143,70 @@ object Script {
      * @param stack data stack
      * @return a updated data stack
      */
-    def run(script: List[ScriptElt], stack: List[Array[Byte]], conditions: List[Boolean]): List[Array[Byte]] = script match {
+    @tailrec
+    final def run(script: List[ScriptElt], stack: Stack, conditions: List[Boolean], altstack: Stack): Stack = script match {
       case Nil => stack
+      case OP_IF :: tail if conditions.exists(_ == false) => run(tail, stack, false :: conditions, altstack)
       case OP_IF :: tail => stack match {
-        case Array(check) :: stacktail if check == 0 => run(tail, stacktail, false :: conditions)
-        case head :: stacktail => run(tail, stacktail, true :: conditions)
+        case head :: stacktail if castToBoolean(head) => run(tail, stacktail, true :: conditions, altstack)
+        case head :: stacktail => run(tail, stacktail, false :: conditions, altstack)
       }
+      case OP_NOTIF :: tail if conditions.exists(_ == false) => run(tail, stack, true :: conditions, altstack)
       case OP_NOTIF :: tail => stack match {
-        case Array(check) :: stacktail if check == 0 => run(tail, stacktail, true :: conditions)
-        case head :: stacktail => run(tail, stacktail, false :: conditions)
+        case head :: stacktail if castToBoolean(head) => run(tail, stacktail, false :: conditions, altstack)
+        case head :: stacktail => run(tail, stacktail, true :: conditions, altstack)
       }
-      case OP_ELSE :: tail => run(tail, stack, !conditions.head :: conditions.tail)
-      case OP_ENDIF :: tail => run(tail, stack, conditions.tail)
-      case head :: tail if conditions.exists(_ == false) => run(tail, stack, conditions)
-      case OP_0 :: tail => run(tail, Array.empty[Byte] :: stack, conditions)
-      case op :: tail if isSimpleValue(op)=> run(tail, Array(simpleValue(op) : Byte) :: stack, conditions)
+      case OP_ELSE :: tail => run(tail, stack, !conditions.head :: conditions.tail, altstack)
+      case OP_ENDIF :: tail => run(tail, stack, conditions.tail, altstack)
+      case head :: tail if conditions.exists(_ == false) => run(tail, stack, conditions, altstack)
+      case OP_0 :: tail => run(tail, Array.empty[Byte] :: stack, conditions, altstack)
+      case op :: tail if isSimpleValue(op) => run(tail, encodeNumber(simpleValue(op)) :: stack, conditions, altstack)
+      case op :: tail if isNop(op) => run(tail, stack, conditions, altstack)
+      case OP_1ADD :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_1ADD on am empty stack")
+      case OP_1ADD :: tail => run(tail, encodeNumber(decodeNumber(stack.head) + 1) :: stack.tail, conditions, altstack)
+      case OP_1SUB :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_1SUB on am empty stack")
+      case OP_1SUB :: tail => run(tail, encodeNumber(decodeNumber(stack.head) - 1) :: stack.tail, conditions, altstack)
+      case OP_ABS :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_ABS on am empty stack")
+      case OP_ABS :: tail => run(tail, encodeNumber(Math.abs(decodeNumber(stack.head))) :: stack.tail, conditions, altstack)
+      case OP_ADD :: tail => stack match {
+        case a :: b :: stacktail =>
+          val x = decodeNumber(a)
+          val y = decodeNumber(b)
+          val result = x + y
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("cannot run OP_ADD on a stack with less then 2 elements")
+      }
+      case OP_BOOLAND :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (castToBoolean(x1) && castToBoolean(x2)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("cannot run OP_BOOLAND on a stack with less then 2 elements")
+      }
+      case OP_BOOLOR :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (castToBoolean(x1) || castToBoolean(x2)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("cannot run OP_BOOLOR on a stack with less then 2 elements")
+      }
       case OP_CHECKSIG :: tail => stack match {
         case pubKey :: sigBytes :: stacktail => {
           val (r, s) = Crypto.decodeSignature(sigBytes)
           val sigHashFlags = sigBytes.last
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
           if (!Crypto.verifySignature(hash, (r, s), pubKey)) throw new RuntimeException("OP_CHECKSIG failed")
-          run(tail, Array(1: Byte) :: stacktail, conditions)
+          run(tail, Array(1: Byte) :: stacktail, conditions, altstack)
         }
         case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
       }
       case OP_CHECKMULTISIG :: tail => {
         // pop public keys
-        val Array(m) = stack.head
+        val m = decodeNumber(stack.head).toInt
         val stack1 = stack.tail
         val pubKeys = stack1.take(m)
         val stack2 = stack1.drop(m)
 
         // pop signatures
-        val Array(n) = stack2.head
+        val n = decodeNumber(stack2.head).toInt
         val stack3 = stack2.tail
         val sigs = stack3.take(n)
         val stack4 = stack3.drop(n + 1) // +1 because of a bug in the official client
@@ -126,97 +219,159 @@ object Script {
             if (Crypto.verifySignature(hash, (r, s), pubKey)) validCount = validCount + 1
           }
         }
-        val result = if (validCount >= n) Array(1:Byte) else Array(0:Byte)
-        run(tail, result :: stack4, conditions)
+        val result = if (validCount >= n) Array(1: Byte) else Array(0: Byte)
+        run(tail, result :: stack4, conditions, altstack)
       }
-      case OP_CODESEPARATOR :: tail => run(tail, stack, conditions)
-      case OP_DROP :: tail => run(tail, stack.tail, conditions)
-      case OP_DUP :: tail => run(tail, stack.head :: stack, conditions)
+      case OP_CHECKMULTISIGVERIFY :: tail => run(OP_CHECKMULTISIG :: OP_VERIFY :: tail, stack, conditions, altstack)
+      case OP_CODESEPARATOR :: tail => run(tail, stack, conditions, altstack)
+      case OP_DEPTH :: tail => run(tail, encodeNumber(stack.length) :: stack, conditions, altstack)
+      case OP_SIZE :: tail if stack.isEmpty => throw new RuntimeException("Cannot run OP_SIZE on an empty stack")
+      case OP_SIZE :: tail => run(tail, encodeNumber(stack.head.length) :: stack, conditions, altstack)
+      case OP_DROP :: tail => run(tail, stack.tail, conditions, altstack)
+      case OP_2DROP :: tail => run(tail, stack.tail.tail, conditions, altstack)
+      case OP_DUP :: tail => run(tail, stack.head :: stack, conditions, altstack)
+      case OP_2DUP :: tail => stack match {
+        case x1 :: x2 :: stacktail => run(tail, x1 :: x2 :: x1 :: x2 :: stacktail, conditions, altstack)
+      }
+      case OP_3DUP :: tail => stack match {
+        case x1 :: x2 :: x3 :: stacktail => run(tail, x1 :: x2 :: x3 :: x1 :: x2 :: x3 :: stacktail, conditions, altstack)
+      }
       case OP_EQUAL :: tail => stack match {
-        case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => run(tail, Array(0:Byte) :: stacktail, conditions)
-        case a :: b :: stacktail => run(tail, Array(1:Byte) :: stacktail, conditions)
+        case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => run(tail, Array(0: Byte) :: stacktail, conditions, altstack)
+        case a :: b :: stacktail => run(tail, Array(1: Byte) :: stacktail, conditions, altstack)
         case _ => throw new RuntimeException("Cannot perform OP_EQUAL on a stack with less than 2 elements")
       }
       case OP_EQUALVERIFY :: tail => stack match {
         case a :: b :: _ if !java.util.Arrays.equals(a, b) => throw new RuntimeException("OP_EQUALVERIFY failed: elements are different")
-        case a :: b :: stacktail => run(tail, stacktail, conditions)
+        case a :: b :: stacktail => run(tail, stacktail, conditions, altstack)
         case _ => throw new RuntimeException("Cannot perform OP_EQUALVERIFY on a stack with less than 2 elements")
       }
-      case OP_HASH160 :: tail => run(tail, Crypto.hash160(stack.head) :: stack.tail, conditions)
-      case OP_HASH256 :: tail => run(tail, Crypto.hash256(stack.head) :: stack.tail, conditions)
-      case op :: tail if isNop(op) => run(tail, stack, conditions)
-      case OP_PUSHDATA(data) :: tail => run(tail, data :: stack, conditions)
-      case OP_SHA256 :: tail => run(tail, Crypto.sha256(stack.head) :: stack.tail, conditions)
+      case OP_FROMALTSTACK :: tail => run(tail, altstack.head :: stack, conditions, altstack.tail)
+      case OP_HASH160 :: tail => run(tail, Crypto.hash160(stack.head) :: stack.tail, conditions, altstack)
+      case OP_HASH256 :: tail => run(tail, Crypto.hash256(stack.head) :: stack.tail, conditions, altstack)
+      case OP_IFDUP :: tail => stack match {
+        case head :: _ if castToBoolean(head) => run(tail, head :: stack, conditions, altstack)
+        case _ => run(tail, stack, conditions, altstack)
+      }
+      case OP_LESSTHAN :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (decodeNumber(x2) < decodeNumber(x1)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_LESSTHANOREQUAL :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (decodeNumber(x2) <= decodeNumber(x1)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_GREATERTHAN :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (decodeNumber(x2) > decodeNumber(x1)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_GREATERTHANOREQUAL :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (decodeNumber(x2) >= decodeNumber(x1)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_MAX :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val n1 = decodeNumber(x1)
+          val n2 = decodeNumber(x2)
+          val result = if (n1 > n2) n1 else n2
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_MIN :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val n1 = decodeNumber(x1)
+          val n2 = decodeNumber(x2)
+          val result = if (n1 < n2) n1 else n2
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_NEGATE :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_NEGATE on am empty stack")
+      case OP_NEGATE :: tail => run(tail, encodeNumber(-decodeNumber(stack.head)) :: stack.tail, conditions, altstack)
+      case OP_NIP :: tail => stack match {
+        case x1 :: x2 :: stacktail => run(tail, x1 :: stacktail, conditions, altstack)
+      }
+      case OP_NOT :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_NOT on am empty stack")
+      case OP_NOT :: tail => run(tail, encodeNumber(if (decodeNumber(stack.head) == 0) 1 else 0) :: stack.tail, conditions, altstack)
+      case OP_0NOTEQUAL :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_0NOTEQUAL on am empty stack")
+      case OP_0NOTEQUAL :: tail => run(tail, encodeNumber(if (decodeNumber(stack.head) == 0) 0 else 1) :: stack.tail, conditions, altstack)
+      case OP_NUMEQUAL :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (decodeNumber(x1) == decodeNumber(x2)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_NUMEQUALVERIFY :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          if (decodeNumber(x1) != decodeNumber(x2)) throw new RuntimeException("OP_NUMEQUALVERIFY failed")
+          run(tail, stacktail, conditions, altstack)
+      }
+      case OP_NUMNOTEQUAL :: tail => stack match {
+        case x1 :: x2 :: stacktail =>
+          val result = if (decodeNumber(x1) != decodeNumber(x2)) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
+      case OP_OVER :: tail => stack match {
+        case x1 :: x2 :: _ => run(tail, x2 :: stack, conditions, altstack)
+      }
+      case OP_2OVER :: tail => stack match {
+        case x1 :: x2 :: x3 :: x4 :: _ => run(tail, x3 :: x4 :: stack, conditions, altstack)
+      }
+      case OP_PICK :: tail => stack match {
+        case head :: stacktail =>
+          val n = decodeNumber(head).toInt
+          run(tail, stacktail(n) :: stacktail, conditions, altstack)
+      }
+      case OP_PUSHDATA(data) :: tail => run(tail, data :: stack, conditions, altstack)
+      case OP_ROLL :: tail => stack match {
+        case head :: stacktail =>
+          val n = decodeNumber(head).toInt
+          run(tail, stacktail(n) :: stacktail.take(n) ::: stacktail.takeRight(stacktail.length - 1 - n), conditions, altstack)
+
+      }
+      case OP_ROT :: tail => stack match {
+        case x1 :: x2 :: x3 :: stacktail => run(tail, x3 :: x1 :: x2 :: stacktail, conditions, altstack)
+      }
+      case OP_2ROT :: tail => stack match {
+        case x1 :: x2 :: x3 :: x4 :: x5 :: x6 :: stacktail => run(tail, x5 :: x6 :: x1 :: x2 :: x3 :: x4 :: stacktail, conditions, altstack)
+      }
+      case OP_RIPEMD160 :: tail => run(tail, Crypto.ripemd160(stack.head) :: stack.tail, conditions, altstack)
+      case OP_SHA1 :: tail => run(tail, Crypto.sha1(stack.head) :: stack.tail, conditions, altstack)
+      case OP_SHA256 :: tail => run(tail, Crypto.sha256(stack.head) :: stack.tail, conditions, altstack)
+      case OP_SUB :: tail => stack match {
+        case a :: b :: stacktail =>
+          val x = decodeNumber(a)
+          val y = decodeNumber(b)
+          val result = y - x
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("cannot run OP_SUB on a stack of less than 2 elements")
+      }
+
+      case OP_SWAP :: tail => stack match {
+        case x1 :: x2 :: stacktail => run(tail, x2 :: x1 :: stacktail, conditions, altstack)
+      }
+      case OP_2SWAP :: tail => stack match {
+        case x1 :: x2 :: x3 :: x4 :: stacktail => run(tail, x3 :: x4 :: x1 :: x2 :: stacktail, conditions, altstack)
+      }
+      case OP_TOALTSTACK :: tail => run(tail, stack.tail, conditions, stack.head :: altstack)
+      case OP_TUCK :: tail => stack match {
+        case x1 :: x2 :: stacktail => run(tail, x1 :: x2 :: x1 :: stacktail, conditions, altstack)
+      }
+      case OP_VERIFY :: tail => stack match {
+        case Nil => throw new RuntimeException("cannot run OP_VERIFY on an empty stack")
+        case head :: stacktail if !castToBoolean(head) => throw new RuntimeException("OP_VERIFY failed")
+        case head :: stacktail => run(tail, stacktail, conditions, altstack)
+      }
+      case OP_WITHIN :: tail => stack match {
+        case encMax :: encMin :: encN :: stacktail =>
+          val max = decodeNumber(encMax)
+          val min = decodeNumber(encMin)
+          val n = decodeNumber(encN)
+          val result = if (n >= min && n < max) 1 else 0
+          run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+      }
     }
   }
-
-//  def execute(context: Context)(script: List[ScriptElt], stack: List[Array[Byte]] = List.empty[Array[Byte]]): List[Array[Byte]] = script match {
-//    case Nil => stack
-//    case OP_0 :: tail => execute(context)(tail, Array.empty[Byte] :: stack)
-//    case op :: tail if isSimpleValue(op)=> execute(context)(tail, Array(simpleValue(op) : Byte) :: stack)
-//    case OP_CHECKSIG :: tail => stack match {
-//      case pubKey :: sigBytes :: stacktail => {
-//        val (r, s) = Crypto.decodeSignature(sigBytes)
-//        val sigHashFlags = sigBytes.last
-//        // replace signature script with pubkey script of the output we are trying to redeeem
-//        val txin1 = context.tx.txIn(context.inputIndex).copy(signatureScript = context.previousOutputScript)
-//        // remove all signature scripts except for the input that we are processing
-//        val tx1 = context.tx.copy(txIn = context.tx.txIn.map(_.copy(signatureScript = Array())).updated(context.inputIndex, txin1))
-//        val hash = Crypto.hash256(Transaction.write(tx1) ++ writeUInt32(sigHashFlags))
-//        if (!Crypto.verifySignature(hash, (r, s), pubKey)) throw new RuntimeException("OP_CHECKSIG failed")
-//        execute(context)(tail, Array(1: Byte) :: stacktail)
-//      }
-//      case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
-//    }
-//    case OP_CHECKMULTISIG :: tail => {
-//      // pop public keys
-//      val Array(m) = stack.head
-//      val stack1 = stack.tail
-//      val pubKeys = stack1.take(m)
-//      val stack2 = stack1.drop(m)
-//
-//      // pop signatures
-//      val Array(n) = stack2.head
-//      val stack3 = stack2.tail
-//      val sigs = stack3.take(n)
-//      val stack4 = stack3.drop(n + 1) // +1 because of a bug in the official client
-//      val serializedTx = {
-//        val txin1 = context.tx.txIn(context.inputIndex).copy(signatureScript = context.previousOutputScript)
-//        // remove all signature scripts except for the input that we are processing
-//        val tx1 = context.tx.copy(txIn = context.tx.txIn.map(_.copy(signatureScript = Array())).updated(context.inputIndex, txin1))
-//        Transaction.write(tx1)
-//      }
-//      var validCount = 0
-//      for (pubKey <- pubKeys) {
-//        for (sig <- sigs) {
-//          val (r, s) = Crypto.decodeSignature(sig)
-//          val sigHashFlags = sig.last
-//          val hash = Crypto.hash256(serializedTx ++ writeUInt32(sigHashFlags))
-//          if (Crypto.verifySignature(hash, (r, s), pubKey)) validCount = validCount + 1
-//        }
-//      }
-//      val result = if (validCount >= n) Array(1:Byte) else Array(0:Byte)
-//      execute(context)(tail, result :: stack4)
-//    }
-//    case OP_CODESEPARATOR :: tail => execute(context)(tail, stack)
-//    case OP_DROP :: tail => execute(context)(tail, stack.tail)
-//    case OP_DUP :: tail => execute(context)(tail, stack.head :: stack)
-//    case OP_EQUAL :: tail => stack match {
-//      case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => execute(context)(tail, Array(0:Byte) :: stacktail)
-//      case a :: b :: stacktail => execute(context)(tail, Array(1:Byte) :: stacktail)
-//      case _ => throw new RuntimeException("Cannot perform OP_EQUAL on a stack with less than 2 elements")
-//    }
-//    case OP_EQUALVERIFY :: tail => stack match {
-//      case a :: b :: _ if !java.util.Arrays.equals(a, b) => throw new RuntimeException("OP_EQUALVERIFY failed: elements are different")
-//      case a :: b :: stacktail => execute(context)(tail, stacktail)
-//      case _ => throw new RuntimeException("Cannot perform OP_EQUALVERIFY on a stack with less than 2 elements")
-//    }
-//    case OP_HASH160 :: tail => execute(context)(tail, Crypto.hash160(stack.head) :: stack.tail)
-//    case OP_HASH256 :: tail => execute(context)(tail, Crypto.hash256(stack.head) :: stack.tail)
-//    case op :: tail if isNop(op) => execute(context)(tail, stack)
-//    case OP_PUSHDATA(data) :: tail => execute(context)(tail, data :: stack)
-//    case OP_SHA256 :: tail => execute(context)(tail, Crypto.sha256(stack.head) :: stack.tail)
-//  }
 
   /**
    * extract a public key hash from a public key script

@@ -105,7 +105,7 @@ object TxIn extends BtcMessage[TxIn] {
  *                 information is updated before inclusion into a block. Unused for now.
  */
 case class TxIn(outPoint: OutPoint, signatureScript: Array[Byte], sequence: Long) {
-  require(signatureScript.size < MaxScriptElementSize, s"signature script is ${signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
+  //require(signatureScript.size <= MaxScriptElementSize, s"signature script is ${signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
 
   override def toString = s"TxIn($outPoint, ${toHexString(signatureScript)}, $sequence)"
 }
@@ -127,7 +127,7 @@ object TxOut extends BtcMessage[TxOut] {
 case class TxOut(amount: Long, publicKeyScript: Array[Byte]) {
   //require(amount >= 0, s"invalid txout amount: $amount")
   require(amount < MaxMoney, s"invalid txout amount: $amount")
-  require(publicKeyScript.size < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
+  //require(publicKeyScript.size < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
 
   override def toString = s"TxOut($amount, ${toHexString(publicKeyScript)})"
 }

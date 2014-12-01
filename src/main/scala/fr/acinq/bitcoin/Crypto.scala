@@ -6,7 +6,7 @@ import java.math.BigInteger
 import org.bouncycastle.asn1.sec.SECNamedCurves
 import org.bouncycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
 import org.bouncycastle.crypto.Digest
-import org.bouncycastle.crypto.digests.{GeneralDigest, RIPEMD160Digest, SHA256Digest}
+import org.bouncycastle.crypto.digests.{SHA1Digest, GeneralDigest, RIPEMD160Digest, SHA256Digest}
 import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters}
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 
@@ -25,6 +25,8 @@ object Crypto {
     digest.doFinal(out, 0)
     out
   }
+
+  def sha1 = hash(new SHA1Digest) _
 
   def sha256 = hash(new SHA256Digest) _
 
