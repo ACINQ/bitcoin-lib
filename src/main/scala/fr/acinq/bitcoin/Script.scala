@@ -17,6 +17,7 @@ object Script {
    * @param stack initial command stack
    * @return an updated command stack
    */
+  @tailrec
   def parse(input: InputStream, stack: collection.immutable.Vector[ScriptElt] = Vector.empty[ScriptElt]): List[ScriptElt] = {
     input.read() match {
       case -1 => stack.toList
@@ -232,9 +233,11 @@ object Script {
       case OP_DUP :: tail => run(tail, stack.head :: stack, conditions, altstack)
       case OP_2DUP :: tail => stack match {
         case x1 :: x2 :: stacktail => run(tail, x1 :: x2 :: x1 :: x2 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_2DUP on a stack with less than 2 elements")
       }
       case OP_3DUP :: tail => stack match {
         case x1 :: x2 :: x3 :: stacktail => run(tail, x1 :: x2 :: x3 :: x1 :: x2 :: x3 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_3DUP on a stack with less than 3 elements")
       }
       case OP_EQUAL :: tail => stack match {
         case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => run(tail, Array(0: Byte) :: stacktail, conditions, altstack)
@@ -257,21 +260,25 @@ object Script {
         case x1 :: x2 :: stacktail =>
           val result = if (decodeNumber(x2) < decodeNumber(x1)) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_LESSTHAN on a stack with less than 2 elements")
       }
       case OP_LESSTHANOREQUAL :: tail => stack match {
         case x1 :: x2 :: stacktail =>
           val result = if (decodeNumber(x2) <= decodeNumber(x1)) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_LESSTHANOREQUAL on a stack with less than 2 elements")
       }
       case OP_GREATERTHAN :: tail => stack match {
         case x1 :: x2 :: stacktail =>
           val result = if (decodeNumber(x2) > decodeNumber(x1)) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_GREATERTHAN on a stack with less than 2 elements")
       }
       case OP_GREATERTHANOREQUAL :: tail => stack match {
         case x1 :: x2 :: stacktail =>
           val result = if (decodeNumber(x2) >= decodeNumber(x1)) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_GREATERTHANOREQUAL on a stack with less than 2 elements")
       }
       case OP_MAX :: tail => stack match {
         case x1 :: x2 :: stacktail =>
@@ -279,6 +286,7 @@ object Script {
           val n2 = decodeNumber(x2)
           val result = if (n1 > n2) n1 else n2
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_MAX on a stack with less than 2 elements")
       }
       case OP_MIN :: tail => stack match {
         case x1 :: x2 :: stacktail =>
@@ -286,11 +294,13 @@ object Script {
           val n2 = decodeNumber(x2)
           val result = if (n1 < n2) n1 else n2
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_MIN on a stack with less than 2 elements")
       }
       case OP_NEGATE :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_NEGATE on am empty stack")
       case OP_NEGATE :: tail => run(tail, encodeNumber(-decodeNumber(stack.head)) :: stack.tail, conditions, altstack)
       case OP_NIP :: tail => stack match {
         case x1 :: x2 :: stacktail => run(tail, x1 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_NIP on a stack with less than 2 elements")
       }
       case OP_NOT :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_NOT on am empty stack")
       case OP_NOT :: tail => run(tail, encodeNumber(if (decodeNumber(stack.head) == 0) 1 else 0) :: stack.tail, conditions, altstack)
@@ -300,62 +310,71 @@ object Script {
         case x1 :: x2 :: stacktail =>
           val result = if (decodeNumber(x1) == decodeNumber(x2)) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_NUMEQUAL on a stack with less than 2 elements")
       }
       case OP_NUMEQUALVERIFY :: tail => stack match {
         case x1 :: x2 :: stacktail =>
           if (decodeNumber(x1) != decodeNumber(x2)) throw new RuntimeException("OP_NUMEQUALVERIFY failed")
           run(tail, stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_NUMEQUALVERIFY on a stack with less than 2 elements")
       }
       case OP_NUMNOTEQUAL :: tail => stack match {
         case x1 :: x2 :: stacktail =>
           val result = if (decodeNumber(x1) != decodeNumber(x2)) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_NUMNOTEQUAL on a stack with less than 2 elements")
       }
       case OP_OVER :: tail => stack match {
         case x1 :: x2 :: _ => run(tail, x2 :: stack, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_OVER on a stack with less than 2 elements")
       }
       case OP_2OVER :: tail => stack match {
         case x1 :: x2 :: x3 :: x4 :: _ => run(tail, x3 :: x4 :: stack, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_2OVER on a stack with less than 4 elements")
       }
       case OP_PICK :: tail => stack match {
         case head :: stacktail =>
           val n = decodeNumber(head).toInt
           run(tail, stacktail(n) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_PICK on a stack with less than 1 elements")
       }
       case OP_PUSHDATA(data) :: tail => run(tail, data :: stack, conditions, altstack)
       case OP_ROLL :: tail => stack match {
         case head :: stacktail =>
           val n = decodeNumber(head).toInt
           run(tail, stacktail(n) :: stacktail.take(n) ::: stacktail.takeRight(stacktail.length - 1 - n), conditions, altstack)
-
+        case _ => throw new RuntimeException("Cannot perform OP_ROLL on a stack with less than 1 elements")
       }
       case OP_ROT :: tail => stack match {
         case x1 :: x2 :: x3 :: stacktail => run(tail, x3 :: x1 :: x2 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_ROT on a stack with less than 3 elements")
       }
       case OP_2ROT :: tail => stack match {
         case x1 :: x2 :: x3 :: x4 :: x5 :: x6 :: stacktail => run(tail, x5 :: x6 :: x1 :: x2 :: x3 :: x4 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_2ROT on a stack with less than 6 elements")
       }
       case OP_RIPEMD160 :: tail => run(tail, Crypto.ripemd160(stack.head) :: stack.tail, conditions, altstack)
       case OP_SHA1 :: tail => run(tail, Crypto.sha1(stack.head) :: stack.tail, conditions, altstack)
       case OP_SHA256 :: tail => run(tail, Crypto.sha256(stack.head) :: stack.tail, conditions, altstack)
       case OP_SUB :: tail => stack match {
-        case a :: b :: stacktail =>
-          val x = decodeNumber(a)
-          val y = decodeNumber(b)
-          val result = y - x
+        case x1 :: x2 :: stacktail =>
+           val result = decodeNumber(x2) - decodeNumber(x1)
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
         case _ => throw new RuntimeException("cannot run OP_SUB on a stack of less than 2 elements")
       }
 
       case OP_SWAP :: tail => stack match {
         case x1 :: x2 :: stacktail => run(tail, x2 :: x1 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_SWAP on a stack with less than 2 elements")
       }
       case OP_2SWAP :: tail => stack match {
         case x1 :: x2 :: x3 :: x4 :: stacktail => run(tail, x3 :: x4 :: x1 :: x2 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_2SWAP on a stack with less than 4 elements")
       }
       case OP_TOALTSTACK :: tail => run(tail, stack.tail, conditions, stack.head :: altstack)
       case OP_TUCK :: tail => stack match {
         case x1 :: x2 :: stacktail => run(tail, x1 :: x2 :: x1 :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_TUCK on a stack with less than 2 elements")
       }
       case OP_VERIFY :: tail => stack match {
         case Nil => throw new RuntimeException("cannot run OP_VERIFY on an empty stack")
@@ -369,6 +388,7 @@ object Script {
           val n = decodeNumber(encN)
           val result = if (n >= min && n < max) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
+        case _ => throw new RuntimeException("Cannot perform OP_WITHIN on a stack with less than 3 elements")
       }
     }
   }
