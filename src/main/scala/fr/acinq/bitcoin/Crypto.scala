@@ -66,7 +66,34 @@ object Crypto {
 
   def encodeSignature(t: (BigInteger, BigInteger)): Array[Byte] = encodeSignature(t._1, t._2)
 
-    /**
+  def isDERSignature(sig: Array[Byte]) : Boolean = Try(decodeSignature(sig)).isSuccess
+
+  def isLowDERSignature(sig: Array[Byte]): Boolean = Try(decodeSignature(sig)).map(_._2.compareTo(halfCurveOrder) <= 0).getOrElse(false)
+
+  def checkSignatureEncoding(sig: Array[Byte], flags: Int) : Boolean = {
+    import Script._
+    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0) isDERSignature(sig)
+    else if ((flags & SCRIPT_VERIFY_LOW_S) != 0) isLowDERSignature(sig)
+    else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0) isDefinedHashtypeSignature(sig)
+    else true
+  }
+
+  def checkPubKeyEncoding(key: Array[Byte], flags: Int) : Boolean = {
+    if ((flags & Script.SCRIPT_VERIFY_STRICTENC) != 0) {
+      key.length match {
+        case 65 if key(0) != 4 => true
+        case 33 if key(0) != 2 && key(0) != 2 => true
+        case _ => false
+      }
+    } else true
+  }
+
+  def isDefinedHashtypeSignature(sig: Array[Byte]): Boolean = if (sig.isEmpty) false else {
+    val hashType = sig.last & (~(SIGHASH_ANYONECANPAY))
+    if (hashType < SIGHASH_ALL || hashType > SIGHASH_SINGLE) false else true
+  }
+
+  /**
    * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
    * @param blob sigbyte data
    * @return the decoded (r, s) signature
@@ -93,7 +120,6 @@ object Crypto {
     Try(signer.verifySignature(data, r, s)) match {
       case Success(result) => result
       case Failure(cause) => {
-        println(cause)
         false
       }
     }

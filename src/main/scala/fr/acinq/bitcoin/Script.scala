@@ -12,6 +12,74 @@ object Script {
   type Stack = List[Array[Byte]]
 
   /**
+   * script execution flags
+   */
+  val SCRIPT_VERIFY_NONE      = 0
+
+  // Evaluate P2SH subscripts (softfork safe, BIP16).
+  val SCRIPT_VERIFY_P2SH      = (1 << 0)
+
+  // Passing a non-strict-DER signature or one with undefined hashtype to a checksig operation causes script failure.
+  // Evaluating a pubkey that is not (0x04 + 64 bytes) or (0x02 or 0x03 + 32 bytes) by checksig causes script failure.
+  // (softfork safe, but not used or intended as a consensus rule).
+  val SCRIPT_VERIFY_STRICTENC = (1 << 1)
+
+  // Passing a non-strict-DER signature to a checksig operation causes script failure (softfork safe, BIP62 rule 1)
+  val SCRIPT_VERIFY_DERSIG    = (1 << 2)
+
+  // Passing a non-strict-DER signature or one with S > order/2 to a checksig operation causes script failure
+  // (softfork safe, BIP62 rule 5).
+  val SCRIPT_VERIFY_LOW_S     = (1 << 3)
+
+  // verify dummy stack item consumed by CHECKMULTISIG is of zero-length (softfork safe, BIP62 rule 7).
+  val SCRIPT_VERIFY_NULLDUMMY = (1 << 4)
+
+  // Using a non-push operator in the scriptSig causes script failure (softfork safe, BIP62 rule 2).
+  val SCRIPT_VERIFY_SIGPUSHONLY = (1 << 5)
+
+  // Require minimal encodings for all push operations (OP_0... OP_16, OP_1NEGATE where possible, direct
+  // pushes up to 75 bytes, OP_PUSHDATA up to 255 bytes, OP_PUSHDATA2 for anything larger). Evaluating
+  // any other push causes the script to fail (BIP62 rule 3).
+  // In addition, whenever a stack element is interpreted as a number, it must be of minimal length (BIP62 rule 4).
+  // (softfork safe)
+  val SCRIPT_VERIFY_MINIMALDATA = (1 << 6)
+
+  // Discourage use of NOPs reserved for upgrades (NOP1-10)
+  //
+  // Provided so that nodes can avoid accepting or mining transactions
+  // containing executed NOP's whose meaning may change after a soft-fork,
+  // thus rendering the script invalid; with this flag set executing
+  // discouraged NOPs fails the script. This verification flag will never be
+  // a mandatory flag applied to scripts in a block. NOPs that are not
+  // executed, e.g.  within an unexecuted IF ENDIF block, are *not* rejected.
+  val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS  = (1 << 7)
+
+  /**
+   * Mandatory script verification flags that all new blocks must comply with for
+   * them to be valid. (but old blocks may not comply with) Currently just P2SH,
+   * but in the future other flags may be added, such as a soft-fork to enforce
+   * strict DER encoding.
+   *
+   * Failing one of these tests may trigger a DoS ban - see CheckInputs() for
+   * details.
+   */
+  val MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH
+
+  /**
+   * Standard script verification flags that standard transactions will comply
+   * with. However scripts violating these flags may still be present in valid
+   * blocks and we must accept those blocks.
+   */
+  val STANDARD_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS |
+    SCRIPT_VERIFY_STRICTENC |
+    SCRIPT_VERIFY_MINIMALDATA |
+    SCRIPT_VERIFY_NULLDUMMY |
+    SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS
+
+  /** For convenience, standard but not mandatory verify flags. */
+  val STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS
+
+  /**
    * parse a script from a input stream of binary data
    * @param input input stream
    * @param stack initial command stack
@@ -129,7 +197,23 @@ object Script {
    * Bitcoin script runner
    * @param context script execution context
    */
-  class Runner(context: Context) {
+  class Runner(context: Context, scriptFlag: Int = SCRIPT_VERIFY_NONE) {
+
+    def checkSignatures(pubKeys: Seq[Array[Byte]], sigs: Seq[Array[Byte]]) : Boolean = if (sigs.isEmpty) true else {
+      var validCount = 0
+      for (pubKey <- pubKeys) {
+        if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag)) return false
+        for (sig <- sigs) {
+          if (!Crypto.checkSignatureEncoding(sig, scriptFlag)) return false
+          val (r, s) = Crypto.decodeSignature(sig)
+          val sigHashFlags = sig.last
+          val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
+          if (Crypto.verifySignature(hash, (r, s), pubKey)) validCount = validCount + 1
+        }
+      }
+      validCount >= sigs.length
+    }
+
     def run(script: Array[Byte]): Stack = run(parse(script))
 
     def run(script: List[ScriptElt]): Stack = run(script, List.empty[Array[Byte]])
@@ -191,14 +275,19 @@ object Script {
       }
       case OP_CHECKSIG :: tail => stack match {
         case pubKey :: sigBytes :: stacktail => {
-          val (r, s) = Crypto.decodeSignature(sigBytes)
-          val sigHashFlags = sigBytes.last
-          val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
-          if (!Crypto.verifySignature(hash, (r, s), pubKey)) throw new RuntimeException("OP_CHECKSIG failed")
-          run(tail, Array(1: Byte) :: stacktail, conditions, altstack)
+          val result = if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag) || !Crypto.checkPubKeyEncoding(pubKey, scriptFlag))
+            false
+          else {
+            val (r, s) = Crypto.decodeSignature(sigBytes)
+            val sigHashFlags = sigBytes.last
+            val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
+            Crypto.verifySignature(hash, (r, s), pubKey)
+          }
+          run(tail, ( if (result) Array(1:Byte) else Array(0:Byte)) :: stacktail, conditions, altstack)
         }
         case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
       }
+      case OP_CHECKSIGVERIFY :: tail => run(OP_CHECKSIG :: OP_VERIFY :: tail, stack, conditions, altstack)
       case OP_CHECKMULTISIG :: tail => {
         // pop public keys
         val m = decodeNumber(stack.head).toInt
@@ -211,16 +300,8 @@ object Script {
         val stack3 = stack2.tail
         val sigs = stack3.take(n)
         val stack4 = stack3.drop(n + 1) // +1 because of a bug in the official client
-        var validCount = 0
-        for (pubKey <- pubKeys) {
-          for (sig <- sigs) {
-            val (r, s) = Crypto.decodeSignature(sig)
-            val sigHashFlags = sig.last
-            val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
-            if (Crypto.verifySignature(hash, (r, s), pubKey)) validCount = validCount + 1
-          }
-        }
-        val result = if (validCount >= n) Array(1: Byte) else Array(0: Byte)
+
+        val result = if(checkSignatures(pubKeys, sigs)) Array(1: Byte) else Array(0: Byte)
         run(tail, result :: stack4, conditions, altstack)
       }
       case OP_CHECKMULTISIGVERIFY :: tail => run(OP_CHECKMULTISIG :: OP_VERIFY :: tail, stack, conditions, altstack)
@@ -389,6 +470,17 @@ object Script {
           val result = if (n >= min && n < max) 1 else 0
           run(tail, encodeNumber(result) :: stacktail, conditions, altstack)
         case _ => throw new RuntimeException("Cannot perform OP_WITHIN on a stack with less than 3 elements")
+      }
+    }
+
+    def checkSignature(pubKey: Array[Byte], sigBytes: Array[Byte]) : Boolean = {
+      if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag) || !Crypto.checkPubKeyEncoding(pubKey, scriptFlag))
+        false
+      else {
+        val (r, s) = Crypto.decodeSignature(sigBytes)
+        val sigHashFlags = sigBytes.last
+        val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
+        Crypto.verifySignature(hash, (r, s), pubKey)
       }
     }
   }

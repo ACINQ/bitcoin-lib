@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import java.io.InputStreamReader
 
 import com.google.common.io.BaseEncoding
+import fr.acinq.bitcoin
 import org.json4s.DefaultFormats
 import org.json4s.jackson.{JsonMethods, Serialization}
 import org.junit.runner.RunWith
@@ -41,6 +42,21 @@ class ScriptSpec extends FlatSpec {
       case t: Throwable => throw new RuntimeException(s"cannot parse $input", t)
     }
   }
+
+  import Script._
+
+  val mapFlagNames = Map(
+    "NONE" -> SCRIPT_VERIFY_NONE,
+    "P2SH" -> SCRIPT_VERIFY_P2SH,
+    "STRICTENC" -> SCRIPT_VERIFY_STRICTENC,
+    "DERSIG" -> SCRIPT_VERIFY_DERSIG,
+    "LOW_S" -> SCRIPT_VERIFY_LOW_S,
+    "SIGPUSHONLY" -> SCRIPT_VERIFY_SIGPUSHONLY,
+    "MINIMALDATA" -> SCRIPT_VERIFY_MINIMALDATA,
+    "NULLDUMMY" -> SCRIPT_VERIFY_NULLDUMMY,
+    "DISCOURAGE_UPGRADABLE_NOPS" -> SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
+
+  def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
   "Script" should "parse signature scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("47304402202b4da291cc39faf8433911988f9f49fc5c995812ca2f94db61468839c228c3e90220628bff3ff32ec95825092fa051cba28558a981fcf59ce184b14f2e215e69106701410414b38f4be3bb9fa0f4f32b74af07152b2f2f630bc02122a491137b6c523e46f18a0d5034418966f93dfc37cc3739ef7b2007213a302b7fba161557f4ad644a1c")
@@ -104,20 +120,23 @@ class ScriptSpec extends FlatSpec {
       txOut = TxOut(0, Array.empty[Byte]) :: Nil,
       lockTime = 0)
 
-    def runTest(scriptPubKeyText: String, scriptSigText: String, flags: String, comments: Option[String]): Unit = {
+    def runTest(scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String]): Unit = {
       val scriptPubKey = parseFromText(scriptPubKeyText)
       val scriptSig = parseFromText(scriptSigText)
       val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
       val ctx = Script.Context(tx, 0, scriptPubKey)
-      val runner = new Script.Runner(ctx)
+      val runner = new Script.Runner(ctx, scriptFlag = parseScriptFlags(flags))
       try {
-        val stack = runner.run(scriptPubKey)
-        val stack1 = runner.run(scriptSig, stack)
+        val stack = runner.run(scriptSig)
+        val stack1 = runner.run(scriptPubKey, stack)
         assert(!stack1.isEmpty)
         if(!Script.castToBoolean(stack1.head)) {
           println("-- error -- ")
           println(s"scriptPubKey : $scriptPubKeyText $scriptPubKey")
           println(s"scriptSig : $scriptSigText $scriptSig")
+          println(s"credit tx: ${toHexString(Transaction.write(creditTx(scriptPubKey)))}}")
+          println(s"spending tx: ${toHexString(Transaction.write(tx))}}")
+          comments.map(println)
         }
       }
       catch {
@@ -126,15 +145,18 @@ class ScriptSpec extends FlatSpec {
           t.printStackTrace()
           println(s"scriptPubKey : $scriptPubKeyText $scriptPubKey")
           println(s"scriptSig : $scriptSigText $scriptSig")
+          println(s"credit tx: ${toHexString(Transaction.write(creditTx(scriptPubKey)))}}")
+          println(s"spending tx: ${toHexString(Transaction.write(tx))}}")
+          comments.map(println)
       }
     }
-    
+
     val stream = classOf[ScriptSpec].getResourceAsStream("/script_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
     // use tail to skip the first line of the .json file
     json.extract[List[List[String]]].tail.foreach(_ match {
-      case scriptPubKey :: scriptSig :: flags :: comments :: Nil => runTest(scriptPubKey, scriptSig, flags, Some(comments))
-      case scriptPubKey :: scriptSig :: flags :: Nil => runTest(scriptPubKey, scriptSig, flags, None)
+      case scriptSig :: scriptPubKey ::  flags :: comments :: Nil => runTest(scriptSig, scriptPubKey, flags, Some(comments))
+      case scriptSig :: scriptPubKey :: flags :: Nil => runTest(scriptSig, scriptPubKey, flags, None)
       case _ => ()
     })
   }
