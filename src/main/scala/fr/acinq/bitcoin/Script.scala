@@ -279,7 +279,7 @@ object Script {
             false
           else {
             val (r, s) = Crypto.decodeSignature(sigBytes)
-            val sigHashFlags = sigBytes.last
+            val sigHashFlags = sigBytes.last & 0xff
             val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
             Crypto.verifySignature(hash, (r, s), pubKey)
           }

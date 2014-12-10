@@ -16,8 +16,8 @@ import scala.collection.mutable.ArrayBuffer
 class ScriptSpec extends FlatSpec {
   implicit val format = DefaultFormats
 
-  def parseFromText(input: String) : Array[Byte] = {
-    def parseInternal(tokens: List[String], acc: Array[Byte] = Array.empty[Byte]) : Array[Byte] = tokens match {
+  def parseFromText(input: String): Array[Byte] = {
+    def parseInternal(tokens: List[String], acc: Array[Byte] = Array.empty[Byte]): Array[Byte] = tokens match {
       case Nil => acc
       case head :: tail if head.matches("^-?[0-9]*$") => head.toLong match {
         case -1 => parseInternal(tail, acc :+ ScriptElt.elt2code(OP_1NEGATE).toByte)
@@ -126,36 +126,17 @@ class ScriptSpec extends FlatSpec {
       val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
       val ctx = Script.Context(tx, 0, scriptPubKey)
       val runner = new Script.Runner(ctx, scriptFlag = parseScriptFlags(flags))
-      try {
-        val stack = runner.run(scriptSig)
-        val stack1 = runner.run(scriptPubKey, stack)
-        assert(!stack1.isEmpty)
-        if(!Script.castToBoolean(stack1.head)) {
-          println("-- error -- ")
-          println(s"scriptPubKey : $scriptPubKeyText $scriptPubKey")
-          println(s"scriptSig : $scriptSigText $scriptSig")
-          println(s"credit tx: ${toHexString(Transaction.write(creditTx(scriptPubKey)))}}")
-          println(s"spending tx: ${toHexString(Transaction.write(tx))}}")
-          comments.map(println)
-        }
-      }
-      catch {
-        case t: Throwable =>
-          println(s"-- $t -- ")
-          t.printStackTrace()
-          println(s"scriptPubKey : $scriptPubKeyText $scriptPubKey")
-          println(s"scriptSig : $scriptSigText $scriptSig")
-          println(s"credit tx: ${toHexString(Transaction.write(creditTx(scriptPubKey)))}}")
-          println(s"spending tx: ${toHexString(Transaction.write(tx))}}")
-          comments.map(println)
-      }
+      val stack = runner.run(scriptSig)
+      val stack1 = runner.run(scriptPubKey, stack)
+      assert(!stack1.isEmpty)
+      assert(Script.castToBoolean(stack1.head))
     }
 
     val stream = classOf[ScriptSpec].getResourceAsStream("/script_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
     // use tail to skip the first line of the .json file
     json.extract[List[List[String]]].tail.foreach(_ match {
-      case scriptSig :: scriptPubKey ::  flags :: comments :: Nil => runTest(scriptSig, scriptPubKey, flags, Some(comments))
+      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => runTest(scriptSig, scriptPubKey, flags, Some(comments))
       case scriptSig :: scriptPubKey :: flags :: Nil => runTest(scriptSig, scriptPubKey, flags, None)
       case _ => ()
     })
