@@ -136,11 +136,8 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // check script
     val ctx = Script.Context(tx2, 0, previousTx.publicKeyScript)
-    val executor = new Script.Runner(ctx)
-    val stack = executor.run(tx2.txIn(0).signatureScript)
-    val stack1 = executor.run(previousTx.publicKeyScript, stack)
-    val List(Array(check)) = stack1
-    assert(check === 1)
+    val runner = new Script.Runner(ctx)
+    assert(runner.verifyScripts(tx2.txIn(0).signatureScript, previousTx.publicKeyScript))
   }
   // same as above, but using Transaction.sign() instead of signing the tx manually
   it should "create and verify pay2pk transactions with 1 input/1 output using helper method" in {
@@ -179,11 +176,8 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // redeem the tx
     val ctx = Script.Context(tx2, 0, previousTx.publicKeyScript)
-    val executor = new Script.Runner(ctx)
-    val stack = executor.run(tx2.txIn(0).signatureScript)
-    val stack1 = executor.run(previousTx.publicKeyScript, stack)
-    val List(Array(check)) = stack1
-    assert(check === 1)
+    val runner = new Script.Runner(ctx)
+    assert(runner.verifyScripts(tx2.txIn(0).signatureScript, previousTx.publicKeyScript))
   }
   it should "create and verify sign pay2pk transactions with multiple inputs and outputs" in {
     val destAddress = "moKHwpsxovDtfBJyoXpof21vvWooBExutV"
@@ -229,10 +223,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     for (i <- 0 until tx1.txIn.length) {
       val ctx = Script.Context(tx1, i, previousTx(i).publicKeyScript)
       val runner = new Script.Runner(ctx)
-      val stack = runner.run(tx1.txIn(i).signatureScript)
-      val stack1 = runner.run(previousTx(i).publicKeyScript, stack)
-      val List(Array(check)) = stack1
-      assert(check === 1)
+      assert(runner.verifyScripts(tx1.txIn(i).signatureScript, previousTx(i).publicKeyScript))
     }
     // the id of this tx on testnet is 882e971dbdb7b762cd07e5db016d3c81267ec5233186a31e6f40457a0a56a311
   }
@@ -287,11 +278,8 @@ class TransactionSpec extends FlatSpec with Matchers {
     signedTx.txIn.zipWithIndex.map {
       case (txin, index) =>
         val ctx = Script.Context(signedTx, index, previousTx(index).publicKeyScript)
-        val executor = new Script.Runner(ctx)
-        val stack = executor.run(txin.signatureScript)
-        val stack1 = executor.run(previousTx(index).publicKeyScript, stack)
-        val List(Array(check)) = stack1
-        assert(check === 1)
+        val runner = new Script.Runner(ctx)
+        assert(runner.verifyScripts(txin.signatureScript, previousTx(index).publicKeyScript))
     }
   }
 }

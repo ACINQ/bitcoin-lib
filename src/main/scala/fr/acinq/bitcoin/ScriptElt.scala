@@ -118,7 +118,7 @@ object OP_PUSHDATA {
   def apply(data:String) : OP_PUSHDATA = new OP_PUSHDATA(fromHexString(data))
 }
 case class OP_PUSHDATA(data: Array[Byte]) extends ScriptElt {
-  require(data.size <= MaxScriptElementSize, s"data is ${data.length} bytes, limit is $MaxScriptElementSize bytes")
+  //require(data.size <= MaxScriptElementSize, s"data is ${data.length} bytes, limit is $MaxScriptElementSize bytes")
   override def toString = s"OP_PUSHDATA(${toHexString(data)})"
 }
 case class OP_INVALID(code: Int) extends ScriptElt
@@ -249,4 +249,6 @@ object ScriptElt {
 
   // name -> code
   val name2code =  code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap)
+
+  def getCode(op: ScriptElt): Int = Script.write(op :: Nil).head
 }

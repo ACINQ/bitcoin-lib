@@ -1,6 +1,6 @@
 package fr.acinq
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
+import java.io._
 import java.math.BigInteger
 
 /**
@@ -158,7 +158,10 @@ package object bitcoin {
 
   def bytes(input: InputStream, size: Int): Array[Byte] = {
     val blob = new Array[Byte](size)
-    input.read(blob)
+    if (size > 0) {
+      val count = input.read(blob)
+      if (count < size) throw new IOException("not enough data to read from")
+    }
     blob
   }
 

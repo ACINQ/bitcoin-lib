@@ -71,7 +71,7 @@ object Crypto {
   def isLowDERSignature(sig: Array[Byte]): Boolean = Try(decodeSignature(sig)).map(_._2.compareTo(halfCurveOrder) <= 0).getOrElse(false)
 
   def checkSignatureEncoding(sig: Array[Byte], flags: Int) : Boolean = {
-    import Script._
+    import ScriptFlags._
     if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0) isDERSignature(sig)
     else if ((flags & SCRIPT_VERIFY_LOW_S) != 0) isLowDERSignature(sig)
     else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0) isDefinedHashtypeSignature(sig)
@@ -79,10 +79,10 @@ object Crypto {
   }
 
   def checkPubKeyEncoding(key: Array[Byte], flags: Int) : Boolean = {
-    if ((flags & Script.SCRIPT_VERIFY_STRICTENC) != 0) {
+    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) {
       key.length match {
-        case 65 if key(0) != 4 => true
-        case 33 if key(0) != 2 && key(0) != 2 => true
+        case 65 if key(0) == 4 => true
+        case 33 if key(0) == 2 || key(0) == 3 => true
         case _ => false
       }
     } else true

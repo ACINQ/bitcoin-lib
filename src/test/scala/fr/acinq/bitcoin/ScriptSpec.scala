@@ -11,11 +11,9 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.{Success, Failure, Try}
 
-@RunWith(classOf[JUnitRunner])
-class ScriptSpec extends FlatSpec {
-  implicit val format = DefaultFormats
-
+object ScriptSpec {
   def parseFromText(input: String): Array[Byte] = {
     def parseInternal(tokens: List[String], acc: Array[Byte] = Array.empty[Byte]): Array[Byte] = tokens match {
       case Nil => acc
@@ -43,7 +41,7 @@ class ScriptSpec extends FlatSpec {
     }
   }
 
-  import Script._
+  import ScriptFlags._
 
   val mapFlagNames = Map(
     "NONE" -> SCRIPT_VERIFY_NONE,
@@ -58,7 +56,23 @@ class ScriptSpec extends FlatSpec {
 
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
-  "Script" should "parse signature scripts" in {
+  def creditTx(scriptPubKey: Array[Byte]) = Transaction(version = 1,
+    txIn = TxIn(OutPoint(new Array[Byte](32), -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
+    txOut = TxOut(0, scriptPubKey) :: Nil,
+    lockTime = 0)
+
+  def spendingTx(scriptSig: Array[Byte], tx: Transaction) = Transaction(version = 1,
+    txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
+    txOut = TxOut(0, Array.empty[Byte]) :: Nil,
+    lockTime = 0)
+}
+
+@RunWith(classOf[JUnitRunner])
+class ScriptSpec extends FlatSpec {
+  import ScriptSpec._
+  implicit val format = DefaultFormats
+
+   "Script" should "parse signature scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("47304402202b4da291cc39faf8433911988f9f49fc5c995812ca2f94db61468839c228c3e90220628bff3ff32ec95825092fa051cba28558a981fcf59ce184b14f2e215e69106701410414b38f4be3bb9fa0f4f32b74af07152b2f2f630bc02122a491137b6c523e46f18a0d5034418966f93dfc37cc3739ef7b2007213a302b7fba161557f4ad644a1c")
     val script = Script.parse(blob)
     val pk = Script.publicKey(script)
@@ -108,36 +122,28 @@ class ScriptSpec extends FlatSpec {
     assert(Script.castToBoolean(Array(0, 0, 0)) === false)
     assert(Script.castToBoolean(Array(0x80.toByte)) === false)
   }
-  it should "pass reference client valid script tests" in {
 
-    def creditTx(scriptPubKey: Array[Byte]) = Transaction(version = 1,
-      txIn = TxIn(OutPoint(new Array[Byte](32), -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
-      txOut = TxOut(0, scriptPubKey) :: Nil,
-      lockTime = 0)
 
-    def spendingTx(scriptSig: Array[Byte], tx: Transaction) = Transaction(version = 1,
-      txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
-      txOut = TxOut(0, Array.empty[Byte]) :: Nil,
-      lockTime = 0)
+  def runTest(scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedResult: Boolean): Unit = {
+    val scriptPubKey = parseFromText(scriptPubKeyText)
+    val scriptSig = parseFromText(scriptSigText)
+    val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
+    val ctx = Script.Context(tx, 0, scriptPubKey)
+    val runner = new Script.Runner(ctx, parseScriptFlags(flags))
 
-    def runTest(scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String]): Unit = {
-      val scriptPubKey = parseFromText(scriptPubKeyText)
-      val scriptSig = parseFromText(scriptSigText)
-      val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
-      val ctx = Script.Context(tx, 0, scriptPubKey)
-      val runner = new Script.Runner(ctx, scriptFlag = parseScriptFlags(flags))
-      val stack = runner.run(scriptSig)
-      val stack1 = runner.run(scriptPubKey, stack)
-      assert(!stack1.isEmpty)
-      assert(Script.castToBoolean(stack1.head))
+    val result = runner.verifyScripts(scriptSig, scriptPubKey)
+    if(result != expectedResult) {
+      fail(comments.getOrElse(""))
     }
-
+  }
+  
+  it should "pass reference client valid script tests" in {
     val stream = classOf[ScriptSpec].getResourceAsStream("/script_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
     // use tail to skip the first line of the .json file
     json.extract[List[List[String]]].tail.foreach(_ match {
-      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => runTest(scriptSig, scriptPubKey, flags, Some(comments))
-      case scriptSig :: scriptPubKey :: flags :: Nil => runTest(scriptSig, scriptPubKey, flags, None)
+      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => runTest(scriptSig, scriptPubKey, flags, Some(comments), true)
+      case scriptSig :: scriptPubKey :: flags :: Nil => runTest(scriptSig, scriptPubKey, flags, None, true)
       case _ => ()
     })
   }
