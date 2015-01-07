@@ -55,12 +55,20 @@ package object bitcoin {
     writeUInt8((input >> 8) & 0xff, out)
   }
 
+  def writeUInt16(input: Int, out: OutputStream): Unit = writeUInt16(input.toLong, out)
+
   def writeUInt16BigEndian(input: Long, out: OutputStream): Unit = {
     writeUInt8((input >> 8) & 0xff, out)
     writeUInt8((input) & 0xff, out)
   }
 
-  def writeUInt16(input: Int, out: OutputStream): Unit = writeUInt16(input.toLong, out)
+  def writeUInt16BigEndian(input: Long): Array[Byte] = {
+    val out = new ByteArrayOutputStream(2)
+    writeUInt16BigEndian(input, out)
+    out.toByteArray
+  }
+
+  def writeUInt16BigEndian(input: Int): Array[Byte] = writeUInt16BigEndian(input.toLong)
 
   def uint32(a: Int, b: Int, c: Int, d: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8) | ((c & 0xffl) << 16) | ((d & 0xffl) << 24)
 
@@ -123,6 +131,12 @@ package object bitcoin {
     writeUInt8((input >>> 40) & 0xff, out)
     writeUInt8((input >>> 48) & 0xff, out)
     writeUInt8((input >>> 56) & 0xff, out)
+  }
+
+  def writeUInt64(input: Long): Array[Byte] = {
+    val out = new ByteArrayOutputStream(8)
+    writeUInt64(input, out)
+    out.toByteArray
   }
 
   def writeUInt64(input: Int, out: OutputStream): Unit = writeUInt64(input.toLong, out)

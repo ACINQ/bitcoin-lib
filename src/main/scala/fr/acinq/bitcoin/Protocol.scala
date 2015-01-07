@@ -54,6 +54,8 @@ trait BtcMessage[T] {
 
 
 object OutPoint extends BtcMessage[OutPoint] {
+  def apply(tx: Transaction, index: Int) = new OutPoint(Transaction.hash(tx), index)
+
   def read(input: InputStream): OutPoint = OutPoint(hash(input), uint32(input))
 
   def write(input: OutPoint, out: OutputStream) = {
@@ -265,7 +267,14 @@ object Transaction extends BtcMessage[Transaction] {
    * @param input transaction
    * @return the id of the transaction
    */
-  def txid(input: Transaction): String = toHexString(Crypto.hash256(Transaction.write(input)).reverse)
+  def txid(input: Transaction): String = toHexString(hash(input).reverse)
+
+  /**
+   *
+   * @param input transaction
+   * @return the hash of the transaction
+   */
+  def hash(input: Transaction) : Array[Byte] = Crypto.hash256(Transaction.write(input))
 }
 
 /**
