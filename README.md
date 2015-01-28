@@ -41,12 +41,12 @@ Not all script instructions have been implemented, but as is the library should 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.2</version>
+    <version>0.9.3</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.3-SNAPSHOT, the latest released version is 0.9.2
+The latest snapshot (development) version is 0.9.4-SNAPSHOT, the latest released version is 0.9.3
 
 ## Usage
 
