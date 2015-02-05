@@ -11,6 +11,12 @@ import scala.collection.mutable.ArrayBuffer
  * see https://en.bitcoin.it/wiki/Protocol_specification
  */
 
+case class BinaryData(data: Array[Byte]) {
+  def length = data.length
+  override def toString = toHexString(data)
+}
+
+
 trait BtcMessage[T] {
   /**
    * write a message to a stream
@@ -50,15 +56,17 @@ trait BtcMessage[T] {
    * @return a deserialized message of type T
    */
   def read(in: String): T = read(fromHexString(in))
+
+  def validate(t: T): Unit = {}
 }
 
 
 object OutPoint extends BtcMessage[OutPoint] {
   def apply(tx: Transaction, index: Int) = new OutPoint(Transaction.hash(tx), index)
 
-  def read(input: InputStream): OutPoint = OutPoint(hash(input), uint32(input))
+  override def read(input: InputStream): OutPoint = OutPoint(hash(input), uint32(input))
 
-  def write(input: OutPoint, out: OutputStream) = {
+  override def write(input: OutPoint, out: OutputStream) = {
     out.write(input.hash)
     writeUInt32(input.index, out)
   }
@@ -69,33 +77,35 @@ object OutPoint extends BtcMessage[OutPoint] {
  * @param hash reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
  * @param index index of the output in tx that we want to refer to
  */
-case class OutPoint(hash: Array[Byte], index: Long) {
+case class OutPoint(hash: BinaryData, index: Long) {
   require(hash.length == 32)
   require(index >= -1)
 
-  override def toString = s"OutPoint(${toHexString(hash)}, $index)"
-
-  def isCoinbaseOutPoint = index == 0xffffffffL && hash.find(_ != 0).isEmpty
+  def isCoinbaseOutPoint = index == 0xffffffffL && hash.data.find(_ != 0).isEmpty
 
   /**
    *
    * @return the id of the transaction this output belongs to
    */
-  def txid = toHexString(hash.reverse)
+  def txid = toHexString(hash.data.reverse)
 }
 
 object TxIn extends BtcMessage[TxIn] {
-  def read(input: InputStream): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
+  override def read(input: InputStream): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
 
-  def write(input: TxIn, out: OutputStream) = {
+  override def write(input: TxIn, out: OutputStream) = {
     OutPoint.write(input.outPoint, out)
     writeScript(input.signatureScript, out)
     writeUInt32(input.sequence, out)
   }
 
+  override def validate(input: TxIn) : Unit = {
+    require(input.signatureScript.length <= MaxScriptElementSize, s"signature script is ${input.signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
+  }
+
   def coinbase(script: Array[Byte]): TxIn = {
     require(script.length >= 2 && script.length <= 100, "coinbase script length must be between 2 and 100")
-    TxIn(OutPoint(new Array[Byte](32), -1L), script, sequence = 0xffffffffL)
+    TxIn(OutPoint(new Array[Byte](32), 0xffffffffL), script, sequence = 0xffffffffL)
   }
 }
 
@@ -106,18 +116,21 @@ object TxIn extends BtcMessage[TxIn] {
  * @param sequence Transaction version as defined by the sender. Intended for "replacement" of transactions when
  *                 information is updated before inclusion into a block. Unused for now.
  */
-case class TxIn(outPoint: OutPoint, signatureScript: Array[Byte], sequence: Long) {
-  //require(signatureScript.size <= MaxScriptElementSize, s"signature script is ${signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
-
-  override def toString = s"TxIn($outPoint, ${toHexString(signatureScript)}, $sequence)"
-}
+case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long)
 
 object TxOut extends BtcMessage[TxOut] {
-  def read(input: InputStream): TxOut = TxOut(uint64(input), script(input))
+  override def read(input: InputStream): TxOut = TxOut(uint64(input), script(input))
 
-  def write(input: TxOut, out: OutputStream) = {
+  override def write(input: TxOut, out: OutputStream) = {
     writeUInt64(input.amount, out)
     writeScript(input.publicKeyScript, out)
+  }
+
+  override def validate(input: TxOut) : Unit = {
+    import input._
+    require(amount >= 0, s"invalid txout amount: $amount")
+    require(amount < MaxMoney, s"invalid txout amount: $amount")
+    require(publicKeyScript.length < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
   }
 }
 
@@ -126,16 +139,10 @@ object TxOut extends BtcMessage[TxOut] {
  * @param amount amount in Satoshis
  * @param publicKeyScript Usually contains the public key as a Bitcoin script setting up conditions to claim this output.
  */
-case class TxOut(amount: Long, publicKeyScript: Array[Byte]) {
-  //require(amount >= 0, s"invalid txout amount: $amount")
-  require(amount < MaxMoney, s"invalid txout amount: $amount")
-  //require(publicKeyScript.size < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
-
-  override def toString = s"TxOut($amount, ${toHexString(publicKeyScript)})"
-}
+case class TxOut(amount: Long, publicKeyScript: BinaryData)
 
 object Transaction extends BtcMessage[Transaction] {
-  def read(input: InputStream): Transaction = {
+  override def read(input: InputStream): Transaction = {
     val version = uint32(input)
     val nbrIn = varint(input)
     val txIn = ArrayBuffer.empty[TxIn]
@@ -151,13 +158,23 @@ object Transaction extends BtcMessage[Transaction] {
     Transaction(version, txIn.toList, txOut.toList, lockTime)
   }
 
-  def write(input: Transaction, out: OutputStream) = {
+  override def write(input: Transaction, out: OutputStream) = {
     writeUInt32(input.version, out)
     writeVarint(input.txIn.length, out)
     input.txIn.map(t => TxIn.write(t, out))
     writeVarint(input.txOut.length, out)
     input.txOut.map(t => TxOut.write(t, out))
     writeUInt32(input.lockTime, out)
+  }
+
+  override def validate(input: Transaction) : Unit = {
+    require(input.txIn.nonEmpty, "input list cannot be empty")
+    require(input.txOut.nonEmpty, "output list cannot be empty")
+    require(input.txOut.map(_.amount).sum < MaxMoney, "sum of outputs amount is invalid")
+    input.txIn.map(TxIn.validate)
+    input.txOut.map(TxOut.validate)
+    // TODO: check for duplicate inputs
+    // TODO: check that first tx is a coinbase tx and all others are not
   }
 
   /**
@@ -195,7 +212,7 @@ object Transaction extends BtcMessage[Transaction] {
         val inputs = resetSequence(tx2.txIn, inputIndex)
         val outputs = for (i <- 0 to inputIndex) yield {
           if (i == inputIndex) tx2.txOut(inputIndex)
-          else TxOut(-1, Array())
+          else TxOut(-1, Array.empty[Byte])
         }
         tx2.copy(txIn = inputs, txOut = outputs)
       }
@@ -282,7 +299,7 @@ object Transaction extends BtcMessage[Transaction] {
  * @param prevPubKeyScript previous output public key script
  * @param privateKey private key associated with the previous output public key
  */
-case class SignData(prevPubKeyScript: Array[Byte], privateKey: Array[Byte])
+case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
 
 /**
  * Transaction
@@ -292,16 +309,11 @@ case class SignData(prevPubKeyScript: Array[Byte], privateKey: Array[Byte])
  * @param lockTime The block number or timestamp at which this transaction is locked
  */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
-  require(txIn.nonEmpty, "input list cannot be empty")
-  //require(txOut.nonEmpty, "output list cannot be empty")
-  require(txOut.map(_.amount).sum < MaxMoney, "sum of outputs amount is invalid")
-  // TODO: check for duplicate inputs
-  // TODO: check that first tx is a coinbase tx and all others are not
   lazy val txid = Transaction.txid(this)
 }
 
 object BlockHeader extends BtcMessage[BlockHeader] {
-  def read(input: InputStream): BlockHeader = {
+  override def read(input: InputStream): BlockHeader = {
     val version = uint32(input)
     val hashPreviousBlock = hash(input)
     val hashMerkleRoot = hash(input)
@@ -311,7 +323,7 @@ object BlockHeader extends BtcMessage[BlockHeader] {
     BlockHeader(version, hashPreviousBlock, hashMerkleRoot, time, bits, nonce)
   }
 
-  def write(input: BlockHeader, out: OutputStream) = {
+  override def write(input: BlockHeader, out: OutputStream) = {
     writeUInt32(input.version, out)
     out.write(input.hashPreviousBlock)
     out.write(input.hashMerkleRoot)
@@ -342,11 +354,9 @@ object BlockHeader extends BtcMessage[BlockHeader] {
  * @param bits The calculated difficulty target being used for this block
  * @param nonce The nonce used to generate this block… to allow variations of the header and compute different hashes
  */
-case class BlockHeader(version: Long, hashPreviousBlock: Array[Byte], hashMerkleRoot: Array[Byte], time: Long, bits: Long, nonce: Long) {
+case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleRoot: BinaryData, time: Long, bits: Long, nonce: Long) {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
-
-  override def toString = s"BlockHeader($version, ${toHexString(hashPreviousBlock)}, ${toHexString(hashMerkleRoot)}, $time, $bits, $nonce)"
 }
 
 /**
@@ -368,7 +378,7 @@ object MerkleTree {
 }
 
 object Block extends BtcMessage[Block] {
-  def read(input: InputStream): Block = {
+  override def read(input: InputStream): Block = {
     val raw = bytes(input, 80)
     val header = BlockHeader.read(new ByteArrayInputStream(raw))
     val nbrTx = varint(input)
@@ -379,10 +389,15 @@ object Block extends BtcMessage[Block] {
     Block(header, tx)
   }
 
-  def write(input: Block, out: OutputStream) = {
+  override def write(input: Block, out: OutputStream) = {
     BlockHeader.write(input.header, out)
     writeVarint(input.tx.length, out)
     input.tx.map(t => Transaction.write(t, out))
+  }
+
+  override def validate(input: Block) : Unit = {
+    BlockHeader.validate(input.header)
+    input.tx.map(Transaction.validate)
   }
 
   // genesis block
@@ -409,7 +424,7 @@ object Block extends BtcMessage[Block] {
    */
   def checkProofOfWork(block: Block): Boolean = {
     val (target, _, _) = decodeCompact(block.header.bits)
-    val hash = new BigInteger(1, block.hash)
+    val hash = new BigInteger(1, block.blockId)
     hash.compareTo(target) <= 0
   }
 }
@@ -422,8 +437,11 @@ object Block extends BtcMessage[Block] {
 case class Block(header: BlockHeader, tx: Seq[Transaction]) {
   require(util.Arrays.equals(header.hashMerkleRoot, MerkleTree.computeRoot(tx)), "invalid block:  merkle root mismatch")
   require(tx.map(Transaction.txid).toSet.size == tx.size, "invalid block: duplicate transactions")
+
+  lazy val hash = Crypto.hash256(BlockHeader.write(header))
+
   // hash is reversed here (same as tx id)
-  lazy val hash = Crypto.hash256(BlockHeader.write(header)).reverse
+  lazy val blockId = hash.reverse
 }
 
 object Address {
@@ -468,7 +486,7 @@ object Message extends BtcMessage[Message] {
   val MagicTestnet3 = 0x0709110BL
   val MagicNamecoin = 0xFEB4BEF9L
 
-  def read(in: InputStream): Message = {
+  override def read(in: InputStream): Message = {
     val magic = uint32(in)
     val buffer = new Array[Byte](12)
     in.read(buffer)
@@ -483,7 +501,7 @@ object Message extends BtcMessage[Message] {
     Message(magic, command, payload)
   }
 
-  def write(input: Message, out: OutputStream) = {
+  override def write(input: Message, out: OutputStream) = {
     writeUInt32(input.magic, out)
     val buffer = new Array[Byte](12)
     input.command.getBytes("ISO-8859-1").copyToArray(buffer)
@@ -501,12 +519,12 @@ object Message extends BtcMessage[Message] {
  * @param command ASCII string identifying the packet content, NULL padded (non-NULL padding results in packet rejected)
  * @param payload The actual data
  */
-case class Message(magic: Long, command: String, payload: Array[Byte]) {
+case class Message(magic: Long, command: String, payload: BinaryData) {
   require(command.length <= 12)
 }
 
 object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestamp] {
-  def read(in: InputStream): NetworkAddressWithTimestamp = {
+  override def read(in: InputStream): NetworkAddressWithTimestamp = {
     val time = uint32(in)
     val services = uint64(in)
     val raw = new Array[Byte](16)
@@ -517,7 +535,7 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
     NetworkAddressWithTimestamp(time, services, address, port)
   }
 
-  def write(input: NetworkAddressWithTimestamp, out: OutputStream) = {
+  override def write(input: NetworkAddressWithTimestamp, out: OutputStream) = {
     writeUInt32(input.time, out)
     writeUInt64(input.services, out)
     out.write(fromHexString("00000000000000000000ffff"))
@@ -529,7 +547,7 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
 case class NetworkAddressWithTimestamp(time: Long, services: Long, address: InetAddress, port: Long)
 
 object NetworkAddress extends BtcMessage[NetworkAddress] {
-  def read(in: InputStream): NetworkAddress = {
+  override def read(in: InputStream): NetworkAddress = {
     val services = uint64(in)
     val raw = new Array[Byte](16)
     in.read(raw)
@@ -539,7 +557,7 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
     NetworkAddress(services, address, port)
   }
 
-  def write(input: NetworkAddress, out: OutputStream) = {
+  override def write(input: NetworkAddress, out: OutputStream) = {
     writeUInt64(input.services, out)
     out.write(fromHexString("00000000000000000000ffff"))
     out.write(input.address.getAddress)
@@ -550,7 +568,7 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
 case class NetworkAddress(services: Long, address: InetAddress, port: Long)
 
 object Version extends BtcMessage[Version] {
-  def read(in: InputStream): Version = {
+  override def read(in: InputStream): Version = {
     val version = uint32(in)
     val services = uint64(in)
     val timestamp = uint64(in)
@@ -566,7 +584,7 @@ object Version extends BtcMessage[Version] {
     Version(version, services, timestamp, addr_recv, addr_from, nonce, user_agent, start_height, relay)
   }
 
-  def write(input: Version, out: OutputStream) = {
+  override def write(input: Version, out: OutputStream) = {
     writeUInt32(input.version, out)
     writeUInt64(input.services, out)
     writeUInt64(input.timestamp, out)
@@ -628,10 +646,8 @@ object InventoryVector extends BtcMessage[InventoryVector] {
   override def read(in: InputStream): InventoryVector = InventoryVector(uint32(in), hash(in))
 }
 
-case class InventoryVector(`type`: Long, hash: Array[Byte]) {
+case class InventoryVector(`type`: Long, hash: BinaryData) {
   require(hash.length == 32, "invalid hash length")
-
-  override def toString = s"InventoryVector(${`type`}, ${toHexString(hash)})"
 }
 
 object Inventory extends BtcMessage[Inventory] {
@@ -663,7 +679,7 @@ object Getblocks extends BtcMessage[Getblocks] {
 
   override def read(in: InputStream): Getblocks = {
     val version = uint32(in)
-    val vector = ArrayBuffer.empty[Array[Byte]]
+    val vector = ArrayBuffer.empty[BinaryData]
     val count = varint(in)
     for (i <- 1L to count) {
       vector += hash(in)
@@ -673,9 +689,9 @@ object Getblocks extends BtcMessage[Getblocks] {
   }
 }
 
-case class Getblocks(version: Long, locatorHashes: Seq[Array[Byte]], stopHash: Array[Byte]) {
-  locatorHashes.map(h => require(h.size == 32))
-  require(stopHash.size == 32)
+case class Getblocks(version: Long, locatorHashes: Seq[BinaryData], stopHash: BinaryData) {
+  locatorHashes.map(h => require(h.length == 32))
+  require(stopHash.length == 32)
 }
 
 object Getdata extends BtcMessage[Getdata] {

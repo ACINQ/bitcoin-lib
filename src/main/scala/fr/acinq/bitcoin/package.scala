@@ -195,6 +195,12 @@ package object bitcoin {
 
   def fromHexString(hex: String): Array[Byte] = hex.stripPrefix("0x").sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)
 
+  implicit def string2binaryData(input: String) : BinaryData = BinaryData(fromHexString(input))
+
+  implicit def array2binaryData(input: Array[Byte]) : BinaryData = BinaryData(input)
+
+  implicit def binaryData2array(input: BinaryData) : Array[Byte] = input.data.toArray
+
   /**
    *
    * @param input compact size encoded integer as used to encode proof-of-work difficulty target

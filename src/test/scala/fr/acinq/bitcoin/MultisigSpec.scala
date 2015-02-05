@@ -32,7 +32,7 @@ class MultisigSpec extends FlatSpec with Matchers {
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
     val txIn = TxIn(
       OutPoint(fromHexString("41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea").reverse, 0),
-      signatureScript = Array(), // empy signature script
+      signatureScript = Array.empty[Byte], // empy signature script
       sequence = 0xFFFFFFFFL)
 
     // and we want to sent the output to our multisig address

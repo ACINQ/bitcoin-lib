@@ -13,9 +13,9 @@ import org.bouncycastle.math.ec.ECPoint
  */
 object DeterministicWallet {
 
-  case class ExtendedPrivateKey(secretkey: Array[Byte], chaincode: Array[Byte], depth: Int, index: Long, parent: Long)
+  case class ExtendedPrivateKey(secretkey: BinaryData, chaincode: BinaryData, depth: Int, index: Long, parent: Long)
 
-  case class ExtendedPublicKey(publickey: Array[Byte], chaincode: Array[Byte], depth: Int, index: Long, parent: Long)
+  case class ExtendedPublicKey(publickey: BinaryData, chaincode: BinaryData, depth: Int, index: Long, parent: Long)
 
   def encode(input: ExtendedPrivateKey, testnet: Boolean): String = {
     val out = new ByteArrayOutputStream()
@@ -64,7 +64,7 @@ object DeterministicWallet {
   def publicKey(input: ExtendedPrivateKey) : ExtendedPublicKey = {
     // add an extra 1 to make sure the returned public key will be encoded
     // in compressed format as per specs.
-    val pub = Crypto.publicKeyFromPrivateKey(input.secretkey :+ 1.toByte)
+    val pub = Crypto.publicKeyFromPrivateKey(input.secretkey.data :+ 1.toByte)
     ExtendedPublicKey(pub, input.chaincode, depth = input.depth, index = input.index, parent = input.parent)
   }
 
@@ -90,11 +90,11 @@ object DeterministicWallet {
    */
   def derivePrivateKey(parent: ExtendedPrivateKey, index: Long) = {
     val I = if (index >= 0x80000000L) {
-      val buffer = 0.toByte +: parent.secretkey
+      val buffer = 0.toByte +: parent.secretkey.data
       hmac512(parent.chaincode, buffer ++ writeUInt32BigEndian(index))
     } else {
       val pub = publicKey(parent).publickey
-      hmac512(parent.chaincode, pub ++ writeUInt32BigEndian(index))
+      hmac512(parent.chaincode, pub.data ++ writeUInt32BigEndian(index))
     }
     val IL = I.take(32)
     val IR = I.takeRight(32)
@@ -112,7 +112,7 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, index: Long) : ExtendedPublicKey = {
     require(index < 0x80000000L, "Cannot derive public keys from public hardened keys")
 
-    val I = hmac512(parent.chaincode, parent.publickey ++ writeUInt32BigEndian(index))
+    val I = hmac512(parent.chaincode, parent.publickey.data ++ writeUInt32BigEndian(index))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val p = new BigInteger(1, IL)
