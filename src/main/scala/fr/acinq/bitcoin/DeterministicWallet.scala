@@ -70,7 +70,7 @@ object DeterministicWallet {
    * @return a "master" private key
    */
   def generate(seed: Array[Byte]): ExtendedPrivateKey = {
-    val I = hmac512("Bitcoin seed".getBytes("UTF-8"), seed)
+    val I = Crypto.hmac512("Bitcoin seed".getBytes("UTF-8"), seed)
     val IL = I.take(32)
     val IR = I.takeRight(32)
     ExtendedPrivateKey(IL, IR, depth = 0, path = List.empty[Long], parent = 0L)
@@ -111,10 +111,10 @@ object DeterministicWallet {
   def derivePrivateKey(parent: ExtendedPrivateKey, index: Long) = {
     val I = if (isHardened(index)) {
       val buffer = 0.toByte +: parent.secretkey.data
-      hmac512(parent.chaincode, buffer ++ writeUInt32BigEndian(index))
+      Crypto.hmac512(parent.chaincode, buffer ++ writeUInt32BigEndian(index))
     } else {
       val pub = publicKey(parent).publickey
-      hmac512(parent.chaincode, pub.data ++ writeUInt32BigEndian(index))
+      Crypto.hmac512(parent.chaincode, pub.data ++ writeUInt32BigEndian(index))
     }
     val IL = I.take(32)
     val IR = I.takeRight(32)
@@ -132,14 +132,14 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, index: Long) : ExtendedPublicKey = {
     require(!isHardened(index), "Cannot derive public keys from public hardened keys")
 
-    val I = hmac512(parent.chaincode, parent.publickey.data ++ writeUInt32BigEndian(index))
+    val I = Crypto.hmac512(parent.chaincode, parent.publickey.data ++ writeUInt32BigEndian(index))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val p = new BigInteger(1, IL)
     if (p.compareTo(Crypto.curve.getN) == 1) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val Ki = point(p).add(Crypto.curve.getCurve.decodePoint(parent.publickey))
+    val Ki = Crypto.point(p).add(Crypto.curve.getCurve.decodePoint(parent.publickey))
     if (Ki.isInfinity) {
       throw new RuntimeException("cannot generated child public key")
     }
@@ -150,19 +150,6 @@ object DeterministicWallet {
   def derivePrivateKey(parent: ExtendedPrivateKey, chain: Seq[Long]): ExtendedPrivateKey = chain.foldLeft(parent)(derivePrivateKey)
 
   def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent)(derivePublicKey)
-
-  def hmac512(key: Array[Byte], data: Array[Byte]) : Array[Byte] = {
-    val mac = new HMac(new SHA512Digest())
-    mac.init(new KeyParameter(key))
-    mac.update(data, 0, data.length)
-    val out = new Array[Byte](64)
-    mac.doFinal(out, 0)
-    out
-  }
-
-  private def point(p: BigInteger): ECPoint = Crypto.curve.getG.multiply(p)
-
-  private def serp(p: ECPoint): Array[Byte] = p.getEncoded(true)
 
   val xprv = 0x0488ade4
   val tprv = 0x04358394

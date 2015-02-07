@@ -102,7 +102,7 @@ class DeterministicWalletSpec extends FlatSpec {
 
     // now we have: the master public key, and a child private key, and we want to climb the tree back up
     // to the parent private key
-    val I = hmac512(m_pub.chaincode, m_pub.publickey.data ++ writeUInt32BigEndian(42L))
+    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickey.data ++ writeUInt32BigEndian(42L))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val guess = new BigInteger(1, m42.secretkey).subtract(new BigInteger(1, IL)).mod(Crypto.curve.getN)

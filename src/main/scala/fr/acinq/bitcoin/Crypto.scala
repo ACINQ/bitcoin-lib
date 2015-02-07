@@ -6,9 +6,11 @@ import java.math.BigInteger
 import org.bouncycastle.asn1.sec.SECNamedCurves
 import org.bouncycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
 import org.bouncycastle.crypto.Digest
-import org.bouncycastle.crypto.digests.{SHA1Digest, GeneralDigest, RIPEMD160Digest, SHA256Digest}
-import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters}
+import org.bouncycastle.crypto.digests._
+import org.bouncycastle.crypto.macs.HMac
+import org.bouncycastle.crypto.params.{KeyParameter, ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters}
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
+import org.bouncycastle.math.ec.ECPoint
 
 import scala.util.{Failure, Success, Try}
 
@@ -18,6 +20,19 @@ object Crypto {
   val halfCurveOrder = params.getN().shiftRight(1)
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
+
+  def hmac512(key: Array[Byte], data: Array[Byte]) : Array[Byte] = {
+    val mac = new HMac(new SHA512Digest())
+    mac.init(new KeyParameter(key))
+    mac.update(data, 0, data.length)
+    val out = new Array[Byte](64)
+    mac.doFinal(out, 0)
+    out
+  }
+
+  def point(p: BigInteger): ECPoint = Crypto.curve.getG.multiply(p)
+
+  def serp(p: ECPoint): Array[Byte] = p.getEncoded(true)
 
   def hash(digest: Digest)(input: Array[Byte]): Array[Byte] = {
     digest.update(input, 0, input.length)
