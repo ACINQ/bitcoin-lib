@@ -233,8 +233,12 @@ object Transaction extends BtcMessage[Transaction] {
    * @return a hash which can be used to signed the referenced tx input
    */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Array[Byte] = {
-    val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
-    Crypto.hash256(Transaction.write(txCopy) ++ writeUInt32(sighashType))
+    if (isHashSingle(sighashType) && inputIndex >= tx.txOut.length) {
+      fromHexString("0100000000000000000000000000000000000000000000000000000000000000")
+    } else {
+      val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
+      Crypto.hash256(Transaction.write(txCopy) ++ writeUInt32(sighashType))
+    }
   }
 
   /**
