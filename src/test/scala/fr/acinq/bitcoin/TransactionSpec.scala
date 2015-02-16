@@ -297,7 +297,24 @@ class TransactionSpec extends FlatSpec with Matchers {
       val result = runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)
       result
     }
-    
+
+    assert(results.find(!_).isEmpty)
+  }
+
+  it should "solve transaction puzzle #2" in {
+    // tx puzzle 61d47409a240a4b67ce75ec4dffa30e1863485f8fe64a6334410347692f9e60e
+    val tx = Transaction.read("01000000012edfb7a1a41b61e46eae1032c38d8792eacb79f7a6599dd24372f4a3e88a31700000000006030000800191ffffffff010000000000000000016a00000000")
+    val previousTxMap = Map(
+      "70318ae8a3f47243d29d59a6f779cbea92878dc33210ae6ee4611ba4a1b7df2e" -> Transaction.read("010000000192cad3c8e41d1e2f1baf6f8a991c3db6bf67a60c49e963beb44f8e41a78073dd010000008b48304502203b4cb2c60cd688129ec89da31464ce9ce07da56125425afdf9fd67559e708b3c0221008174b7a26787a8eb30460a699f584518351a741bc37775dc702d7f14e8f53e340141043a58cccd11db5dfc34e1433eef0b2b3bf6b947113d5e45562a095781663c919dda444017ab9a7c0e458478e7ef3edf5233eb476c1cb62ecfbb03bc4e22e40333ffffffff0250c300000000000017a914bb89dd62e80d1801df9aa570769b012f246c4f6d8730ee9a00000000001976a91463e8c29bfd51ee98778481c920bb6d288a220f9188ac00000000")
+    )
+    val results = for (i <- 0 until tx.txIn.length) yield {
+      val prevOutputScript = previousTxMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
+      val ctx = new Script.Context(tx, i, prevOutputScript)
+      val runner = new Script.Runner(ctx)
+      val result = runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)
+      result
+    }
+
     assert(results.find(!_).isEmpty)
   }
 }
