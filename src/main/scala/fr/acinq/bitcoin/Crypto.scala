@@ -87,22 +87,25 @@ object Crypto {
 
   def checkSignatureEncoding(sig: Array[Byte], flags: Int) : Boolean = {
     import ScriptFlags._
-    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0) isDERSignature(sig)
+    // Empty signature. Not strictly DER encoded, but allowed to provide a
+    // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
+    if (sig.isEmpty) true
+    else if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0) isDERSignature(sig)
     else if ((flags & SCRIPT_VERIFY_LOW_S) != 0) isLowDERSignature(sig)
     else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0) isDefinedHashtypeSignature(sig)
     else true
   }
 
   def checkPubKeyEncoding(key: Array[Byte], flags: Int) : Boolean = {
-    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) {
-      key.length match {
-        case 65 if key(0) == 4 => true
-        case 33 if key(0) == 2 || key(0) == 3 => true
-        case _ => false
-      }
-    } else true
+    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) isPubKeyValid(key) else true
   }
 
+  def isPubKeyValid(key: Array[Byte]) : Boolean = key.length match {
+    case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 => true
+    case 33 if key(0) == 2 || key(0) == 3 => true
+    case _ => false
+  }
+  
   def isDefinedHashtypeSignature(sig: Array[Byte]): Boolean = if (sig.isEmpty) false else {
     val hashType = sig.last & (~(SIGHASH_ANYONECANPAY))
     if (hashType < SIGHASH_ALL || hashType > SIGHASH_SINGLE) false else true
@@ -132,12 +135,13 @@ object Crypto {
     val signer = new ECDSASigner
     val params = new ECPublicKeyParameters(curve.getCurve.decodePoint(publicKey), curve)
     signer.init(false, params)
-    Try(signer.verifySignature(data, r, s)) match {
-      case Success(result) => result
-      case Failure(cause) => {
-        false
-      }
-    }
+    signer.verifySignature(data, r, s)
+//    Try(signer.verifySignature(data, r, s)) match {
+//      case Success(result) => result
+//      case Failure(cause) => {
+//        false
+//      }
+//    }
   }
 
   /**

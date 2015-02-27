@@ -69,10 +69,12 @@ object ScriptSpec {
 
 @RunWith(classOf[JUnitRunner])
 class ScriptSpec extends FlatSpec {
+
   import ScriptSpec._
+
   implicit val format = DefaultFormats
 
-   "Script" should "parse signature scripts" in {
+  "Script" should "parse signature scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("47304402202b4da291cc39faf8433911988f9f49fc5c995812ca2f94db61468839c228c3e90220628bff3ff32ec95825092fa051cba28558a981fcf59ce184b14f2e215e69106701410414b38f4be3bb9fa0f4f32b74af07152b2f2f630bc02122a491137b6c523e46f18a0d5034418966f93dfc37cc3739ef7b2007213a302b7fba161557f4ad644a1c")
     val script = Script.parse(blob)
     val pk = Script.publicKey(script)
@@ -91,6 +93,10 @@ class ScriptSpec extends FlatSpec {
     val OP_HASH160 :: OP_PUSHDATA(scriptHash) :: OP_EQUAL :: Nil = script
     val multisigAddress = Address.encode(Address.TestnetScriptVersion, scriptHash)
     assert(multisigAddress === "2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
+  }
+  it should "detect 'pay to script' scripts" in {
+    val script = fromHexString("a91415727299b05b45fdaf9ac9ecf7565cfe27c3e56787")
+    assert(Script.isPayToScript(script))
   }
   it should "parse if/else/endif" in {
     val tx = Transaction(version = 1,
@@ -132,11 +138,11 @@ class ScriptSpec extends FlatSpec {
     val runner = new Script.Runner(ctx, parseScriptFlags(flags))
 
     val result = runner.verifyScripts(scriptSig, scriptPubKey)
-    if(result != expectedResult) {
+    if (result != expectedResult) {
       fail(comments.getOrElse(""))
     }
   }
-  
+
   it should "pass reference client valid script tests" in {
     val stream = classOf[ScriptSpec].getResourceAsStream("/script_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))

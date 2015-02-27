@@ -215,6 +215,8 @@ object Script {
     case _ => false
   }
 
+  def isPayToScript(script: Array[Byte]) : Boolean = script.length == 23 && script(0) == elt2code(OP_HASH160).toByte && script(1) == 0x14 && script(22) == elt2code(OP_EQUAL).toByte
+
   /**
    * execution context of a tx script
    * @param tx current transaction
@@ -232,11 +234,12 @@ object Script {
   class Runner(context: Context, scriptFlag: Int = MANDATORY_SCRIPT_VERIFY_FLAGS) {
 
     def checkSignature(pubKey: Array[Byte], sigBytes: Array[Byte]): Boolean = {
-      if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag) || !Crypto.checkPubKeyEncoding(pubKey, scriptFlag))
-        false
+      if (sigBytes.isEmpty) false
+      else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag) || !Crypto.checkPubKeyEncoding(pubKey, scriptFlag)) false
+      else if (!Crypto.isPubKeyValid(pubKey)) false
       else {
         val (r, s) = Crypto.decodeSignature(sigBytes)
-        val sigHashFlags = sigBytes.last
+        val sigHashFlags = sigBytes.last & 0xff
         val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
         Crypto.verifySignature(hash, (r, s), pubKey)
       }
@@ -245,15 +248,9 @@ object Script {
     def checkSignatures(pubKeys: Seq[Array[Byte]], sigs: Seq[Array[Byte]]): Boolean = sigs match {
       case Nil => true
       case _ if sigs.length > pubKeys.length => false
-      case sig :: _ if !Crypto.checkSignatureEncoding(sig, scriptFlag) => throw new RuntimeException("sig")
+      case sig :: _ if !Crypto.checkSignatureEncoding(sig, scriptFlag) => throw new RuntimeException("invalid signature")
       case sig :: _ =>
-        if (!Crypto.checkPubKeyEncoding(pubKeys.head, scriptFlag)) {
-          throw new RuntimeException("pubKey")
-        }
-        val (r, s) = Crypto.decodeSignature(sig)
-        val sigHashFlags = sig.last
-        val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
-        if (Crypto.verifySignature(hash, (r, s), pubKeys.head))
+        if (checkSignature(pubKeys.head, sig))
           checkSignatures(pubKeys.tail, sigs.tail)
         else
           checkSignatures(pubKeys.tail, sigs)
@@ -274,7 +271,7 @@ object Script {
      * @return a updated data stack
      */
     @tailrec
-    final def run(script: List[ScriptElt], stack: Stack, conditions: List[Boolean], altstack: Stack): Stack = {
+    final def run(script: List[ScriptElt], stack: Stack, conditions: List[Boolean], altstack: Stack, opCount: Int = 0): Stack = {
       if ((stack.length + altstack.length) > 1000) throw new RuntimeException(s"stack is too large: stack size = ${stack.length} alt stack size = ${altstack.length}")
       script match {
         // first, things that are always checked even in non-executed IF branches
@@ -301,7 +298,7 @@ object Script {
         // and now, things that are checked only in an executed IF branch
         case OP_0 :: tail => run(tail, Array.empty[Byte] :: stack, conditions, altstack)
         case op :: tail if isSimpleValue(op) => run(tail, encodeNumber(simpleValue(op)) :: stack, conditions, altstack)
-        case op :: tail if isUpgradableNop(op) && (scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0 => throw new RuntimeException("use of upgradable NOP is discouraged")
+        case op :: tail if isUpgradableNop(op) && ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
         case op :: tail if isNop(op) => run(tail, stack, conditions, altstack)
         case OP_1ADD :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_1ADD on am empty stack")
         case OP_1ADD :: tail => run(tail, encodeNumber(decodeNumber(stack.head) + 1) :: stack.tail, conditions, altstack)
@@ -335,14 +332,7 @@ object Script {
         }
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
-            val result = if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag) || !Crypto.checkPubKeyEncoding(pubKey, scriptFlag))
-              false
-            else {
-              val (r, s) = Crypto.decodeSignature(sigBytes)
-              val sigHashFlags = sigBytes.last & 0xff
-              val hash = Transaction.hashForSigning(context.tx, context.inputIndex, context.previousOutputScript, sigHashFlags)
-              Crypto.verifySignature(hash, (r, s), pubKey)
-            }
+           val result = checkSignature(pubKey, sigBytes)
             run(tail, (if (result) Array(1: Byte) else Array(0: Byte)) :: stacktail, conditions, altstack)
           }
           case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
@@ -551,14 +541,17 @@ object Script {
      * @return true if the scripts were successfully verified
      */
     def verifyScripts(scriptSig: Array[Byte], scriptPubKey: Array[Byte]) : Boolean = {
-      val ssig = Script.parse(scriptSig)
-      if (((scriptFlag & SCRIPT_VERIFY_SIGPUSHONLY) != 0) && !Script.isPushOnly(ssig)) throw new RuntimeException("signature script is not PUSH-only")
-      val stack = run(ssig)
-      val spub = Script.parse(scriptPubKey)
-      val stack1 = run(spub, stack)
-      if (stack1.isEmpty) false
-      else if (!Script.castToBoolean(stack1.head)) false
-      else if (((scriptFlag & SCRIPT_VERIFY_P2SH) != 0) && Script.isPayToScript(spub)) {
+      try {
+        val ssig = Script.parse(scriptSig)
+        if (((scriptFlag & SCRIPT_VERIFY_SIGPUSHONLY) != 0) && !Script.isPushOnly(ssig)) throw new RuntimeException("signature script is not PUSH-only")
+        val stack = run(ssig)
+        val spub = Script.parse(scriptPubKey)
+        val stack1 = run(spub, stack)
+        val checkP2SH = (scriptFlag & SCRIPT_VERIFY_P2SH) != 0
+        val isP2SH = Script.isPayToScript(scriptPubKey)
+        if (stack1.isEmpty) false
+        else if (!Script.castToBoolean(stack1.head)) false
+        else if (((scriptFlag & SCRIPT_VERIFY_P2SH) != 0) && Script.isPayToScript(scriptPubKey)) {
           // scriptSig must be literals-only or validation fails
           if (!Script.isPushOnly(ssig)) throw new RuntimeException("signature script is not PUSH-only")
 
@@ -573,6 +566,10 @@ object Script {
           val stack2 = runner1.run(stack.head, stack.tail)
           if (stack2.isEmpty) false else Script.castToBoolean(stack2.head)
         } else true
+      }
+      catch {
+        case t: Throwable => false
+      }
     }
   }
 
