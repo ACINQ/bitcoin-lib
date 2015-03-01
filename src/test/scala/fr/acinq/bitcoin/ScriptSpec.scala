@@ -65,6 +65,19 @@ object ScriptSpec {
     txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
     txOut = TxOut(0, Array.empty[Byte]) :: Nil,
     lockTime = 0)
+
+  def runTest(scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedResult: Boolean): Unit = {
+    val scriptPubKey = parseFromText(scriptPubKeyText)
+    val scriptSig = parseFromText(scriptSigText)
+    val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
+    val ctx = Script.Context(tx, 0, scriptPubKey)
+    val runner = new Script.Runner(ctx, parseScriptFlags(flags))
+
+    val result = Try(runner.verifyScripts(scriptSig, scriptPubKey)).getOrElse(false)
+    if (result != expectedResult) {
+      throw new RuntimeException(comments.getOrElse(""))
+    }
+  }
 }
 
 @RunWith(classOf[JUnitRunner])
@@ -128,28 +141,13 @@ class ScriptSpec extends FlatSpec {
     assert(Script.castToBoolean(Array(0, 0, 0)) === false)
     assert(Script.castToBoolean(Array(0x80.toByte)) === false)
   }
-
-
-  def runTest(scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedResult: Boolean): Unit = {
-    val scriptPubKey = parseFromText(scriptPubKeyText)
-    val scriptSig = parseFromText(scriptSigText)
-    val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
-    val ctx = Script.Context(tx, 0, scriptPubKey)
-    val runner = new Script.Runner(ctx, parseScriptFlags(flags))
-
-    val result = runner.verifyScripts(scriptSig, scriptPubKey)
-    if (result != expectedResult) {
-      fail(comments.getOrElse(""))
-    }
-  }
-
   it should "pass reference client valid script tests" in {
     val stream = classOf[ScriptSpec].getResourceAsStream("/script_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
     // use tail to skip the first line of the .json file
     json.extract[List[List[String]]].tail.foreach(_ match {
-      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => runTest(scriptSig, scriptPubKey, flags, Some(comments), true)
-      case scriptSig :: scriptPubKey :: flags :: Nil => runTest(scriptSig, scriptPubKey, flags, None, true)
+      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, Some(comments), true)
+      case scriptSig :: scriptPubKey :: flags :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, None, true)
       case _ => ()
     })
   }
