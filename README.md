@@ -17,10 +17,10 @@ This is a simple scala library which implements some (most ?) of the bitcoin pro
 * BIP 32 (deterministic wallets)
 * BIP 70
 
-## Limitations and compatibility issues
+## Objectives
 
-This is a very early beta release and should not be used in production. If you're looking for a mature bitcoin library for the JVM you should
-have a look at [bitcoinj](https://github.com/bitcoinj/bitcoinj) instead.
+Our goal is not to re-implement a full Bitcoin node (this would be a doomed and rather pointless endeavour) but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We also use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32 for example).  
+This is a very early beta release and should not be used in production. If you're looking for a mature bitcoin library for the JVM you should have a look at [bitcoinj](https://github.com/bitcoinj/bitcoinj) instead.
 
 Not all script instructions have been implemented, but as is the library should be able to parse and validate the entire blockchain.
 
@@ -139,4 +139,70 @@ Please have a look at unit tests, more samples will be added soon.
   val signedTx = Transaction.sign(tx, List(signData))
 
 ```
+### HD Wallet
 
+Let's play with the scala console and the first test vector from https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
+
+```shell
+mvn scala:console
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] Building bitcoin-lib 0.9.4-SNAPSHOT
+[INFO] ------------------------------------------------------------------------
+[INFO]
+[INFO] --- scala-maven-plugin:3.2.0:console (default-cli) @ bitcoin-lib_2.11 ---
+[WARNING]  Expected all dependencies to require Scala version: 2.11.4
+[WARNING]  fr.acinq:bitcoin-lib_2.11:0.9.4-SNAPSHOT requires scala version: 2.11.4
+[WARNING]  com.github.scopt:scopt_2.11:3.2.0 requires scala version: 2.11.0
+[WARNING] Multiple versions of scala libraries detected!
+[WARNING] scala-maven-plugin cannot fork scala console!!  Running in process
+Welcome to Scala version 2.11.1 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_31).
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala> import fr.acinq.bitcoin._
+import fr.acinq.bitcoin._
+
+scala> import fr.acinq.bitcoin.DeterministicWallet
+DeterministicWallet   DeterministicWalletSpec
+
+scala> import fr.acinq.bitcoin.DeterministicWallet._
+import fr.acinq.bitcoin.DeterministicWallet._
+
+scala> val m = generate(fromHexString("000102030405060708090a0b0c0d0e0f"))
+m: fr.acinq.bitcoin.DeterministicWallet.ExtendedPrivateKey = ExtendedPrivateKey(e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35,873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508,0,m,0)
+
+scala> encode(m, false)
+res1: String = xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi
+
+scala> publicKey(m)
+res2: fr.acinq.bitcoin.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey(0339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2,873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508,0,m,0)
+
+scala> encode(publicKey(m), false)
+res3: String = xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8
+
+scala> val priv = derivePrivateKey(m, hardened(0) :: 1L :: hardened(2) :: 2L :: Nil)
+priv: fr.acinq.bitcoin.DeterministicWallet.ExtendedPrivateKey = ExtendedPrivateKey(0f479245fb19a38a1954c5c7c0ebab2f9bdfd96a17563ef28a6a4b1a2a764ef4,cfb71883f01676f587d023cc53a35bc7f88f724b1f8c2892ac1275ac822a3edd,4,m/0h/1/2h/2,4001020172)
+
+scala> encode(priv, false)
+res5: String = xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334
+
+scala> encode(publicKey(priv), false)
+res6: String = xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV
+
+scala> val k2 = derivePrivateKey(m, hardened(0) :: 1L :: hardened(2) :: Nil)
+k2: fr.acinq.bitcoin.DeterministicWallet.ExtendedPrivateKey = ExtendedPrivateKey(cbce0d719ecf7431d88e6a89fa1483e02e35092
+af60c042b1df2ff59fa424dca,04466b9cc8e161e966409ca52986c584f07e9dc81f735db683c3ff6ec7b1503f,3,m/0h/1/2h,3203769081)
+
+scala> val K2 = publicKey(k2)
+K2: fr.acinq.bitcoin.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey(0357bfe1e341d01c69fe5654309956cbea516822f
+ba8a601743a012a7896ee8dc2,04466b9cc8e161e966409ca52986c584f07e9dc81f735db683c3ff6ec7b1503f,3,m/0h/1/2h,3203769081)
+
+scala> derivePublicKey(K2, 2L :: 1000000000L :: Nil)
+res8: fr.acinq.bitcoin.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey(022a471424da5e657499d1ff51cb43c47481a03b1e77f951fe64cec9f5a48f7011,c783e67b921d2beb8f6b389cc646d7263b4145701dadd2161548a8b078e65e9e,5,m/0h/1/2h/2/1000000000,3632322520)
+
+scala> encode(derivePublicKey(K2, 2L :: 1000000000L :: Nil), false)
+res10: String = xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy
+
+```
