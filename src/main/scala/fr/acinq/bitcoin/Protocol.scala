@@ -701,7 +701,7 @@ case class Getblocks(version: Long, locatorHashes: Seq[BinaryData], stopHash: Bi
 object Getdata extends BtcMessage[Getdata] {
   override def write(t: Getdata, out: OutputStream): Unit = {
     writeVarint(t.inventory.size, out)
-    t.inventory.map(i => InventoryVector.write(i))
+    t.inventory.map(i => InventoryVector.write(i, out))
   }
 
   override def read(in: InputStream): Getdata = {
@@ -715,3 +715,20 @@ object Getdata extends BtcMessage[Getdata] {
 }
 
 case class Getdata(inventory: Seq[InventoryVector])
+
+object Reject extends BtcMessage[Reject] {
+  override def write(t: Reject, out: OutputStream): Unit = {
+    writeVarstring(t.message, out)
+    writeUInt8(t.code, out)
+    writeVarstring(t.reason, out)
+  }
+
+  override def read(in: InputStream): Reject = {
+    val message = varstring(in)
+    val code = uint8(in)
+    val reason = varstring(in)
+    Reject(message, code, reason, Array.empty[Byte])
+  }
+}
+
+case class Reject(message: String, code: Long, reason: String, data: BinaryData)

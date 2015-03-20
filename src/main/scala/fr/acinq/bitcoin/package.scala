@@ -179,6 +179,16 @@ package object bitcoin {
     blob
   }
 
+  def varstring(input: InputStream): String = {
+    val length = varint(input)
+    new String(bytes(input, length), "UTF-8")
+  }
+
+  def writeVarstring(input: String, out: OutputStream) = {
+    writeVarint(input.length, out)
+    out.write(input.getBytes("UTF-8"))
+  }
+
   def hash(input: InputStream): Array[Byte] = bytes(input, 32) // a hash is always 256 bits
 
   def script(input: InputStream): Array[Byte] = {

@@ -147,19 +147,28 @@ class ProtocolSpec extends FlatSpec {
     assert(getblocks.locatorHashes(0).toString === "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000")
     assert(toHexString(Getblocks.write(getblocks)) === toHexString(message.payload))
   }
-  it should "read and write getdata messages"in {
+  it should "read and write getdata messages" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/getdata.dat")
     val message = Message.read(stream)
     assert(message.command === "getdata")
     val getdata = Getdata.read(message.payload)
     assert(getdata.inventory.size === 128)
     assert(toHexString(getdata.inventory(0).hash) === "4860eb18bf1b1620e37e9490fc8a427514416fd75159ab86688e9a8300000000")
+    val check = Getdata.write(getdata)
+    assert(util.Arrays.equals(check, message.payload))
   }
-  it should "read and write block messages"in {
+  it should "read and write block messages" in {
     val message = Message.read("f9beb4d9626c6f636b00000000000000d7000000934d270a010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000")
     assert(message.command === "block")
     val block = Block.read(message.payload)
     assert(util.Arrays.equals(block.header.hashPreviousBlock, Block.LivenetGenesisBlock.hash))
     assert(block.tx(0).txIn(0).outPoint.isCoinbaseOutPoint)
+  }
+  it should "read and write reject messages" in {
+    val message = Message.read("0b11090772656a6563740000000000001f00000051e3a01d076765746461746101156572726f722070617273696e67206d657373616765")
+    assert(message.command === "reject")
+    val reject = Reject.read(message.payload)
+    assert(reject.message === "getdata")
+    assert(util.Arrays.equals(Reject.write(reject), message.payload))
   }
 }
