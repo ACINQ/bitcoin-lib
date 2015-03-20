@@ -24,7 +24,7 @@ package object bitcoin {
    * basic serialization functions
    */
 
-  def uint8(blob: Array[Byte]) = blob(0) & 0xffl
+  def uint8(blob: IndexedSeq[Byte]) = blob(0) & 0xffl
 
   def uint8(input: InputStream): Long = input.read().toLong
 
@@ -42,7 +42,7 @@ package object bitcoin {
 
   def uint16BigEndian(a: Int, b: Int): Long = ((b & 0xffl) << 0) | ((a & 0xffl) << 8)
 
-  def uint16(blob: Array[Byte]): Long = uint16(blob(0), blob(1))
+  def uint16(blob: IndexedSeq[Byte]): Long = uint16(blob(0), blob(1))
 
   def uint16BigEndian(blob: Array[Byte]): Long = uint16BigEndian(blob(0), blob(1))
 
@@ -72,7 +72,7 @@ package object bitcoin {
 
   def uint32(a: Int, b: Int, c: Int, d: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8) | ((c & 0xffl) << 16) | ((d & 0xffl) << 24)
 
-  def uint32(blob: Array[Byte]): Long = uint32(blob(0), blob(1), blob(2), blob(3))
+  def uint32(blob: IndexedSeq[Byte]): Long = uint32(blob(0), blob(1), blob(2), blob(3))
 
   def uint32(input: InputStream): Long = {
     val blob = new Array[Byte](4)
@@ -118,7 +118,7 @@ package object bitcoin {
 
   def uint64(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int, h: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8) | ((c & 0xffl) << 16) | ((d & 0xffl) << 24) | ((e & 0xffl) << 32) | ((f & 0xffl) << 40) | ((g & 0xffl) << 48) | ((h & 0xffl) << 56)
 
-  def uint64(blob: Array[Byte]): Long = uint64(blob(0), blob(1), blob(2), blob(3), blob(4), blob(5), blob(6), blob(7))
+  def uint64(blob: IndexedSeq[Byte]): Long = uint64(blob(0), blob(1), blob(2), blob(3), blob(4), blob(5), blob(6), blob(7))
 
   def uint64(input: InputStream): Long = uint64(input.read(), input.read(), input.read(), input.read(), input.read(), input.read(), input.read(), input.read())
 
@@ -191,7 +191,7 @@ package object bitcoin {
     out.write(input)
   }
 
-  def toHexString(blob: Array[Byte]) = blob.map("%02x".format(_)).mkString
+  def toHexString(blob: IndexedSeq[Byte]) = blob.map("%02x".format(_)).mkString
 
   def fromHexString(hex: String): Array[Byte] = hex.stripPrefix("0x").sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)
 
@@ -200,6 +200,8 @@ package object bitcoin {
   implicit def array2binaryData(input: Array[Byte]) : BinaryData = BinaryData(input)
 
   implicit def binaryData2array(input: BinaryData) : Array[Byte] = input.data.toArray
+
+  implicit def binaryData2indexeqSeq(input: BinaryData) : IndexedSeq[Byte] = input.data
 
   /**
    *

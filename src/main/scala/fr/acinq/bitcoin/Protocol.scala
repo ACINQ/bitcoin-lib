@@ -11,7 +11,7 @@ import scala.collection.mutable.ArrayBuffer
  * see https://en.bitcoin.it/wiki/Protocol_specification
  */
 
-case class BinaryData(data: Array[Byte]) {
+case class BinaryData(data: IndexedSeq[Byte]) {
   def length = data.length
   override def toString = toHexString(data)
 }

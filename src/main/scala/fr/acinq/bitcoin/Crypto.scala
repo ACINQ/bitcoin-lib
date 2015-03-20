@@ -8,11 +8,11 @@ import org.bouncycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests._
 import org.bouncycastle.crypto.macs.HMac
-import org.bouncycastle.crypto.params.{KeyParameter, ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters}
+import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters, KeyParameter}
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.bouncycastle.math.ec.ECPoint
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 object Crypto {
   val params = SECNamedCurves.getByName("secp256k1")
@@ -21,10 +21,10 @@ object Crypto {
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
 
-  def hmac512(key: Array[Byte], data: Array[Byte]) : Array[Byte] = {
+  def hmac512(key: IndexedSeq[Byte], data: IndexedSeq[Byte]) : Array[Byte] = {
     val mac = new HMac(new SHA512Digest())
-    mac.init(new KeyParameter(key))
-    mac.update(data, 0, data.length)
+    mac.init(new KeyParameter(key.toArray))
+    mac.update(data.toArray, 0, data.length)
     val out = new Array[Byte](64)
     mac.doFinal(out, 0)
     out
@@ -34,8 +34,8 @@ object Crypto {
 
   def serp(p: ECPoint): Array[Byte] = p.getEncoded(true)
 
-  def hash(digest: Digest)(input: Array[Byte]): Array[Byte] = {
-    digest.update(input, 0, input.length)
+  def hash(digest: Digest)(input: IndexedSeq[Byte]): Array[Byte] = {
+    digest.update(input.toArray, 0, input.length)
     val out = new Array[Byte](digest.getDigestSize)
     digest.doFinal(out, 0)
     out
@@ -53,7 +53,7 @@ object Crypto {
    * @param input array of byte
    * @return the 160 bits BTC hash of input
    */
-  def hash160(input: Array[Byte]): Array[Byte] = ripemd160(sha256(input))
+  def hash160(input: IndexedSeq[Byte]): Array[Byte] = ripemd160(sha256(input))
 
   /**
    * 256 bits bitcoin hash
@@ -61,7 +61,7 @@ object Crypto {
    * @param input array of byte
    * @return the 256 bits BTC hash of input
    */
-  def hash256(input: Array[Byte]) = sha256(sha256(input))
+  def hash256(input: IndexedSeq[Byte]) = sha256(sha256(input))
 
   /**
    * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
@@ -81,11 +81,11 @@ object Crypto {
 
   def encodeSignature(t: (BigInteger, BigInteger)): Array[Byte] = encodeSignature(t._1, t._2)
 
-  def isDERSignature(sig: Array[Byte]) : Boolean = Try(decodeSignature(sig)).isSuccess
+  def isDERSignature(sig: IndexedSeq[Byte]) : Boolean = Try(decodeSignature(sig)).isSuccess
 
-  def isLowDERSignature(sig: Array[Byte]): Boolean = Try(decodeSignature(sig)).map(_._2.compareTo(halfCurveOrder) <= 0).getOrElse(false)
+  def isLowDERSignature(sig: IndexedSeq[Byte]): Boolean = Try(decodeSignature(sig)).map(_._2.compareTo(halfCurveOrder) <= 0).getOrElse(false)
 
-  def checkSignatureEncoding(sig: Array[Byte], flags: Int) : Boolean = {
+  def checkSignatureEncoding(sig: IndexedSeq[Byte], flags: Int) : Boolean = {
     import ScriptFlags._
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
@@ -96,17 +96,17 @@ object Crypto {
     else true
   }
 
-  def checkPubKeyEncoding(key: Array[Byte], flags: Int) : Boolean = {
+  def checkPubKeyEncoding(key: IndexedSeq[Byte], flags: Int) : Boolean = {
     if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) isPubKeyValid(key) else true
   }
 
-  def isPubKeyValid(key: Array[Byte]) : Boolean = key.length match {
+  def isPubKeyValid(key: IndexedSeq[Byte]) : Boolean = key.length match {
     case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 => true
     case 33 if key(0) == 2 || key(0) == 3 => true
     case _ => false
   }
   
-  def isDefinedHashtypeSignature(sig: Array[Byte]): Boolean = if (sig.isEmpty) false else {
+  def isDefinedHashtypeSignature(sig: IndexedSeq[Byte]): Boolean = if (sig.isEmpty) false else {
     val hashType = sig.last & (~(SIGHASH_ANYONECANPAY))
     if (hashType < SIGHASH_ALL || hashType > SIGHASH_SINGLE) false else true
   }
@@ -116,8 +116,8 @@ object Crypto {
    * @param blob sigbyte data
    * @return the decoded (r, s) signature
    */
-  def decodeSignature(blob: Array[Byte]): (BigInteger, BigInteger) = {
-    val decoder = new ASN1InputStream(blob)
+  def decodeSignature(blob: IndexedSeq[Byte]): (BigInteger, BigInteger) = {
+    val decoder = new ASN1InputStream(blob.toArray)
     val seq = decoder.readObject.asInstanceOf[DLSequence]
     val r = seq.getObjectAt(0).asInstanceOf[ASN1Integer]
     val s = seq.getObjectAt(1).asInstanceOf[ASN1Integer]
@@ -125,7 +125,7 @@ object Crypto {
     (r.getPositiveValue, s.getPositiveValue)
   }
 
-  def verifySignature(data: Array[Byte], signature: (BigInteger, BigInteger), publicKey: Array[Byte]): Boolean = {
+  def verifySignature(data: IndexedSeq[Byte], signature: (BigInteger, BigInteger), publicKey: IndexedSeq[Byte]): Boolean = {
     val (r, s) = signature
     require(r.compareTo(one) >= 0, "r must be >= 1")
     require(r.compareTo(curve.getN) < 0, "r must be < N")
@@ -133,15 +133,9 @@ object Crypto {
     require(s.compareTo(curve.getN) < 0, "s must be < N")
 
     val signer = new ECDSASigner
-    val params = new ECPublicKeyParameters(curve.getCurve.decodePoint(publicKey), curve)
+    val params = new ECPublicKeyParameters(curve.getCurve.decodePoint(publicKey.toArray), curve)
     signer.init(false, params)
-    signer.verifySignature(data, r, s)
-//    Try(signer.verifySignature(data, r, s)) match {
-//      case Success(result) => result
-//      case Failure(cause) => {
-//        false
-//      }
-//    }
+    signer.verifySignature(data.toArray, r, s)
   }
 
   /**
@@ -149,7 +143,7 @@ object Crypto {
    * @param privateKey private key
    * @return the corresponding public key
    */
-  def publicKeyFromPrivateKey(privateKey: Array[Byte]) = {
+  def publicKeyFromPrivateKey(privateKey: IndexedSeq[Byte]) = {
     // a private key is either 32 bytes or 33 bytes with a last byte of 0x01
     val compressed = privateKey.length match {
       case 32 => false
@@ -157,7 +151,7 @@ object Crypto {
       case _ => throw new Exception("invalid private key")
     }
     // PubKey = G * PrivKey
-    val Q = params.getG().multiply(new BigInteger(1, privateKey.take(32)))
+    val Q = params.getG().multiply(new BigInteger(1, privateKey.take(32).toArray))
     Q.getEncoded(compressed)
   }
 
@@ -169,11 +163,11 @@ object Crypto {
    *                  and you should specify 'false' for testing purposes only
    * @return a (r, s) ECDSA signature pair
    */
-  def sign(data: Array[Byte], privateKey: Array[Byte], randomize: Boolean = true): (BigInteger, BigInteger) = {
+  def sign(data: IndexedSeq[Byte], privateKey: Array[Byte], randomize: Boolean = true): (BigInteger, BigInteger) = {
     val signer = if (randomize) new ECDSASigner() else new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
     val privateKeyParameters = new ECPrivateKeyParameters(new BigInteger(1, privateKey), curve)
     signer.init(true, privateKeyParameters)
-    val Array(r, s) = signer.generateSignature(data)
+    val Array(r, s) = signer.generateSignature(data.toArray)
 
     if (s.compareTo(halfCurveOrder) > 0) {
       (r, curve.getN().subtract(s)) // if s > N/2 then s = N - s
