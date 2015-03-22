@@ -48,7 +48,7 @@ trait BtcMessage[T] {
    * @param in serialized message
    * @return a deserialized message
    */
-  def read(in: Array[Byte]): T = read(new ByteArrayInputStream(in))
+  def read(in: IndexedSeq[Byte]): T = read(new ByteArrayInputStream(in.toArray))
 
   /**
    * read a message from a hex string
@@ -555,7 +555,7 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
     val services = uint64(in)
     val raw = new Array[Byte](16)
     in.read(raw)
-    require(toHexString(raw.take(12)) == "00000000000000000000ffff", "IPV4 only")
+    //require(toHexString(raw.take(12)) == "00000000000000000000ffff", "IPV4 only")
     val address = InetAddress.getByAddress(raw.takeRight(4))
     val port = uint16BigEndian(in)
     NetworkAddress(services, address, port)
