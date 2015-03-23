@@ -295,7 +295,7 @@ object Transaction extends BtcMessage[Transaction] {
    * @param input transaction
    * @return the hash of the transaction
    */
-  def hash(input: Transaction) : Array[Byte] = Crypto.hash256(Transaction.write(input))
+  def hash(input: Transaction) : BinaryData = Crypto.hash256(Transaction.write(input))
 }
 
 /**
@@ -313,6 +313,7 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
  * @param lockTime The block number or timestamp at which this transaction is locked
  */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
+  lazy val hash = Transaction.hash(this)
   lazy val txid = Transaction.txid(this)
 }
 
@@ -421,6 +422,9 @@ object Block extends BtcMessage[Block] {
   // testnet genesis block
   val TestnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
 
+  val RegtestGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 0x207fffffL, nonce = 2, time = 1296688602))
+
+  // mine.header.copy(bits = 0x0x207fffffL, nonce = 2, time = 1296688602)
   /**
    * Proof of work: hash(block) <= target difficulty
    * @param block
@@ -428,7 +432,7 @@ object Block extends BtcMessage[Block] {
    */
   def checkProofOfWork(block: Block): Boolean = {
     val (target, _, _) = decodeCompact(block.header.bits)
-    val hash = new BigInteger(1, block.blockId)
+    val hash = new BigInteger(1, block.blockId.toArray)
     hash.compareTo(target) <= 0
   }
 }
@@ -442,10 +446,10 @@ case class Block(header: BlockHeader, tx: Seq[Transaction]) {
   require(util.Arrays.equals(header.hashMerkleRoot, MerkleTree.computeRoot(tx)), "invalid block:  merkle root mismatch")
   require(tx.map(Transaction.txid).toSet.size == tx.size, "invalid block: duplicate transactions")
 
-  lazy val hash = Crypto.hash256(BlockHeader.write(header))
+  lazy val hash:BinaryData = Crypto.hash256(BlockHeader.write(header))
 
   // hash is reversed here (same as tx id)
-  lazy val blockId = hash.reverse
+  lazy val blockId = BinaryData(hash.reverse)
 }
 
 object Address {
