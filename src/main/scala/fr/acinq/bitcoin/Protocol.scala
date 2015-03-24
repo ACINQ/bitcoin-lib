@@ -85,7 +85,7 @@ case class OutPoint(hash: BinaryData, index: Long) {
   require(hash.length == 32)
   require(index >= -1)
 
-  def isCoinbaseOutPoint = index == 0xffffffffL && hash.data.find(_ != 0).isEmpty
+  def isCoinbaseOutPoint = index == 0xffffffffL && hash.data.forall(_ == 0)
 
   /**
    *
