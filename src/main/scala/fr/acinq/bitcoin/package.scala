@@ -20,6 +20,11 @@ package object bitcoin {
   val SIGHASH_SINGLE = 3
   val SIGHASH_ANYONECANPAY = 0x80
 
+  object Hash {
+    val Zeroes: BinaryData = "0000000000000000000000000000000000000000000000000000000000000000"
+    val One: BinaryData = "0100000000000000000000000000000000000000000000000000000000000000"
+  }
+
   /**
    * basic serialization functions
    */

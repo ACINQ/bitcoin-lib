@@ -85,7 +85,7 @@ case class OutPoint(hash: BinaryData, index: Long) {
   require(hash.length == 32)
   require(index >= -1)
 
-  def isCoinbaseOutPoint = index == 0xffffffffL && hash.data.forall(_ == 0)
+  def isCoinbaseOutPoint = index == 0xffffffffL && hash == Hash.Zeroes
 
   /**
    *
@@ -238,7 +238,7 @@ object Transaction extends BtcMessage[Transaction] {
    */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Array[Byte] = {
     if (isHashSingle(sighashType) && inputIndex >= tx.txOut.length) {
-      fromHexString("0100000000000000000000000000000000000000000000000000000000000000")
+      Hash.One
     } else {
       val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
       Crypto.hash256(Transaction.write(txCopy) ++ writeUInt32(sighashType))
