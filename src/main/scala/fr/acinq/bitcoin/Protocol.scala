@@ -11,6 +11,10 @@ import scala.collection.mutable.ArrayBuffer
  * see https://en.bitcoin.it/wiki/Protocol_specification
  */
 
+object BinaryData {
+  def apply(hex: String) : BinaryData = hex
+}
+
 case class BinaryData(data: IndexedSeq[Byte]) {
   def length = data.length
   override def toString = toHexString(data)
@@ -676,6 +680,31 @@ object Inventory extends BtcMessage[Inventory] {
 }
 
 case class Inventory(inventory: Seq[InventoryVector])
+
+object Getheaders extends BtcMessage[Getheaders] {
+  override def write(t: Getheaders, out: OutputStream): Unit = {
+    writeUInt32(t.version, out)
+    writeVarint(t.locatorHashes.size, out)
+    t.locatorHashes.map(h => out.write(h))
+    out.write(t.stopHash)
+  }
+
+  override def read(in: InputStream): Getheaders = {
+    val version = uint32(in)
+    val vector = ArrayBuffer.empty[BinaryData]
+    val count = varint(in)
+    for (i <- 1L to count) {
+      vector += hash(in)
+    }
+    val stopHash = hash(in)
+    Getheaders(version, vector.toSeq, stopHash)
+  }
+}
+
+case class Getheaders(version: Long, locatorHashes: Seq[BinaryData], stopHash: BinaryData) {
+  locatorHashes.map(h => require(h.length == 32))
+  require(stopHash.length == 32)
+}
 
 object Getblocks extends BtcMessage[Getblocks] {
   override def write(t: Getblocks, out: OutputStream): Unit = {

@@ -53,6 +53,7 @@ class ProtocolSpec extends FlatSpec {
   it should "generate genesis block" in {
     assert(toHexString(Block.write(Block.LivenetGenesisBlock)) === "0100000000000000000000000000000000000000000000000000000000000000000000003BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A29AB5F49FFFF001D1DAC2B7C0101000000010000000000000000000000000000000000000000000000000000000000000000FFFFFFFF4D04FFFF001D0104455468652054696D65732030332F4A616E2F32303039204368616E63656C6C6F72206F6E206272696E6B206F66207365636F6E64206261696C6F757420666F722062616E6B73FFFFFFFF0100F2052A01000000434104678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5FAC00000000".toLowerCase)
     assert(toHexString(Block.TestnetGenesisBlock.blockId) === "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943")
+    assert(toHexString(Block.RegtestGenesisBlock.blockId) === "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206")
   }
   it should "decode proof-of-work difficulty" in {
     assert(decodeCompact(0) === (BigInteger.ZERO, false, false))
@@ -146,6 +147,11 @@ class ProtocolSpec extends FlatSpec {
     assert(getblocks.version === 70002)
     assert(getblocks.locatorHashes(0).toString === "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000")
     assert(toHexString(Getblocks.write(getblocks)) === toHexString(message.payload))
+  }
+  it should "read and write getheaders message" in {
+    val getheaders = Getheaders.read("711101000106226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f0000000000000000000000000000000000000000000000000000000000000000")
+    assert(getheaders.locatorHashes(0) === Block.RegtestGenesisBlock.hash)
+    assert(toHexString(Getheaders.write(getheaders)) === "711101000106226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f0000000000000000000000000000000000000000000000000000000000000000")
   }
   it should "read and write getdata messages" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/getdata.dat")
