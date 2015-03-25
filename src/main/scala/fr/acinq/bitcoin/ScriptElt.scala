@@ -114,12 +114,21 @@ case object OP_NOP9 extends ScriptElt
 case object OP_NOP10 extends ScriptElt
 case object OP_SMALLINTEGER extends ScriptElt
 case object OP_INVALIDOPCODE extends ScriptElt
+//case OP_PUSHDATA(data) :: tail if data.length < 0x4c => out.write(data.length); out.write(data); write(tail, out)
+//case OP_PUSHDATA(data) :: tail if data.length < 0xff => writeUInt8(0x4c, out); writeUInt8(data.length, out); out.write(data); write(tail, out)
+//case OP_PUSHDATA(data) :: tail if data.length < 0xffff => writeUInt8(0x4d, out); writeUInt16(data.length, out); out.write(data); write(tail, out)
+//case OP_PUSHDATA(data) :: tail if data.length < 0xffffffff => writeUInt8(0x4e, out); writeUInt32(data.length, out); out.write(data); write(tail, out)
+
 object OP_PUSHDATA {
-  def apply(data:String) : OP_PUSHDATA = new OP_PUSHDATA(fromHexString(data))
+  def apply(data: BinaryData) = if (data.length < 0x4c) new OP_PUSHDATA(data, data.length)
+  else if (data.length < 0xff) new OP_PUSHDATA(data, 0x4c)
+  else if (data.length < 0xffff) new OP_PUSHDATA(data, 0x4d)
+  else if (data.length < 0xffffffff) new OP_PUSHDATA(data, 0x4e)
+  else throw new IllegalArgumentException(s"data is ${data.length}, too big for OP_PUSHDATA")
 }
-case class OP_PUSHDATA(data: Array[Byte]) extends ScriptElt {
-  //require(data.size <= MaxScriptElementSize, s"data is ${data.length} bytes, limit is $MaxScriptElementSize bytes")
-  override def toString = s"OP_PUSHDATA(${toHexString(data)})"
+
+case class OP_PUSHDATA(data: BinaryData, code: Int) extends ScriptElt {
+  override def toString = data.toString
 }
 case class OP_INVALID(code: Int) extends ScriptElt
 

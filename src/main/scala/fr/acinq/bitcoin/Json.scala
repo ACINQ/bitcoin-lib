@@ -28,9 +28,9 @@ object Json {
       val asm = script.mkString(" ")
       val hex = toHexString(input)
       script match {
-        case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hash) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil =>
+        case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hash, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil =>
           new ScriptPubKey(asm, hex, 1, "pubkeyhash", List(Address.encode(if (testnet) Address.TestnetPubkeyVersion else Address.LivenetPubkeyVersion, hash)))
-        case OP_HASH160 :: OP_PUSHDATA(hash) :: OP_EQUAL :: Nil if hash.size == 20 =>
+        case OP_HASH160 :: OP_PUSHDATA(hash, _) :: OP_EQUAL :: Nil if hash.size == 20 =>
           new ScriptPubKey(asm, hex, 1, "scripthash", List(Address.encode(if (testnet) Address.TestnetScriptVersion else Address.LivenetScriptVersion, hash)))
       }
     }

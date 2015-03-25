@@ -104,7 +104,7 @@ class MultisigSpec extends FlatSpec with Matchers {
 
     // the id of this tx on testnet is f137884feb9a951bf9b159432ebb771ec76fa6e7332c06cb8a6b718148f101af
     // redeem the tx
-    val ctx = Script.Context(signedTx, 0, redeemScript)
+    val ctx = Script.Context(signedTx, 0)
     val runner = new Script.Runner(ctx, scriptFlag = ScriptFlags.SCRIPT_VERIFY_P2SH)
     assert(runner.verifyScripts(signedTx.txIn(0).signatureScript, previousTx(0).publicKeyScript))
   }

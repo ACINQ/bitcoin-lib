@@ -70,7 +70,7 @@ object ScriptSpec {
     val scriptPubKey = parseFromText(scriptPubKeyText)
     val scriptSig = parseFromText(scriptSigText)
     val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
-    val ctx = Script.Context(tx, 0, scriptPubKey)
+    val ctx = Script.Context(tx, 0)
     val runner = new Script.Runner(ctx, parseScriptFlags(flags))
 
     val result = Try(runner.verifyScripts(scriptSig, scriptPubKey)).getOrElse(false)
@@ -103,7 +103,7 @@ class ScriptSpec extends FlatSpec {
   it should "parse 'pay to script' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("a914a90003b4ddef4be46fc61e7f2167da9d234944e287")
     val script = Script.parse(blob)
-    val OP_HASH160 :: OP_PUSHDATA(scriptHash) :: OP_EQUAL :: Nil = script
+    val OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil = script
     val multisigAddress = Address.encode(Address.TestnetScriptVersion, scriptHash)
     assert(multisigAddress === "2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
   }
@@ -116,7 +116,7 @@ class ScriptSpec extends FlatSpec {
       txIn = TxIn(OutPoint(new Array[Byte](32), 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
       txOut = TxOut(0x12a05f200L, Array.empty[Byte]) :: Nil,
       lockTime = 0)
-    val ctx = Script.Context(tx, 0, Script.write(OP_NOP :: Nil))
+    val ctx = Script.Context(tx, 0)
     val runner = new Script.Runner(ctx)
     val script = OP_1 :: OP_2 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack = runner.run(script)

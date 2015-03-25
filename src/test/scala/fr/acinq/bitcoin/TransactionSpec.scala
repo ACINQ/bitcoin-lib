@@ -135,7 +135,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     assert(Crypto.verifySignature(hashed, (r1, s1), publicKey))
 
     // check script
-    val ctx = Script.Context(tx2, 0, previousTx.publicKeyScript)
+    val ctx = Script.Context(tx2, 0)
     val runner = new Script.Runner(ctx)
     assert(runner.verifyScripts(tx2.txIn(0).signatureScript, previousTx.publicKeyScript))
   }
@@ -175,7 +175,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val tx2 = Transaction.sign(tx1, List(SignData(previousTx.publicKeyScript, previousTx.privateKey)))
 
     // redeem the tx
-    val ctx = Script.Context(tx2, 0, previousTx.publicKeyScript)
+    val ctx = Script.Context(tx2, 0)
     val runner = new Script.Runner(ctx)
     assert(runner.verifyScripts(tx2.txIn(0).signatureScript, previousTx.publicKeyScript))
   }
@@ -221,7 +221,7 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // now check that we can redeem this tx
     for (i <- 0 until tx1.txIn.length) {
-      val ctx = Script.Context(tx1, i, previousTx(i).publicKeyScript)
+      val ctx = Script.Context(tx1, i)
       val runner = new Script.Runner(ctx)
       assert(runner.verifyScripts(tx1.txIn(i).signatureScript, previousTx(i).publicKeyScript))
     }
@@ -277,7 +277,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     // redeem tx
     signedTx.txIn.zipWithIndex.map {
       case (txin, index) =>
-        val ctx = Script.Context(signedTx, index, previousTx(index).publicKeyScript)
+        val ctx = Script.Context(signedTx, index)
         val runner = new Script.Runner(ctx)
         assert(runner.verifyScripts(txin.signatureScript, previousTx(index).publicKeyScript))
     }
@@ -292,7 +292,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     )
     val results = for (i <- 0 until tx.txIn.length) yield {
       val prevOutputScript = previousTxMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
-      val ctx = new Script.Context(tx, i, prevOutputScript)
+      val ctx = new Script.Context(tx, i)
       val runner = new Script.Runner(ctx)
       val result = runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)
       result
@@ -309,7 +309,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     )
     val results = for (i <- 0 until tx.txIn.length) yield {
       val prevOutputScript = previousTxMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
-      val ctx = new Script.Context(tx, i, prevOutputScript)
+      val ctx = new Script.Context(tx, i)
       val runner = new Script.Runner(ctx)
       val result = runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)
       result
