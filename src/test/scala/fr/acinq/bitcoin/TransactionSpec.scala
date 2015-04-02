@@ -1,11 +1,17 @@
 package fr.acinq.bitcoin
 
-import java.io.ByteArrayOutputStream
+import java.io.{InputStreamReader, ByteArrayOutputStream}
 import java.util
 
+import fr.acinq.bitcoin.Script.{Runner, Context}
+import org.json4s.JsonAST.{JArray, JInt, JValue, JString}
+import org.json4s.jackson.JsonMethods
+import org.json4s.DefaultFormats
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
+
+import scala.util.{Failure, Success, Try}
 
 object TransactionSpec {
 
@@ -16,6 +22,22 @@ object TransactionSpec {
 
   // extracts data required from signature
   def toSignData(ptx: PreviousTransaction) = SignData(prevPubKeyScript = ptx.publicKeyScript, privateKey = ptx.privateKey)
+
+
+  def validateTransaction(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = {
+    val txMap = inputs.map(t => t.txid -> t).toMap
+    val prevoutMap = for (i <- 0 until tx.txIn.length) yield tx.txIn(i).outPoint -> txMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
+    validateTransaction(tx, prevoutMap.toMap, scriptFlags)
+  }
+
+  def validateTransaction(tx: Transaction, prevoutScripts: Map[OutPoint, BinaryData], scriptFlags: Int): Unit = {
+    for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
+      val prevOutputScript = prevoutScripts(tx.txIn(i).outPoint)
+      val ctx = new Context(tx, i)
+      val runner = new Runner(ctx, scriptFlags)
+      assert(runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript))
+    }
+  }
 }
 
 @RunWith(classOf[JUnitRunner])
@@ -283,38 +305,61 @@ class TransactionSpec extends FlatSpec with Matchers {
     }
   }
 
-  it should "solve transaction puzzle #1" in {
-    // tx puzzle a59012de71dafa1510fd57d339ff488d50da4808c9fd4c001d6de8874d8aa26d
-    val tx = Transaction.read("010000000298a4782ee3399a79f2b6a7c70f9f810986a42e819c14340fa35e813aac9681ae000000006e4830450220087ede38729e6d35e4f515505018e659222031273b7366920f393ee3ab17bc1e022100ca43164b757d1a6d1235f13200d4b5f76dd8fda4ec9fc28546b2df5b1211e8df03210275983913e60093b767e85597ca9397fb2f418e57f998d6afbbc536116085b1cb02ac91ffffffffa939fd811ba1c70a3ec3d955717418fe4a24dd5e597f7a47230674c853b7f360000000006d4830450220087ede38729e6d35e4f515505018e659222031273b7366920f393ee3ab17bc1e022100ca43164b757d1a6d1235f13200d4b5f76dd8fda4ec9fc28546b2df5b1211e8df03210275983913e60093b767e85597ca9397fb2f418e57f998d6afbbc536116085b1cb01acffffffff01a08601000000000017a9146c21ac707cb37c90794294acda011060ef0fc0118700000000")
-    val previousTxMap = Map(
-      "ae8196ac3a815ea30f34149c812ea48609819f0fc7a7b6f2799a39e32e78a498" -> Transaction.read("01000000015a7005f8a0792562bd20b9eff51c09f3e9e6522174c04098762eab1be1afc057000000006b4830450221009c290467721372d171f0d888bb193b70e6c07b116112ef23483ecbe030938636022075ce1f6be389288a4ed7c81725836a2700b539db85aeb757160c950a78fa29c6012103bc9d9e9b50db4fc3f1eb93b9a3e2cc22e179dab4df22179a34413f86078444a6ffffffff02a08601000000000017a914827fe37ec405346ad4e995323cea83559537b89e87f8e03500000000001976a914f21d36cb22c671a4b022bc953890bb9c45820a1c88ac00000000"),
-      "60f3b753c8740623477a7f595edd244afe18747155d9c33e0ac7a11b81fd39a9" -> Transaction.read("0100000001ae9e6387e20d0fc30aa043ed735e33e805200d65e9d33ab503913f7436001e6b000000006b483045022100b5e73e71be331971d57ad6d804020a70a88c5617d72584d2ec76f327316da8b3022014c0d150d67847cc9c3731390691309f0465e46f4c20ee17aafc13794f8d5152012103de3d3c06403ba70b3efd5b139eb09aff8b8260bfe838a831a44666a794f5e84dffffffff02a08601000000000017a91417be79cf51aa88feebb0a25e9d6a153ead585e5987583c3900000000001976a914285fb1890240afe00b852d1b6eab49a767bc462288ac00000000")
-    )
-    val results = for (i <- 0 until tx.txIn.length) yield {
-      val prevOutputScript = previousTxMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
-      val ctx = new Script.Context(tx, i)
-      val runner = new Script.Runner(ctx)
-      val result = runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)
-      result
-    }
+  it should "pass reference tx valid tests" in {
+    implicit val format = DefaultFormats
 
-    assert(results.find(!_).isEmpty)
+    val stream = classOf[ScriptSpec].getResourceAsStream("/tx_valid.json")
+    val json = JsonMethods.parse(new InputStreamReader(stream))
+
+    json.extract[List[List[JValue]]].filter(_.size > 1).map(_.reverse).map(_ match {
+      case JString(verifyFlags) :: JString(serializedTransaction) :: tail => {
+        val prevoutMap = collection.mutable.HashMap.empty[OutPoint, BinaryData]
+        tail match {
+          case List(JArray(m)) => m.map(_ match {
+            case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) => {
+              val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
+              prevoutMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> prevoutScript
+            }
+          })
+        }
+        val tx = Transaction.read(serializedTransaction)
+        Try {
+          Transaction.validate(tx)
+          TransactionSpec.validateTransaction(tx, prevoutMap.toMap, ScriptSpec.parseScriptFlags(verifyFlags))
+        } match {
+          case Success(_) => ()
+          case Failure(t) => println(s"failed to verify $serializedTransaction: $t")
+        }
+      }
+    })
   }
 
-  it should "solve transaction puzzle #2" in {
-    // tx puzzle 61d47409a240a4b67ce75ec4dffa30e1863485f8fe64a6334410347692f9e60e
-    val tx = Transaction.read("01000000012edfb7a1a41b61e46eae1032c38d8792eacb79f7a6599dd24372f4a3e88a31700000000006030000800191ffffffff010000000000000000016a00000000")
-    val previousTxMap = Map(
-      "70318ae8a3f47243d29d59a6f779cbea92878dc33210ae6ee4611ba4a1b7df2e" -> Transaction.read("010000000192cad3c8e41d1e2f1baf6f8a991c3db6bf67a60c49e963beb44f8e41a78073dd010000008b48304502203b4cb2c60cd688129ec89da31464ce9ce07da56125425afdf9fd67559e708b3c0221008174b7a26787a8eb30460a699f584518351a741bc37775dc702d7f14e8f53e340141043a58cccd11db5dfc34e1433eef0b2b3bf6b947113d5e45562a095781663c919dda444017ab9a7c0e458478e7ef3edf5233eb476c1cb62ecfbb03bc4e22e40333ffffffff0250c300000000000017a914bb89dd62e80d1801df9aa570769b012f246c4f6d8730ee9a00000000001976a91463e8c29bfd51ee98778481c920bb6d288a220f9188ac00000000")
-    )
-    val results = for (i <- 0 until tx.txIn.length) yield {
-      val prevOutputScript = previousTxMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
-      val ctx = new Script.Context(tx, i)
-      val runner = new Script.Runner(ctx)
-      val result = runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)
-      result
-    }
+  it should "pass reference tx invalid tests" in {
+    implicit val format = DefaultFormats
 
-    assert(results.find(!_).isEmpty)
+    val stream = classOf[ScriptSpec].getResourceAsStream("/tx_invalid.json")
+    val json = JsonMethods.parse(new InputStreamReader(stream))
+
+    json.extract[List[List[JValue]]].filter(_.size > 1).map(_.reverse).map(_ match {
+      case JString(verifyFlags) :: JString(serializedTransaction) :: tail => {
+        val prevoutMap = collection.mutable.HashMap.empty[OutPoint, BinaryData]
+        tail match {
+          case List(JArray(m)) => m.map(_ match {
+            case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) => {
+              val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
+              prevoutMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> prevoutScript
+           }
+          })
+        }
+        val tx = Transaction.read(serializedTransaction)
+        Try {
+          Transaction.validate(tx)
+          TransactionSpec.validateTransaction(tx, prevoutMap.toMap, ScriptSpec.parseScriptFlags(verifyFlags))
+        } match {
+          case Success(_) => println(s"tx found valid when it should not be: $serializedTransaction")
+          case Failure(t) => ()
+        }
+      }
+    })
   }
 }

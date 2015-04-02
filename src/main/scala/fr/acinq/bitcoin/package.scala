@@ -11,6 +11,7 @@ package object bitcoin {
   val Cent = 1000000L
   val MaxMoney = 21000000 * Coin
   val MaxScriptElementSize = 520
+  val MaxBlockSize = 1000000
 
   /**
    * signature hash flags

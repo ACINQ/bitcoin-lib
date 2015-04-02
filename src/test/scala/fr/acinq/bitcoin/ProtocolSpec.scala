@@ -19,7 +19,7 @@ class ProtocolSpec extends FlatSpec {
     // check that we can deserialize and re-serialize scripts
     block.tx.map(tx => {
       tx.txIn.map(txin => {
-        if (!txin.outPoint.isCoinbaseOutPoint) {
+        if (!OutPoint.isCoinbase(txin.outPoint)) {
           val script = Script.parse(txin.signatureScript)
           val stream = new ByteArrayOutputStream()
           Script.write(script, stream)
@@ -168,7 +168,7 @@ class ProtocolSpec extends FlatSpec {
     assert(message.command === "block")
     val block = Block.read(message.payload)
     assert(util.Arrays.equals(block.header.hashPreviousBlock, Block.LivenetGenesisBlock.hash))
-    assert(block.tx(0).txIn(0).outPoint.isCoinbaseOutPoint)
+    assert(OutPoint.isCoinbase(block.tx(0).txIn(0).outPoint))
   }
   it should "read and write reject messages" in {
     val message = Message.read("0b11090772656a6563740000000000001f00000051e3a01d076765746461746101156572726f722070617273696e67206d657373616765")

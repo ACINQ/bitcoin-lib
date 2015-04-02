@@ -50,6 +50,13 @@ object ScriptFlags {
   // executed, e.g.  within an unexecuted IF ENDIF block, are *not* rejected.
   val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS = (1 << 7)
 
+  // Require that only a single stack element remains after evaluation. This changes the success criterion from
+  // "At least one stack element must remain, and when interpreted as a boolean, it must be true" to
+  // "Exactly one stack element must remain, and when interpreted as a boolean, it must be true".
+  // (softfork safe, BIP62 rule 6)
+  // Note: CLEANSTACK should never be used without P2SH.
+  val SCRIPT_VERIFY_CLEANSTACK = (1 << 8)
+
   /**
    * Mandatory script verification flags that all new blocks must comply with for
    * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -225,6 +232,13 @@ object Script {
 
   def isPayToScript(script: Array[Byte]): Boolean = script.length == 23 && script(0) == elt2code(OP_HASH160).toByte && script(1) == 0x14 && script(22) == elt2code(OP_EQUAL).toByte
 
+  def removeSignature(script: List[ScriptElt], signature: BinaryData): List[ScriptElt] = {
+    val toRemove = OP_PUSHDATA(signature)
+    script.filterNot(_ == toRemove)
+  }
+
+  def removeSignatures(script: List[ScriptElt], sigs: List[BinaryData]): List[ScriptElt] = sigs.foldLeft(script)(removeSignature)
+
   /**
    * execution context of a tx script
    * @param tx current transaction
@@ -245,10 +259,14 @@ object Script {
       else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag) || !Crypto.checkPubKeyEncoding(pubKey, scriptFlag)) false
       else if (!Crypto.isPubKeyValid(pubKey)) false
       else {
-        val (r, s) = Crypto.decodeSignature(sigBytes)
-        val sigHashFlags = sigBytes.last & 0xff
-        val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags)
-        Crypto.verifySignature(hash, (r, s), pubKey)
+        val sigHashFlags = sigBytes.last & 0xff // sig hash is the last byte
+        val sigBytes1 = sigBytes.take(sigBytes.length - 1) // drop sig hash
+        if (sigBytes1.isEmpty) false
+        else {
+          val (r, s) = Crypto.decodeSignature(sigBytes)
+          val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags)
+          Crypto.verifySignature(hash, (r, s), pubKey)
+        }
       }
     }
 
@@ -343,7 +361,9 @@ object Script {
         }
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
-            val result = checkSignature(pubKey, sigBytes, Script.write(scriptCode))
+            // remove signature from script
+            val scriptCode1 = removeSignature(scriptCode, sigBytes)
+            val result = checkSignature(pubKey, sigBytes, Script.write(scriptCode1))
             run(tail, (if (result) Array(1: Byte) else Array(0: Byte)) :: stacktail, state.copy(opCount = opCount + 1))
           }
           case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
@@ -363,10 +383,13 @@ object Script {
           val n = decodeNumber(stack2.head).toInt
           if (n < 0 || n > m) throw new RuntimeException("OP_CHECKMULTISIG: invalid number of signatures")
           val stack3 = stack2.tail
+          // check that we have at least n + 1 items on the stack (+1 because of a bug in the reference client)
+          require(stack3.size >= n + 1, "invalid stack operation")
           val sigs = stack3.take(n)
-          val stack4 = stack3.drop(n + 1) // +1 because of a bug in the official client
-
-          val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode))
+          if ((scriptFlag & ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack3(n).size == 0, "multisig dummy is not empty")
+          val stack4 = stack3.drop(n + 1)
+          val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+          val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode1))
           val result = if (success) Array(1: Byte) else Array(0: Byte)
           run(tail, result :: stack4, state.copy(opCount = nextOpCount))
         }
@@ -554,6 +577,16 @@ object Script {
      * @return true if the scripts were successfully verified
      */
     def verifyScripts(scriptSig: Array[Byte], scriptPubKey: Array[Byte]): Boolean = {
+      def checkStack(stack: Stack): Boolean = {
+        if (stack.isEmpty) false
+        else if (!Script.castToBoolean(stack.head)) false
+        else if ((scriptFlag & SCRIPT_VERIFY_CLEANSTACK) != 0) {
+          if ((scriptFlag & SCRIPT_VERIFY_P2SH) == 0) throw new RuntimeException("illegal script flag")
+          stack.size == 1
+        }
+        else true
+      }
+
       val ssig = Script.parse(scriptSig)
       if (((scriptFlag & SCRIPT_VERIFY_SIGPUSHONLY) != 0) && !Script.isPushOnly(ssig)) throw new RuntimeException("signature script is not PUSH-only")
       val stack = run(ssig)
@@ -561,9 +594,8 @@ object Script {
       val stack1 = run(spub, stack)
       val checkP2SH = (scriptFlag & SCRIPT_VERIFY_P2SH) != 0
       val isP2SH = Script.isPayToScript(scriptPubKey)
-      if (stack1.isEmpty) false
-      else if (!Script.castToBoolean(stack1.head)) false
-      else if (((scriptFlag & SCRIPT_VERIFY_P2SH) != 0) && Script.isPayToScript(scriptPubKey)) {
+
+      if (((scriptFlag & SCRIPT_VERIFY_P2SH) != 0) && Script.isPayToScript(scriptPubKey)) {
         // scriptSig must be literals-only or validation fails
         if (!Script.isPushOnly(ssig)) throw new RuntimeException("signature script is not PUSH-only")
 
@@ -574,8 +606,10 @@ object Script {
         // and stack would be serialized_script :: sigN :: ... :: sig1 :: Nil
         // we pop the first element of the stack, deserialize it and run it against the rest of the stack
         val stack2 = run(stack.head, stack.tail)
-        if (stack2.isEmpty) false else Script.castToBoolean(stack2.head)
-      } else true
+        checkStack(stack2)
+      } else {
+        checkStack(stack1)
+      }
     }
   }
 

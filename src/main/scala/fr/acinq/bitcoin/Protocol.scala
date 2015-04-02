@@ -74,6 +74,11 @@ object OutPoint extends BtcMessage[OutPoint] {
     out.write(input.hash)
     writeUInt32(input.index, out)
   }
+
+  def isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == Hash.Zeroes
+
+  def isNull(input: OutPoint) = isCoinbase(input)
+
 }
 
 /**
@@ -84,8 +89,6 @@ object OutPoint extends BtcMessage[OutPoint] {
 case class OutPoint(hash: BinaryData, index: Long) {
   require(hash.length == 32)
   require(index >= -1)
-
-  def isCoinbaseOutPoint = index == 0xffffffffL && hash == Hash.Zeroes
 
   /**
    *
@@ -133,7 +136,7 @@ object TxOut extends BtcMessage[TxOut] {
   override def validate(input: TxOut) : Unit = {
     import input._
     require(amount >= 0, s"invalid txout amount: $amount")
-    require(amount < MaxMoney, s"invalid txout amount: $amount")
+    require(amount <= MaxMoney, s"invalid txout amount: $amount")
     require(publicKeyScript.length < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
   }
 }
@@ -174,13 +177,21 @@ object Transaction extends BtcMessage[Transaction] {
   override def validate(input: Transaction) : Unit = {
     require(input.txIn.nonEmpty, "input list cannot be empty")
     require(input.txOut.nonEmpty, "output list cannot be empty")
-    require(input.txOut.map(_.amount).sum < MaxMoney, "sum of outputs amount is invalid")
+    require(Transaction.write(input).size <= MaxBlockSize)
+    require(input.txOut.map(_.amount).sum <= MaxMoney, "sum of outputs amount is invalid")
     input.txIn.map(TxIn.validate)
     input.txOut.map(TxOut.validate)
-    // TODO: check for duplicate inputs
-    // TODO: check that first tx is a coinbase tx and all others are not
+    val outPoints = input.txIn.map(_.outPoint)
+    require(outPoints.size == outPoints.toSet.size, "duplicate inputs")
+    if (Transaction.isCoinbase(input)) {
+      require(input.txIn(0).signatureScript.size >= 2, "coinbase script size")
+      require(input.txIn(0).signatureScript.size <= 100, "coinbase script size")
+    } else {
+      require(input.txIn.forall(in => !OutPoint.isCoinbase(in.outPoint)), "prevout is null")
+    }
   }
 
+  def isCoinbase(input: Transaction) = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn(0).outPoint)
   /**
    * prepare a transaction for signing a specific input
    * @param tx input transaction
