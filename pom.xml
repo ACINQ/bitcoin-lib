@@ -157,11 +157,6 @@
             <version>${scala.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.github.scopt</groupId>
-            <artifactId>scopt_2.11</artifactId>
-            <version>3.2.0</version>
-        </dependency>
-        <dependency>
             <groupId>org.json4s</groupId>
             <artifactId>json4s-jackson_2.11</artifactId>
             <version>3.2.11</version>
@@ -179,7 +174,7 @@
         <dependency>
             <groupId>com.chuusai</groupId>
             <artifactId>shapeless_2.11</artifactId>
-            <version>2.0.0</version>
+            <version>2.1.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -197,13 +192,13 @@
         <dependency>
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_2.11</artifactId>
-            <version>2.2.2</version>
+            <version>2.2.4</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.11</version>
+            <version>4.12</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
