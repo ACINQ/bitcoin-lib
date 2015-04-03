@@ -135,7 +135,7 @@ class ScriptSpec extends FlatSpec {
   }
   it should "encode/decode simple numbers" in {
     for (i <- -1 to 16) {
-      assert(Script.decodeNumber(Script.encodeNumber(i)) === i)
+      assert(Script.decodeNumber(Script.encodeNumber(i), true) === i)
     }
   }
   it should "encode/decode booleans" in {
@@ -150,6 +150,16 @@ class ScriptSpec extends FlatSpec {
     json.extract[List[List[String]]].tail.foreach(_ match {
       case scriptSig :: scriptPubKey :: flags :: comments :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, Some(comments), true)
       case scriptSig :: scriptPubKey :: flags :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, None, true)
+      case _ => ()
+    })
+  }
+  it should "pass reference client invalid script tests" in {
+    val stream = classOf[ScriptSpec].getResourceAsStream("/script_invalid.json")
+    val json = JsonMethods.parse(new InputStreamReader(stream))
+    // use tail to skip the first line of the .json file
+    json.extract[List[List[String]]].tail.foreach(_ match {
+      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, Some(comments), false)
+      case scriptSig :: scriptPubKey :: flags :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, None, false)
       case _ => ()
     })
   }

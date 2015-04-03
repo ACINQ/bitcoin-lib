@@ -21,7 +21,7 @@ object Crypto {
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
 
-  def hmac512(key: IndexedSeq[Byte], data: IndexedSeq[Byte]) : Array[Byte] = {
+  def hmac512(key: IndexedSeq[Byte], data: IndexedSeq[Byte]): Array[Byte] = {
     val mac = new HMac(new SHA512Digest())
     mac.init(new KeyParameter(key.toArray))
     mac.update(data.toArray, 0, data.length)
@@ -81,32 +81,62 @@ object Crypto {
 
   def encodeSignature(t: (BigInteger, BigInteger)): Array[Byte] = encodeSignature(t._1, t._2)
 
-  def isDERSignature(sig: IndexedSeq[Byte]) : Boolean = Try(decodeSignature(sig)).isSuccess
+  def isDERSignature(sig: IndexedSeq[Byte]): Boolean = {
+    require(sig.length >= 9 && sig.length <= 73)
+    require(sig(0) == 0x30.toByte)
+    require(sig(1) == sig.length - 3)
+    require(sig(2) == 0x02.toByte)
 
-  def isLowDERSignature(sig: IndexedSeq[Byte]): Boolean = Try(decodeSignature(sig)).map(_._2.compareTo(halfCurveOrder) <= 0).getOrElse(false)
+    val lenR = sig(3)
+    require(lenR > 0 && lenR + 5 < sig.length)
+    require((sig(4) & 0x80) == 0)
+    if (lenR > 1 && sig(4) == 0) require((sig(5) & 0x80) != 0)
 
-  def checkSignatureEncoding(sig: IndexedSeq[Byte], flags: Int) : Boolean = {
+    require(sig(lenR + 4) == 0x02.toByte)
+    val lenS = sig(lenR + 5)
+    require(lenS > 0)
+    require(lenR + lenS + 7 == sig.length)
+    require((sig(lenR + 6) & 0x80) == 0)
+    if (lenS > 1 && sig(lenR + 6) == 0) require((sig(lenR + 7) & 0x80) != 0)
+
+    true
+  }
+
+  def isLowDERSignature(sig: IndexedSeq[Byte]): Boolean = isDERSignature(sig) && {
+    val (_, s) = decodeSignature(sig)
+    s.compareTo(halfCurveOrder) <= 0
+  }
+
+  def checkSignatureEncoding(sig: IndexedSeq[Byte], flags: Int): Boolean = {
     import ScriptFlags._
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
     if (sig.isEmpty) true
-    else if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0) isDERSignature(sig)
-    else if ((flags & SCRIPT_VERIFY_LOW_S) != 0) isLowDERSignature(sig)
-    else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0) isDefinedHashtypeSignature(sig)
+    else if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0 && !isDERSignature(sig)) false
+    else if ((flags & SCRIPT_VERIFY_LOW_S) != 0 && !isLowDERSignature(sig)) false
+    else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !isDefinedHashtypeSignature(sig)) false
     else true
   }
 
-  def checkPubKeyEncoding(key: IndexedSeq[Byte], flags: Int) : Boolean = {
-    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) isPubKeyValid(key) else true
+  def checkPubKeyEncoding(key: IndexedSeq[Byte], flags: Int): Boolean = {
+    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) isPubKeyCompressedOrUncompressed(key) else true
   }
 
-  def isPubKeyValid(key: IndexedSeq[Byte]) : Boolean = key.length match {
+  def isPubKeyValid(key: IndexedSeq[Byte]): Boolean = key.length match {
     case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 => true
     case 33 if key(0) == 2 || key(0) == 3 => true
     case _ => false
   }
-  
-  def isDefinedHashtypeSignature(sig: IndexedSeq[Byte]): Boolean = if (sig.isEmpty) false else {
+
+  def isPubKeyCompressedOrUncompressed(key: IndexedSeq[Byte]): Boolean = key.length match {
+    case 65 if key(0) == 4 => true
+    case 33 if key(0) == 2 || key(0) == 3 => true
+    case _ => false
+  }
+
+
+  def isDefinedHashtypeSignature(sig: IndexedSeq[Byte]): Boolean = if (sig.isEmpty) false
+  else {
     val hashType = sig.last & (~(SIGHASH_ANYONECANPAY))
     if (hashType < SIGHASH_ALL || hashType > SIGHASH_SINGLE) false else true
   }

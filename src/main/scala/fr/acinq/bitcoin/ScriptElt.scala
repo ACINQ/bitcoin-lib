@@ -1,119 +1,233 @@
 package fr.acinq.bitcoin
 
 abstract class ScriptElt
+
 case object OP_0 extends ScriptElt
+
 case object OP_PUSHDATA1 extends ScriptElt
+
 case object OP_PUSHDATA2 extends ScriptElt
+
 case object OP_PUSHDATA4 extends ScriptElt
+
 case object OP_1NEGATE extends ScriptElt
+
 case object OP_RESERVED extends ScriptElt
+
 case object OP_1 extends ScriptElt
+
 case object OP_2 extends ScriptElt
+
 case object OP_3 extends ScriptElt
+
 case object OP_4 extends ScriptElt
+
 case object OP_5 extends ScriptElt
+
 case object OP_6 extends ScriptElt
+
 case object OP_7 extends ScriptElt
+
 case object OP_8 extends ScriptElt
+
 case object OP_9 extends ScriptElt
+
 case object OP_10 extends ScriptElt
+
 case object OP_11 extends ScriptElt
+
 case object OP_12 extends ScriptElt
+
 case object OP_13 extends ScriptElt
+
 case object OP_14 extends ScriptElt
+
 case object OP_15 extends ScriptElt
+
 case object OP_16 extends ScriptElt
+
 case object OP_NOP extends ScriptElt
+
 case object OP_VER extends ScriptElt
+
 case object OP_IF extends ScriptElt
+
 case object OP_NOTIF extends ScriptElt
+
 case object OP_VERIF extends ScriptElt
+
 case object OP_VERNOTIF extends ScriptElt
+
 case object OP_ELSE extends ScriptElt
+
 case object OP_ENDIF extends ScriptElt
+
 case object OP_VERIFY extends ScriptElt
+
 case object OP_RETURN extends ScriptElt
+
 case object OP_TOALTSTACK extends ScriptElt
+
 case object OP_FROMALTSTACK extends ScriptElt
+
 case object OP_2DROP extends ScriptElt
+
 case object OP_2DUP extends ScriptElt
+
 case object OP_3DUP extends ScriptElt
+
 case object OP_2OVER extends ScriptElt
+
 case object OP_2ROT extends ScriptElt
+
 case object OP_2SWAP extends ScriptElt
+
 case object OP_IFDUP extends ScriptElt
+
 case object OP_DEPTH extends ScriptElt
+
 case object OP_DROP extends ScriptElt
+
 case object OP_DUP extends ScriptElt
+
 case object OP_NIP extends ScriptElt
+
 case object OP_OVER extends ScriptElt
+
 case object OP_PICK extends ScriptElt
+
 case object OP_ROLL extends ScriptElt
+
 case object OP_ROT extends ScriptElt
+
 case object OP_SWAP extends ScriptElt
+
 case object OP_TUCK extends ScriptElt
+
 case object OP_CAT extends ScriptElt
+
 case object OP_SUBSTR extends ScriptElt
+
 case object OP_LEFT extends ScriptElt
+
 case object OP_RIGHT extends ScriptElt
+
 case object OP_SIZE extends ScriptElt
+
 case object OP_INVERT extends ScriptElt
+
 case object OP_AND extends ScriptElt
+
 case object OP_OR extends ScriptElt
+
 case object OP_XOR extends ScriptElt
+
 case object OP_EQUAL extends ScriptElt
+
 case object OP_EQUALVERIFY extends ScriptElt
+
 case object OP_RESERVED1 extends ScriptElt
+
 case object OP_RESERVED2 extends ScriptElt
+
 case object OP_1ADD extends ScriptElt
+
 case object OP_1SUB extends ScriptElt
+
 case object OP_2MUL extends ScriptElt
+
 case object OP_2DIV extends ScriptElt
+
 case object OP_NEGATE extends ScriptElt
+
 case object OP_ABS extends ScriptElt
+
 case object OP_NOT extends ScriptElt
+
 case object OP_0NOTEQUAL extends ScriptElt
+
 case object OP_ADD extends ScriptElt
+
 case object OP_SUB extends ScriptElt
+
 case object OP_MUL extends ScriptElt
+
 case object OP_DIV extends ScriptElt
+
 case object OP_MOD extends ScriptElt
+
 case object OP_LSHIFT extends ScriptElt
+
 case object OP_RSHIFT extends ScriptElt
+
 case object OP_BOOLAND extends ScriptElt
+
 case object OP_BOOLOR extends ScriptElt
+
 case object OP_NUMEQUAL extends ScriptElt
+
 case object OP_NUMEQUALVERIFY extends ScriptElt
+
 case object OP_NUMNOTEQUAL extends ScriptElt
+
 case object OP_LESSTHAN extends ScriptElt
+
 case object OP_GREATERTHAN extends ScriptElt
+
 case object OP_LESSTHANOREQUAL extends ScriptElt
+
 case object OP_GREATERTHANOREQUAL extends ScriptElt
+
 case object OP_MIN extends ScriptElt
+
 case object OP_MAX extends ScriptElt
+
 case object OP_WITHIN extends ScriptElt
+
 case object OP_RIPEMD160 extends ScriptElt
+
 case object OP_SHA1 extends ScriptElt
+
 case object OP_SHA256 extends ScriptElt
+
 case object OP_HASH160 extends ScriptElt
+
 case object OP_HASH256 extends ScriptElt
+
 case object OP_CODESEPARATOR extends ScriptElt
+
 case object OP_CHECKSIG extends ScriptElt
+
 case object OP_CHECKSIGVERIFY extends ScriptElt
+
 case object OP_CHECKMULTISIG extends ScriptElt
+
 case object OP_CHECKMULTISIGVERIFY extends ScriptElt
+
 case object OP_NOP1 extends ScriptElt
+
 case object OP_NOP2 extends ScriptElt
+
 case object OP_NOP3 extends ScriptElt
+
 case object OP_NOP4 extends ScriptElt
+
 case object OP_NOP5 extends ScriptElt
+
 case object OP_NOP6 extends ScriptElt
+
 case object OP_NOP7 extends ScriptElt
+
 case object OP_NOP8 extends ScriptElt
+
 case object OP_NOP9 extends ScriptElt
+
 case object OP_NOP10 extends ScriptElt
+
 case object OP_SMALLINTEGER extends ScriptElt
+
 case object OP_INVALIDOPCODE extends ScriptElt
+
 //case OP_PUSHDATA(data) :: tail if data.length < 0x4c => out.write(data.length); out.write(data); write(tail, out)
 //case OP_PUSHDATA(data) :: tail if data.length < 0xff => writeUInt8(0x4c, out); writeUInt8(data.length, out); out.write(data); write(tail, out)
 //case OP_PUSHDATA(data) :: tail if data.length < 0xffff => writeUInt8(0x4d, out); writeUInt16(data.length, out); out.write(data); write(tail, out)
@@ -125,11 +239,20 @@ object OP_PUSHDATA {
   else if (data.length < 0xffff) new OP_PUSHDATA(data, 0x4d)
   else if (data.length < 0xffffffff) new OP_PUSHDATA(data, 0x4e)
   else throw new IllegalArgumentException(s"data is ${data.length}, too big for OP_PUSHDATA")
+
+  def isMinimal(data: BinaryData, code: Int): Boolean = if (data.length == 0) code == ScriptElt.elt2code(OP_0)
+  else if (data.length == 1 && data.data(0) >= 1 && data.data(0) <= 16) code == ScriptElt.elt2code(OP_1) + (data.data(0) - 1)
+  else if (data.length == 1 && data.data(0) == 0x81.toByte) code == ScriptElt.elt2code(OP_1NEGATE)
+  else if (data.length <= 75) code == data.length
+  else if (data.length <= 255) code == ScriptElt.elt2code(OP_PUSHDATA1)
+  else if (data.length <= 65535) code == ScriptElt.elt2code(OP_PUSHDATA2)
+  else true
 }
 
 case class OP_PUSHDATA(data: BinaryData, code: Int) extends ScriptElt {
   override def toString = data.toString
 }
+
 case class OP_INVALID(code: Int) extends ScriptElt
 
 case class OP_COINBASE_SCRIPT(data: Array[Byte]) extends ScriptElt {
@@ -257,7 +380,7 @@ object ScriptElt {
   val elt2code: Map[ScriptElt, Int] = code2elt.map(_.swap)
 
   // name -> code
-  val name2code =  code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap)
+  val name2code = code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap)
 
   def getCode(op: ScriptElt): Int = Script.write(op :: Nil).head
 }

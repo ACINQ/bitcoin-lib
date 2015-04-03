@@ -74,10 +74,12 @@ object ScriptFlags {
    * blocks and we must accept those blocks.
    */
   val STANDARD_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS |
+    SCRIPT_VERIFY_DERSIG |
     SCRIPT_VERIFY_STRICTENC |
     SCRIPT_VERIFY_MINIMALDATA |
     SCRIPT_VERIFY_NULLDUMMY |
-    SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS
+    SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
+    SCRIPT_VERIFY_CLEANSTACK
 
   /** For convenience, standard but not mandatory verify flags. */
   val STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS
@@ -195,10 +197,28 @@ object Script {
     }
   }
 
-  def decodeNumber(input: Array[Byte]): Long = {
+  def decodeNumber(input: IndexedSeq[Byte], checkMinimalEncoding: Boolean): Long = {
     if (input.isEmpty) 0
     else if (input.length > 4) throw new RuntimeException("number cannot be encoded on more than 4 bytes")
     else {
+      if (checkMinimalEncoding) {
+        // Check that the number is encoded with the minimum possible
+        // number of bytes.
+        //
+        // If the most-significant-byte - excluding the sign bit - is zero
+        // then we're not minimal. Note how this test also rejects the
+        // negative-zero encoding, 0x80.
+        if ((input.last & 0x7f) == 0) {
+          // One exception: if there's more than one byte and the most
+          // significant bit of the second-most-significant-byte is set
+          // it would conflict with the sign bit. An example of this case
+          // is +-255, which encode to 0xff00 and 0xff80 respectively.
+          // (big-endian).
+          if (input.size <= 1 || (input(input.size - 2) & 0x80) == 0) {
+            throw new RuntimeException("non-minimally encoded script number")
+          }
+        }
+      }
       var result = 0L
       for (i <- 0 until input.size) {
         result |= (input(i) & 0xffL) << (8 * i)
@@ -256,7 +276,8 @@ object Script {
 
     def checkSignature(pubKey: Array[Byte], sigBytes: Array[Byte], scriptCode: Array[Byte]): Boolean = {
       if (sigBytes.isEmpty) false
-      else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag) || !Crypto.checkPubKeyEncoding(pubKey, scriptFlag)) false
+      else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) throw new RuntimeException("invalid signature")
+      else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag)) throw new RuntimeException("invalid public key")
       else if (!Crypto.isPubKeyValid(pubKey)) false
       else {
         val sigHashFlags = sigBytes.last & 0xff // sig hash is the last byte
@@ -280,6 +301,10 @@ object Script {
         else
           checkSignatures(pubKeys.tail, sigs, scriptCode)
     }
+
+    def checkMinimalEncoding: Boolean = (scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0
+
+    def decodeNumber(input: IndexedSeq[Byte]): Long = Script.decodeNumber(input, checkMinimalEncoding)
 
     def run(script: Array[Byte]): Stack = run(parse(script))
 
@@ -509,7 +534,10 @@ object Script {
             run(tail, stacktail(n) :: stacktail, state.copy(opCount = opCount + 1))
           case _ => throw new RuntimeException("Cannot perform OP_PICK on a stack with less than 1 elements")
         }
-        case OP_PUSHDATA(data, _) :: tail => run(tail, data :: stack, state)
+        case OP_PUSHDATA(data, code) :: tail if ((scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0) && !OP_PUSHDATA.isMinimal(data, code) => {
+          throw new RuntimeException("not minimal push")
+        }
+        case OP_PUSHDATA(data, code) :: tail => run(tail, data :: stack, state)
         case OP_ROLL :: tail => stack match {
           case head :: stacktail =>
             val n = decodeNumber(head).toInt
