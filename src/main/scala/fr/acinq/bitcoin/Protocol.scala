@@ -66,7 +66,7 @@ trait BtcMessage[T] {
 
 
 object OutPoint extends BtcMessage[OutPoint] {
-  def apply(tx: Transaction, index: Int) = new OutPoint(Transaction.hash(tx), index)
+  def apply(tx: Transaction, index: Int) = new OutPoint(tx.hash, index)
 
   override def read(input: InputStream): OutPoint = OutPoint(hash(input), uint32(input))
 
@@ -297,20 +297,6 @@ object Transaction extends BtcMessage[Transaction] {
 
     input.copy(txIn = signedInputs)
   }
-
-  /**
-   *
-   * @param input transaction
-   * @return the id of the transaction
-   */
-  def txid(input: Transaction): String = toHexString(hash(input).reverse)
-
-  /**
-   *
-   * @param input transaction
-   * @return the hash of the transaction
-   */
-  def hash(input: Transaction) : BinaryData = Crypto.hash256(Transaction.write(input))
 }
 
 /**
@@ -328,8 +314,8 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
  * @param lockTime The block number or timestamp at which this transaction is locked
  */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
-  lazy val hash = Transaction.hash(this)
-  lazy val txid = Transaction.txid(this)
+  lazy val hash : BinaryData = Crypto.hash256(Transaction.write(this))
+  lazy val txid = BinaryData(hash.reverse)
 }
 
 object BlockHeader extends BtcMessage[BlockHeader] {
@@ -377,6 +363,7 @@ object BlockHeader extends BtcMessage[BlockHeader] {
 case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleRoot: BinaryData, time: Long, bits: Long, nonce: Long) {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
+  lazy val hash:BinaryData = Crypto.hash256(BlockHeader.write(this))
 }
 
 /**
@@ -417,6 +404,8 @@ object Block extends BtcMessage[Block] {
 
   override def validate(input: Block) : Unit = {
     BlockHeader.validate(input.header)
+    require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx)), "invalid block:  merkle root mismatch")
+    require(input.tx.map(_.txid).toSet.size == input.tx.size, "invalid block: duplicate transactions")
     input.tx.map(Transaction.validate)
   }
 
@@ -458,10 +447,7 @@ object Block extends BtcMessage[Block] {
  * @param tx transactions
  */
 case class Block(header: BlockHeader, tx: Seq[Transaction]) {
-  require(util.Arrays.equals(header.hashMerkleRoot, MerkleTree.computeRoot(tx)), "invalid block:  merkle root mismatch")
-  require(tx.map(Transaction.txid).toSet.size == tx.size, "invalid block: duplicate transactions")
-
-  lazy val hash:BinaryData = Crypto.hash256(BlockHeader.write(header))
+  lazy val hash = header.hash
 
   // hash is reversed here (same as tx id)
   lazy val blockId = BinaryData(hash.reverse)
@@ -716,6 +702,29 @@ case class Getheaders(version: Long, locatorHashes: Seq[BinaryData], stopHash: B
   locatorHashes.map(h => require(h.length == 32))
   require(stopHash.length == 32)
 }
+
+object Headers extends BtcMessage[Headers] {
+  override def write(t: Headers, out: OutputStream): Unit = {
+    writeVarint(t.headers.size, out)
+    t.headers.map(h => {
+      BlockHeader.write(h, out)
+      writeVarint(0, out)
+    })
+  }
+
+  override def read(in: InputStream): Headers = {
+    val vector = ArrayBuffer.empty[BlockHeader]
+    val count = varint(in)
+    for (i <- 1L to count) {
+      vector += BlockHeader.read(in)
+      val dummy = varint(in)
+      require(dummy == 0, s"header in headers message ends with $dummy, should be 0 instead")
+    }
+    Headers(vector.toSeq)
+  }
+}
+
+case class Headers(headers: Seq[BlockHeader])
 
 object Getblocks extends BtcMessage[Getblocks] {
   override def write(t: Getblocks, out: OutputStream): Unit = {

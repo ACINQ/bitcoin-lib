@@ -45,12 +45,12 @@ object Json {
     sequence = input.sequence)
 
   def convert(transaction: Transaction, testnet: Boolean): Tx = {
-    val txid = Transaction.txid(transaction)
+    val txid = transaction.txid
     val ins = transaction.txIn.map(convert)
     val outs = transaction.txOut.zipWithIndex.map { case (out, index) =>
       TxOut(out.amount, index, ScriptPubKey(out.publicKeyScript, testnet))
     }
-    Tx(txid, transaction.version, transaction.lockTime, ins, outs)
+    Tx(txid.toString, transaction.version, transaction.lockTime, ins, outs)
   }
 
   def toJson(input: Transaction, testnet: Boolean) = Serialization.writePretty(convert(input, testnet))
