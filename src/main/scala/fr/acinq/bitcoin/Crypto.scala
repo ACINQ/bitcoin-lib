@@ -21,7 +21,7 @@ object Crypto {
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
 
-  def hmac512(key: IndexedSeq[Byte], data: IndexedSeq[Byte]): Array[Byte] = {
+  def hmac512(key: Seq[Byte], data: Seq[Byte]): Array[Byte] = {
     val mac = new HMac(new SHA512Digest())
     mac.init(new KeyParameter(key.toArray))
     mac.update(data.toArray, 0, data.length)
@@ -34,7 +34,7 @@ object Crypto {
 
   def serp(p: ECPoint): Array[Byte] = p.getEncoded(true)
 
-  def hash(digest: Digest)(input: IndexedSeq[Byte]): Array[Byte] = {
+  def hash(digest: Digest)(input: Seq[Byte]): Array[Byte] = {
     digest.update(input.toArray, 0, input.length)
     val out = new Array[Byte](digest.getDigestSize)
     digest.doFinal(out, 0)
@@ -53,7 +53,7 @@ object Crypto {
    * @param input array of byte
    * @return the 160 bits BTC hash of input
    */
-  def hash160(input: IndexedSeq[Byte]): Array[Byte] = ripemd160(sha256(input))
+  def hash160(input: Seq[Byte]): Array[Byte] = ripemd160(sha256(input))
 
   /**
    * 256 bits bitcoin hash
@@ -61,7 +61,7 @@ object Crypto {
    * @param input array of byte
    * @return the 256 bits BTC hash of input
    */
-  def hash256(input: IndexedSeq[Byte]) = sha256(sha256(input))
+  def hash256(input: Seq[Byte]) = sha256(sha256(input))
 
   /**
    * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
@@ -81,7 +81,7 @@ object Crypto {
 
   def encodeSignature(t: (BigInteger, BigInteger)): Array[Byte] = encodeSignature(t._1, t._2)
 
-  def isDERSignature(sig: IndexedSeq[Byte]): Boolean = {
+  def isDERSignature(sig: Seq[Byte]): Boolean = {
     require(sig.length >= 9 && sig.length <= 73)
     require(sig(0) == 0x30.toByte)
     require(sig(1) == sig.length - 3)
@@ -102,12 +102,12 @@ object Crypto {
     true
   }
 
-  def isLowDERSignature(sig: IndexedSeq[Byte]): Boolean = isDERSignature(sig) && {
+  def isLowDERSignature(sig: Seq[Byte]): Boolean = isDERSignature(sig) && {
     val (_, s) = decodeSignature(sig)
     s.compareTo(halfCurveOrder) <= 0
   }
 
-  def checkSignatureEncoding(sig: IndexedSeq[Byte], flags: Int): Boolean = {
+  def checkSignatureEncoding(sig: Seq[Byte], flags: Int): Boolean = {
     import ScriptFlags._
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
@@ -118,24 +118,24 @@ object Crypto {
     else true
   }
 
-  def checkPubKeyEncoding(key: IndexedSeq[Byte], flags: Int): Boolean = {
+  def checkPubKeyEncoding(key: Seq[Byte], flags: Int): Boolean = {
     if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) isPubKeyCompressedOrUncompressed(key) else true
   }
 
-  def isPubKeyValid(key: IndexedSeq[Byte]): Boolean = key.length match {
+  def isPubKeyValid(key: Seq[Byte]): Boolean = key.length match {
     case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 => true
     case 33 if key(0) == 2 || key(0) == 3 => true
     case _ => false
   }
 
-  def isPubKeyCompressedOrUncompressed(key: IndexedSeq[Byte]): Boolean = key.length match {
+  def isPubKeyCompressedOrUncompressed(key: Seq[Byte]): Boolean = key.length match {
     case 65 if key(0) == 4 => true
     case 33 if key(0) == 2 || key(0) == 3 => true
     case _ => false
   }
 
 
-  def isDefinedHashtypeSignature(sig: IndexedSeq[Byte]): Boolean = if (sig.isEmpty) false
+  def isDefinedHashtypeSignature(sig: Seq[Byte]): Boolean = if (sig.isEmpty) false
   else {
     val hashType = sig.last & (~(SIGHASH_ANYONECANPAY))
     if (hashType < SIGHASH_ALL || hashType > SIGHASH_SINGLE) false else true
@@ -146,7 +146,7 @@ object Crypto {
    * @param blob sigbyte data
    * @return the decoded (r, s) signature
    */
-  def decodeSignature(blob: IndexedSeq[Byte]): (BigInteger, BigInteger) = {
+  def decodeSignature(blob: Seq[Byte]): (BigInteger, BigInteger) = {
     val decoder = new ASN1InputStream(blob.toArray)
     val seq = decoder.readObject.asInstanceOf[DLSequence]
     val r = seq.getObjectAt(0).asInstanceOf[ASN1Integer]
@@ -155,7 +155,7 @@ object Crypto {
     (r.getPositiveValue, s.getPositiveValue)
   }
 
-  def verifySignature(data: IndexedSeq[Byte], signature: (BigInteger, BigInteger), publicKey: IndexedSeq[Byte]): Boolean = {
+  def verifySignature(data: Seq[Byte], signature: (BigInteger, BigInteger), publicKey: Seq[Byte]): Boolean = {
     val (r, s) = signature
     require(r.compareTo(one) >= 0, "r must be >= 1")
     require(r.compareTo(curve.getN) < 0, "r must be < N")
@@ -173,7 +173,7 @@ object Crypto {
    * @param privateKey private key
    * @return the corresponding public key
    */
-  def publicKeyFromPrivateKey(privateKey: IndexedSeq[Byte]) = {
+  def publicKeyFromPrivateKey(privateKey: Seq[Byte]) = {
     // a private key is either 32 bytes or 33 bytes with a last byte of 0x01
     val compressed = privateKey.length match {
       case 32 => false
@@ -193,7 +193,7 @@ object Crypto {
    *                  and you should specify 'false' for testing purposes only
    * @return a (r, s) ECDSA signature pair
    */
-  def sign(data: IndexedSeq[Byte], privateKey: Array[Byte], randomize: Boolean = true): (BigInteger, BigInteger) = {
+  def sign(data: Seq[Byte], privateKey: Array[Byte], randomize: Boolean = true): (BigInteger, BigInteger) = {
     val signer = if (randomize) new ECDSASigner() else new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
     val privateKeyParameters = new ECPrivateKeyParameters(new BigInteger(1, privateKey), curve)
     signer.init(true, privateKeyParameters)

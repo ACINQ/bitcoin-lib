@@ -15,7 +15,7 @@ object BinaryData {
   def apply(hex: String) : BinaryData = hex
 }
 
-case class BinaryData(data: IndexedSeq[Byte]) {
+case class BinaryData(data: Seq[Byte]) {
   def length = data.length
   override def toString = toHexString(data)
 }
@@ -52,7 +52,7 @@ trait BtcMessage[T] {
    * @param in serialized message
    * @return a deserialized message
    */
-  def read(in: IndexedSeq[Byte]): T = read(new ByteArrayInputStream(in.toArray))
+  def read(in: Seq[Byte]): T = read(new ByteArrayInputStream(in.toArray))
 
   /**
    * read a message from a hex string
@@ -465,28 +465,14 @@ object Address {
    * @param publicKeyHash public key hash
    * @return the address associated to he public key
    */
-  def encode(version: Byte, publicKeyHash: Array[Byte]): String = {
-    val versionAndHash = version +: publicKeyHash
-    val checksum = Crypto.hash256(versionAndHash)
-    val versionAndHashAndChecksum = versionAndHash ++ checksum.take(4)
-    Base58.encode(versionAndHashAndChecksum)
-  }
+  def encode(version: Byte, publicKeyHash: Array[Byte]): String = Base58Check.encode(version, publicKeyHash)
 
   /**
    *
    * @param address btc address
    * @return a (version, public key hash) tuple
    */
-  def decode(address: String): (Byte, Array[Byte]) = {
-    val raw = Base58.decode(address)
-    val versionAndHash = raw.dropRight(4)
-    val checksum = raw.takeRight(4)
-    val computedHash = Crypto.hash256(versionAndHash)
-    if (!util.Arrays.equals(checksum, computedHash.take(4))) {
-      throw new RuntimeException(s"invalid address $address")
-    }
-    (versionAndHash(0), versionAndHash.tail)
-  }
+  def decode(address: String): (Byte, Array[Byte]) = Base58Check.decode(address)
 }
 
 object Message extends BtcMessage[Message] {

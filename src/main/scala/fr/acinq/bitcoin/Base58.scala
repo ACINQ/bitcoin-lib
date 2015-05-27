@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
 import java.math.BigInteger
+import java.util
 
 /*
  * see https://en.bitcoin.it/wiki/Base58Check_encoding
@@ -23,10 +24,10 @@ object Base58 {
    * @param input binary data
    * @return the base-58 representation of input
    */
-  def encode(input: Array[Byte]): String = {
+  def encode(input: Seq[Byte]): String = {
     if (input.isEmpty) ""
     else {
-      val big = new BigInteger(1, input)
+      val big = new BigInteger(1, input.toArray)
       val builder = new StringBuilder
 
       def encode1(current: BigInteger): Unit = current match {
@@ -56,5 +57,24 @@ object Base58 {
     val trim  = input.dropWhile(_ == '1').toList
     val decoded = decode1(trim).toByteArray.dropWhile(_ == 0) // BigInteger.toByteArray may add a leading 0x00
     if (trim.isEmpty) zeroes else zeroes ++ decoded
+  }
+}
+
+object Base58Check {
+  def checksum(data: Seq[Byte]) = Crypto.hash256(data).take(4)
+
+  def encode(version: Byte, data: Seq[Byte]) : String = {
+    val versionAndData = version +: data
+    Base58.encode(versionAndData ++ checksum(versionAndData))
+  }
+
+  def decode(encoded: String) : (Byte, Array[Byte]) = {
+    val raw = Base58.decode(encoded)
+    val versionAndHash = raw.dropRight(4)
+    val checksum = raw.takeRight(4)
+    if (!util.Arrays.equals(checksum, Base58Check.checksum(versionAndHash))) {
+      throw new RuntimeException(s"invalid Base58Check data $encoded")
+    }
+    (versionAndHash(0), versionAndHash.tail)
   }
 }
