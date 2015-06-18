@@ -245,7 +245,7 @@ object Transaction extends BtcMessage[Transaction] {
    * @param inputIndex index of the tx input that is being processed
    * @param previousOutputScript public key script of the output claimed by this tx input
    * @param sighashType signature hash type
-   * @return a hash which can be used to signed the referenced tx input
+   * @return a hash which can be used to sign the referenced tx input
    */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Array[Byte] = {
     if (isHashSingle(sighashType) && inputIndex >= tx.txOut.length) {

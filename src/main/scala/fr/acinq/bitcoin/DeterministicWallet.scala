@@ -108,7 +108,7 @@ object DeterministicWallet {
    * @param index index of the child key
    * @return the derived private key at the specified index
    */
-  def derivePrivateKey(parent: ExtendedPrivateKey, index: Long) = {
+  def derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = {
     val I = if (isHardened(index)) {
       val buffer = 0.toByte +: parent.secretkey.data
       Crypto.hmac512(parent.chaincode, buffer ++ writeUInt32BigEndian(index))

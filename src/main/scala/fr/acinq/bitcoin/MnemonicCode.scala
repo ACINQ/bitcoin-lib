@@ -21,7 +21,7 @@ object MnemonicCode {
     def loop(x: Int, acc: List[Boolean] = List.empty[Boolean]): List[Boolean] = if (x == 0) acc else loop(x / 2, ((x % 2) != 0) :: acc)
 
     val digits = loop(x & 0xff)
-    val zeroes = (0 until 8 - digits.length).map(_ => false).toList
+    val zeroes = List.fill(8 - digits.length)(false)
     zeroes ++ digits
   }
 

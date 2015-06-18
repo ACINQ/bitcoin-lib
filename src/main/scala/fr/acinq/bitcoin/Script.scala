@@ -92,6 +92,10 @@ object Script {
 
   type Stack = List[Array[Byte]]
 
+  private val True = Array(1:Byte)
+
+  private val False = Array.empty[Byte]
+
   /**
    * parse a script from a input stream of binary data
    * @param input input stream
@@ -320,7 +324,7 @@ object Script {
      * run a bitcoin script
      * @param script command stack
      * @param stack data stack
-     * @return a updated data stack
+     * @return an updated data stack
      */
     @tailrec
     final def run(script: List[ScriptElt], stack: Stack, state: State): Stack = {
@@ -389,7 +393,7 @@ object Script {
             // remove signature from script
             val scriptCode1 = removeSignature(scriptCode, sigBytes)
             val result = checkSignature(pubKey, sigBytes, Script.write(scriptCode1))
-            run(tail, (if (result) Array(1: Byte) else Array(0: Byte)) :: stacktail, state.copy(opCount = opCount + 1))
+            run(tail, (if (result) True else False) :: stacktail, state.copy(opCount = opCount + 1))
           }
           case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
         }
@@ -415,7 +419,7 @@ object Script {
           val stack4 = stack3.drop(n + 1)
           val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
           val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode1))
-          val result = if (success) Array(1: Byte) else Array(0: Byte)
+          val result = if (success) True else False
           run(tail, result :: stack4, state.copy(opCount = nextOpCount))
         }
         case OP_CHECKMULTISIGVERIFY :: tail => run(OP_CHECKMULTISIG :: OP_VERIFY :: tail, stack, state.copy(opCount = opCount - 1))
@@ -435,8 +439,8 @@ object Script {
           case _ => throw new RuntimeException("Cannot perform OP_3DUP on a stack with less than 3 elements")
         }
         case OP_EQUAL :: tail => stack match {
-          case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => run(tail, Array(0: Byte) :: stacktail, state.copy(opCount = opCount + 1))
-          case a :: b :: stacktail => run(tail, Array(1: Byte) :: stacktail, state.copy(opCount = opCount + 1))
+          case a :: b :: stacktail if !java.util.Arrays.equals(a, b) => run(tail, False :: stacktail, state.copy(opCount = opCount + 1))
+          case a :: b :: stacktail => run(tail, True :: stacktail, state.copy(opCount = opCount + 1))
           case _ => throw new RuntimeException("Cannot perform OP_EQUAL on a stack with less than 2 elements")
         }
         case OP_EQUALVERIFY :: tail => stack match {

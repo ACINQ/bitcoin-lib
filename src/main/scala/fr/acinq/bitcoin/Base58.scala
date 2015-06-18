@@ -63,9 +63,14 @@ object Base58 {
 object Base58Check {
   def checksum(data: Seq[Byte]) = Crypto.hash256(data).take(4)
 
-  def encode(version: Byte, data: Seq[Byte]) : String = {
-    val versionAndData = version +: data
-    Base58.encode(versionAndData ++ checksum(versionAndData))
+  def encode(prefix: Byte, data: Seq[Byte]) : String = {
+    val prefixAndData = prefix +: data
+    Base58.encode(prefixAndData ++ checksum(prefixAndData))
+  }
+
+  def encode(prefix: Seq[Byte], data: Seq[Byte]) : String = {
+    val prefixAndData = prefix ++ data
+    Base58.encode(prefixAndData ++ checksum(prefixAndData))
   }
 
   def decode(encoded: String) : (Byte, Array[Byte]) = {

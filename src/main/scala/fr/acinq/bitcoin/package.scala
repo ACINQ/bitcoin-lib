@@ -213,6 +213,8 @@ package object bitcoin {
 
   implicit def string2binaryData(input: String) : BinaryData = BinaryData(fromHexString(input))
 
+  implicit def seq2binaryData(input: Seq[Byte]) : BinaryData = BinaryData(input)
+
   implicit def array2binaryData(input: Array[Byte]) : BinaryData = BinaryData(input)
 
   implicit def binaryData2array(input: BinaryData) : Array[Byte] = input.data.toArray
