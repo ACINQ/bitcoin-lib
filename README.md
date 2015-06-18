@@ -15,11 +15,12 @@ This is a simple scala library which implements most of the bitcoin protocol:
 * pay to public key tx
 * pay to script tx / multisig tx
 * BIP 32 (deterministic wallets)
+* BIP 39 (mnemonic code for generating deterministic keys)
 * BIP 70
 
 ## Objectives
 
-Our goal is not to re-implement a full Bitcoin node (this would be a doomed and rather pointless endeavour) but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We also use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32 for example).  
+Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We also use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example).  
 This is a very early beta release and should not be used in production. If you're looking for a mature bitcoin library for the JVM you should have a look at [bitcoinj](https://github.com/bitcoinj/bitcoinj) instead.
 
 ## Configuring maven/sbt
@@ -137,7 +138,7 @@ Please have a look at unit tests, more samples will be added soon.
   val signedTx = Transaction.sign(tx, List(signData))
 
 ```
-### HD Wallet
+### HD Wallet (BIP32)
 
 Let's play with the scala console and the first test vector from https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
 
@@ -203,4 +204,38 @@ res8: fr.acinq.bitcoin.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey
 scala> encode(derivePublicKey(K2, 2L :: 1000000000L :: Nil), false)
 res10: String = xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy
 
+```
+
+### Mnemonic code (BIP39)
+
+```shell
+mvn scala:console
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] Building bitcoin-lib 0.9.4-SNAPSHOT
+[INFO] ------------------------------------------------------------------------
+[INFO]
+[INFO] --- scala-maven-plugin:3.2.0:console (default-cli) @ bitcoin-lib_2.11 ---
+[WARNING]  Expected all dependencies to require Scala version: 2.11.6
+[WARNING]  fr.acinq:bitcoin-lib_2.11:0.9.4-SNAPSHOT requires scala version: 2.11.6
+[WARNING]  org.json4s:json4s-jackson_2.11:3.2.11 requires scala version: 2.11.0
+[WARNING] Multiple versions of scala libraries detected!
+[WARNING] scala-maven-plugin cannot fork scala console!!  Running in process
+Welcome to Scala version 2.11.6 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_45).
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala> import fr.acinq.bitcoin._
+import fr.acinq.bitcoin._
+
+scala> import MnemonicCode._
+import MnemonicCode._
+
+scala> val mnemonics = toMnemonics(fromHexString("77c2b00716cec7213839159e404db50d"))
+mnemonics: List[String] = List(jelly, better, achieve, collect, unaware, mountain, thought, cargo, oxygen, act, hood, bridge)
+
+scala> val key:BinaryData = toSeed(mnemonics, "TREZOR")
+key: fr.acinq.bitcoin.BinaryData = b5b6d0127db1a9d2226af0c3346031d77af31e918dba64287a1b44b8ebf63cdd52676f672a290aae502472cf2d602c051f3e6f18055e84e4c43
+897fc4e51a6ff
 ```
