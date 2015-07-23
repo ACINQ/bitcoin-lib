@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.TransactionSpec.PreviousTransaction
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
@@ -57,25 +56,16 @@ class MultisigSpec extends FlatSpec with Matchers {
 
   it should "spend multisig transaction" in {
     //this is the P2SH multisig input transaction
-    val previousTx = List(
-      PreviousTransaction(// 0.009 BTC
-        txid = "af416176497f898b1eaf545ecec2a42b833488c2e4324f2cde732f875f2a5b34",
-        vout = 0,
-        publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil),
-        privateKey = Array.empty[Byte]) // there is no single private key, this is a multisig transaction
-    )
+    val previousTx = Transaction.read("0100000001ea1df27ca8a897c985f163407e2c20cbc310ca891ca361c207ba8f4b7073e541000000008b483045022100940f7bcb380fb6db698f71928bda8926f76305ff868919e8ef7729647606bf7702200d32f1231860cb7e6777447c4038627bee7f47bc54005f681b62ce71d4a6a7f10141042adeabf9817a4d34adf1fe8e0fd457a3c0c6378afd63325dbaaaccd4f254002f9cc4148f603beb0e874facd3a3e68f5d002a65c0d3658452a4e55a57f5c3b768ffffffff01a0bb0d000000000017a914a90003b4ddef4be46fc61e7f2167da9d234944e28700000000")
 
     val dest = "msCMyGGJ5eRcUgM5SQkwirVQGbGcr9oaYv" //priv: 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
     // 0.008 BTC in satoshi, meaning the fee will be 0.009-0.008 = 0.001
     val amount = 800000
 
-    // convert a previous tx to an tx input with an empty signature script
-    def toTxIn(ptx: PreviousTransaction) = TxIn(outPoint = OutPoint(fromHexString(ptx.txid).reverse, ptx.vout), signatureScript = Array.empty[Byte], sequence = 0xFFFFFFFFL)
-
     // create a tx with empty input signature scripts
     val tx = Transaction(
       version = 1L,
-      txIn = previousTx.map(toTxIn),
+      txIn = List(TxIn(OutPoint(previousTx, 0), Array.empty[Byte], 0xffffffffL)),
       txOut = List(TxOut(
         amount = amount,
         publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(dest)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
@@ -104,8 +94,6 @@ class MultisigSpec extends FlatSpec with Matchers {
 
     // the id of this tx on testnet is f137884feb9a951bf9b159432ebb771ec76fa6e7332c06cb8a6b718148f101af
     // redeem the tx
-    val ctx = Script.Context(signedTx, 0)
-    val runner = new Script.Runner(ctx, scriptFlag = ScriptFlags.SCRIPT_VERIFY_P2SH)
-    assert(runner.verifyScripts(signedTx.txIn(0).signatureScript, previousTx(0).publicKeyScript))
+    Transaction.correctlySpends(signedTx, List(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
 }

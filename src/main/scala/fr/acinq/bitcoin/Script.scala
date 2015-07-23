@@ -119,7 +119,7 @@ object Script {
 
   def parse(blob: Array[Byte]): List[ScriptElt] = if (blob.length > 10000) throw new RuntimeException("script is too large") else parse(new ByteArrayInputStream(blob))
 
-  def write(script: List[ScriptElt], out: OutputStream): Unit = script match {
+  def write(script: Seq[ScriptElt], out: OutputStream): Unit = script match {
     case Nil => ()
     case OP_PUSHDATA(data, length) :: tail if data.length < 0x4c && data.length == length => out.write(data.length); out.write(data); write(tail, out)
     case OP_PUSHDATA(data, 0x4c) :: tail if data.length < 0xff => writeUInt8(0x4c, out); writeUInt8(data.length, out); out.write(data); write(tail, out)
@@ -129,7 +129,7 @@ object Script {
     case head :: tail => out.write(elt2code(head)); write(tail, out)
   }
 
-  def write(script: List[ScriptElt]): Array[Byte] = {
+  def write(script: Seq[ScriptElt]): Array[Byte] = {
     val out = new ByteArrayOutputStream()
     write(script, out)
     out.toByteArray

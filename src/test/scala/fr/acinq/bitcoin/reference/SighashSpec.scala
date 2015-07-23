@@ -1,9 +1,10 @@
-package fr.acinq.bitcoin
+package fr.acinq.bitcoin.reference
 
 import java.io.InputStreamReader
 
+import fr.acinq.bitcoin._
 import org.json4s.DefaultFormats
-import org.json4s.jackson.{JsonMethods, Serialization}
+import org.json4s.jackson.JsonMethods
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -19,7 +20,6 @@ class SighashSpec extends FlatSpec {
   "bitcoin-lib" should "pass reference client sighash tests" in {
     import shapeless._
     import syntax.std.traversable._
-    import HList._
     val stream = classOf[Base58Spec].getResourceAsStream("/sighash.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
     // use tail to skip the first line of the .json file

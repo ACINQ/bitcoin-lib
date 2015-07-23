@@ -98,6 +98,8 @@ case class OutPoint(hash: BinaryData, index: Long) {
 }
 
 object TxIn extends BtcMessage[TxIn] {
+  def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long) : TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
+
   override def read(input: InputStream): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
 
   override def write(input: TxIn, out: OutputStream) = {
@@ -126,6 +128,8 @@ object TxIn extends BtcMessage[TxIn] {
 case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long)
 
 object TxOut extends BtcMessage[TxOut] {
+  def apply(amount: Long, publicKeyScript: Seq[ScriptElt]) : TxOut = new TxOut(amount, Script.write(publicKeyScript))
+
   override def read(input: InputStream): TxOut = TxOut(uint64(input), script(input))
 
   override def write(input: TxOut, out: OutputStream) = {
@@ -296,6 +300,35 @@ object Transaction extends BtcMessage[Transaction] {
     }
 
     input.copy(txIn = signedInputs)
+  }
+
+  /**
+   * checks that a transaction correctly spends its inputs (i.e properly signed)
+   * @param tx transaction to be checked
+   * @param inputs previous tx that are being spent
+   * @param scriptFlags script execution flags
+   * @throws AssertionError is the transaction is not valid (i.e executing input and output scripts does not yield "true")
+   */
+  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = {
+    val txMap = inputs.map(t => t.txid -> t).toMap
+    val prevoutMap = for (i <- 0 until tx.txIn.length) yield tx.txIn(i).outPoint -> txMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
+    correctlySpends(tx, prevoutMap.toMap, scriptFlags)
+  }
+
+  /**
+   * checks that a transaction correctly spends its inputs (i.e properly signed)
+   * @param tx transaction to be checked
+   * @param prevoutScripts map where keys are OutPoint (previous tx ids and vout index) and values are previous output pubkey scripts)
+   * @param scriptFlags script execution flags
+   * @throws AssertionError is the transaction is not valid (i.e executing input and output scripts does not yield "true")
+   */
+  def correctlySpends(tx: Transaction, prevoutScripts: Map[OutPoint, BinaryData], scriptFlags: Int): Unit = {
+    for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
+      val prevOutputScript = prevoutScripts(tx.txIn(i).outPoint)
+      val ctx = new Script.Context(tx, i)
+      val runner = new Script.Runner(ctx, scriptFlags)
+      assert(runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript))
+    }
   }
 }
 
