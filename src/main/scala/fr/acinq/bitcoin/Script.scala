@@ -288,9 +288,8 @@ object Script {
         val sigBytes1 = sigBytes.take(sigBytes.length - 1) // drop sig hash
         if (sigBytes1.isEmpty) false
         else {
-          val (r, s) = Crypto.decodeSignature(sigBytes)
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags)
-          Crypto.verifySignature(hash, (r, s), pubKey)
+          Crypto.verifySignature(hash, sigBytes, pubKey)
         }
       }
     }

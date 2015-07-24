@@ -303,11 +303,11 @@ object Transaction extends BtcMessage[Transaction] {
   }
 
   /**
-   * checks that a transaction correctly spends its inputs (i.e properly signed)
+   * checks that a transaction correctly spends its inputs (i.e is properly signed)
    * @param tx transaction to be checked
    * @param inputs previous tx that are being spent
    * @param scriptFlags script execution flags
-   * @throws AssertionError is the transaction is not valid (i.e executing input and output scripts does not yield "true")
+   * @throws AssertionError if the transaction is not valid (i.e executing input and output scripts does not yield "true")
    */
   def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = {
     val txMap = inputs.map(t => t.txid -> t).toMap
@@ -316,11 +316,11 @@ object Transaction extends BtcMessage[Transaction] {
   }
 
   /**
-   * checks that a transaction correctly spends its inputs (i.e properly signed)
+   * checks that a transaction correctly spends its inputs (i.e sis properly signed)
    * @param tx transaction to be checked
    * @param prevoutScripts map where keys are OutPoint (previous tx ids and vout index) and values are previous output pubkey scripts)
    * @param scriptFlags script execution flags
-   * @throws AssertionError is the transaction is not valid (i.e executing input and output scripts does not yield "true")
+   * @throws AssertionError if the transaction is not valid (i.e executing input and output scripts does not yield "true")
    */
   def correctlySpends(tx: Transaction, prevoutScripts: Map[OutPoint, BinaryData], scriptFlags: Int): Unit = {
     for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {

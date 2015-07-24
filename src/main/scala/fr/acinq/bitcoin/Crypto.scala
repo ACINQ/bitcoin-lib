@@ -169,6 +169,14 @@ object Crypto {
   }
 
   /**
+   * @param data data
+   * @param signature signature
+   * @param publicKey public key
+   * @return true is signature is valid for this data with this public key
+   */
+  def verifySignature(data: Seq[Byte], signature: Seq[Byte], publicKey: Seq[Byte]): Boolean = verifySignature(data, decodeSignature(signature), publicKey)
+
+  /**
    *
    * @param privateKey private key
    * @return the corresponding public key

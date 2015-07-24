@@ -113,8 +113,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     ))
 
     // check signature
-    val (r1, s1) = Crypto.decodeSignature(sig)
-    assert(Crypto.verifySignature(hashed, (r1, s1), publicKey))
+    assert(Crypto.verifySignature(hashed, sig, publicKey))
 
     // check script
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
