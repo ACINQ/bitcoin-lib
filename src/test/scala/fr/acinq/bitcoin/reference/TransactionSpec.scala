@@ -41,6 +41,7 @@ class TransactionSpec extends FlatSpec with Matchers {
           case Failure(t) => println(s"failed to verify $serializedTransaction: $t")
         }
       }
+      case unexpected => println(s"unexpected: $unexpected")
     })
   }
 
@@ -70,6 +71,7 @@ class TransactionSpec extends FlatSpec with Matchers {
           case Failure(t) => ()
         }
       }
+      case unexpected => println(s"unexpected: $unexpected")
     })
   }
 }

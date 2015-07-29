@@ -312,7 +312,7 @@ object Transaction extends BtcMessage[Transaction] {
    * @param tx transaction to be checked
    * @param inputs previous tx that are being spent
    * @param scriptFlags script execution flags
-   * @throws AssertionError if the transaction is not valid (i.e executing input and output scripts does not yield "true")
+   * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
    */
   def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = {
     val txMap = inputs.map(t => t.txid -> t).toMap
@@ -325,14 +325,14 @@ object Transaction extends BtcMessage[Transaction] {
    * @param tx transaction to be checked
    * @param prevoutScripts map where keys are OutPoint (previous tx ids and vout index) and values are previous output pubkey scripts)
    * @param scriptFlags script execution flags
-   * @throws AssertionError if the transaction is not valid (i.e executing input and output scripts does not yield "true")
+   * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
    */
   def correctlySpends(tx: Transaction, prevoutScripts: Map[OutPoint, BinaryData], scriptFlags: Int): Unit = {
     for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
       val prevOutputScript = prevoutScripts(tx.txIn(i).outPoint)
       val ctx = new Script.Context(tx, i)
       val runner = new Script.Runner(ctx, scriptFlags)
-      assert(runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript))
+      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)) throw new RuntimeException(s"cannot tx ${tx.txid} does not spend its input # $i")
     }
   }
 }
