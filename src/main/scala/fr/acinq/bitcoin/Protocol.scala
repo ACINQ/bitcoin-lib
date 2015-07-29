@@ -12,11 +12,12 @@ import scala.collection.mutable.ArrayBuffer
  */
 
 object BinaryData {
-  def apply(hex: String) : BinaryData = hex
+  def apply(hex: String): BinaryData = hex
 }
 
 case class BinaryData(data: Seq[Byte]) {
   def length = data.length
+
   override def toString = toHexString(data)
 }
 
@@ -98,7 +99,7 @@ case class OutPoint(hash: BinaryData, index: Long) {
 }
 
 object TxIn extends BtcMessage[TxIn] {
-  def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long) : TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
+  def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long): TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
 
   override def read(input: InputStream): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
 
@@ -108,7 +109,7 @@ object TxIn extends BtcMessage[TxIn] {
     writeUInt32(input.sequence, out)
   }
 
-  override def validate(input: TxIn) : Unit = {
+  override def validate(input: TxIn): Unit = {
     require(input.signatureScript.length <= MaxScriptElementSize, s"signature script is ${input.signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
   }
 
@@ -125,10 +126,12 @@ object TxIn extends BtcMessage[TxIn] {
  * @param sequence Transaction version as defined by the sender. Intended for "replacement" of transactions when
  *                 information is updated before inclusion into a block. Unused for now.
  */
-case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long)
+case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long) {
+  def isFinal: Boolean = sequence == 0xffffffffL
+}
 
 object TxOut extends BtcMessage[TxOut] {
-  def apply(amount: Long, publicKeyScript: Seq[ScriptElt]) : TxOut = new TxOut(amount, Script.write(publicKeyScript))
+  def apply(amount: Long, publicKeyScript: Seq[ScriptElt]): TxOut = new TxOut(amount, Script.write(publicKeyScript))
 
   override def read(input: InputStream): TxOut = TxOut(uint64(input), script(input))
 
@@ -137,7 +140,7 @@ object TxOut extends BtcMessage[TxOut] {
     writeScript(input.publicKeyScript, out)
   }
 
-  override def validate(input: TxOut) : Unit = {
+  override def validate(input: TxOut): Unit = {
     import input._
     require(amount >= 0, s"invalid txout amount: $amount")
     require(amount <= MaxMoney, s"invalid txout amount: $amount")
@@ -178,7 +181,7 @@ object Transaction extends BtcMessage[Transaction] {
     writeUInt32(input.lockTime, out)
   }
 
-  override def validate(input: Transaction) : Unit = {
+  override def validate(input: Transaction): Unit = {
     require(input.txIn.nonEmpty, "input list cannot be empty")
     require(input.txOut.nonEmpty, "output list cannot be empty")
     require(Transaction.write(input).size <= MaxBlockSize)
@@ -196,6 +199,7 @@ object Transaction extends BtcMessage[Transaction] {
   }
 
   def isCoinbase(input: Transaction) = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn(0).outPoint)
+
   /**
    * prepare a transaction for signing a specific input
    * @param tx input transaction
@@ -273,7 +277,8 @@ object Transaction extends BtcMessage[Transaction] {
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int, privateKey: Array[Byte], randomize: Boolean = true): Array[Byte] = {
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
     val (r, s) = Crypto.sign(hash, privateKey.take(32), randomize)
-    Crypto.encodeSignature(r, s)
+    val sig = Crypto.encodeSignature(r, s)
+    sig :+ (sighashType.toByte)
   }
 
   /**
@@ -295,7 +300,7 @@ object Transaction extends BtcMessage[Transaction] {
       val publicKey = Crypto.publicKeyFromPrivateKey(signData(i).privateKey)
 
       // signature script: push signature and public key
-      val sigScript = Script.write(OP_PUSHDATA(sig :+ 1.toByte) :: OP_PUSHDATA(publicKey) :: Nil)
+      val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
       input.txIn(i).copy(signatureScript = sigScript)
     }
 
@@ -332,6 +337,10 @@ object Transaction extends BtcMessage[Transaction] {
   }
 }
 
+object SignData {
+  def apply(prevPubKeyScript: Seq[ScriptElt], privateKey: BinaryData): SignData = new SignData(Script.write(prevPubKeyScript), privateKey)
+}
+
 /**
  * data for signing pay2pk transaction
  * @param prevPubKeyScript previous output public key script
@@ -347,8 +356,22 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
  * @param lockTime The block number or timestamp at which this transaction is locked
  */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
-  lazy val hash : BinaryData = Crypto.hash256(Transaction.write(this))
+  lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this))
   lazy val txid = BinaryData(hash.reverse)
+
+  /**
+   *
+   * @param blockHeight current block height
+   * @param blockTime current block time
+   * @return true if the transaction is final
+   */
+  def isFinal(blockHeight: Long, blockTime: Long): Boolean = lockTime match {
+    case 0 => true
+    case value if value < LockTimeThreshold && value < blockHeight => true
+    case value if value >= LockTimeThreshold && value < blockTime => true
+    case _ if txIn.exists(!_.isFinal) => false
+    case _ => true
+  }
 }
 
 object BlockHeader extends BtcMessage[BlockHeader] {
@@ -396,7 +419,7 @@ object BlockHeader extends BtcMessage[BlockHeader] {
 case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleRoot: BinaryData, time: Long, bits: Long, nonce: Long) {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
-  lazy val hash:BinaryData = Crypto.hash256(BlockHeader.write(this))
+  lazy val hash: BinaryData = Crypto.hash256(BlockHeader.write(this))
 }
 
 /**
@@ -435,7 +458,7 @@ object Block extends BtcMessage[Block] {
     input.tx.map(t => Transaction.write(t, out))
   }
 
-  override def validate(input: Block) : Unit = {
+  override def validate(input: Block): Unit = {
     BlockHeader.validate(input.header)
     require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx)), "invalid block:  merkle root mismatch")
     require(input.tx.map(_.txid).toSet.size == input.tx.size, "invalid block: duplicate transactions")

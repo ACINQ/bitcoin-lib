@@ -206,7 +206,7 @@ case object OP_CHECKMULTISIGVERIFY extends ScriptElt
 
 case object OP_NOP1 extends ScriptElt
 
-case object OP_NOP2 extends ScriptElt
+case object OP_CHECKLOCKTIMEVERIFY extends ScriptElt
 
 case object OP_NOP3 extends ScriptElt
 
@@ -227,11 +227,6 @@ case object OP_NOP10 extends ScriptElt
 case object OP_SMALLINTEGER extends ScriptElt
 
 case object OP_INVALIDOPCODE extends ScriptElt
-
-//case OP_PUSHDATA(data) :: tail if data.length < 0x4c => out.write(data.length); out.write(data); write(tail, out)
-//case OP_PUSHDATA(data) :: tail if data.length < 0xff => writeUInt8(0x4c, out); writeUInt8(data.length, out); out.write(data); write(tail, out)
-//case OP_PUSHDATA(data) :: tail if data.length < 0xffff => writeUInt8(0x4d, out); writeUInt16(data.length, out); out.write(data); write(tail, out)
-//case OP_PUSHDATA(data) :: tail if data.length < 0xffffffff => writeUInt8(0x4e, out); writeUInt32(data.length, out); out.write(data); write(tail, out)
 
 object OP_PUSHDATA {
   def apply(data: BinaryData) = if (data.length < 0x4c) new OP_PUSHDATA(data, data.length)
@@ -364,7 +359,7 @@ object ScriptElt {
     0xae -> OP_CHECKMULTISIG,
     0xaf -> OP_CHECKMULTISIGVERIFY,
     0xb0 -> OP_NOP1,
-    0xb1 -> OP_NOP2,
+    0xb1 -> OP_CHECKLOCKTIMEVERIFY,
     0xb2 -> OP_NOP3,
     0xb3 -> OP_NOP4,
     0xb4 -> OP_NOP5,
@@ -380,7 +375,7 @@ object ScriptElt {
   val elt2code: Map[ScriptElt, Int] = code2elt.map(_.swap)
 
   // name -> code
-  val name2code = code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap)
+  val name2code = code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap) + ("NOP2" -> 0xb1)
 
   def getCode(op: ScriptElt): Int = Script.write(op :: Nil).head
 }

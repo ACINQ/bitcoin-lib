@@ -57,6 +57,11 @@ object ScriptFlags {
   // Note: CLEANSTACK should never be used without P2SH.
   val SCRIPT_VERIFY_CLEANSTACK = (1 << 8)
 
+  // Verify CHECKLOCKTIMEVERIFY
+  //
+  // See BIP65 for details.
+  val SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY = (1 << 9)
+
   /**
    * Mandatory script verification flags that all new blocks must comply with for
    * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -91,6 +96,8 @@ object Script {
   import ScriptFlags._
 
   type Stack = List[Array[Byte]]
+
+  val LocktimeThreshold = 500000000L
 
   private val True = Array(1:Byte)
 
@@ -135,13 +142,8 @@ object Script {
     out.toByteArray
   }
 
-  def isNop(op: ScriptElt) = op match {
-    case OP_NOP | OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 | OP_NOP9 | OP_NOP10 => true
-    case _ => false
-  }
-
   def isUpgradableNop(op: ScriptElt) = op match {
-    case OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 | OP_NOP9 | OP_NOP10 => true
+    case OP_NOP1 | OP_NOP3 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 | OP_NOP9 | OP_NOP10 => true
     case _ => false
   }
 
@@ -201,9 +203,9 @@ object Script {
     }
   }
 
-  def decodeNumber(input: IndexedSeq[Byte], checkMinimalEncoding: Boolean): Long = {
+  def decodeNumber(input: IndexedSeq[Byte], checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long = {
     if (input.isEmpty) 0
-    else if (input.length > 4) throw new RuntimeException("number cannot be encoded on more than 4 bytes")
+    else if (input.length > maximumSize) throw new RuntimeException(s"number cannot be encoded on more than $maximumSize bytes")
     else {
       if (checkMinimalEncoding) {
         // Check that the number is encoded with the minimum possible
@@ -263,6 +265,36 @@ object Script {
 
   def removeSignatures(script: List[ScriptElt], sigs: List[BinaryData]): List[ScriptElt] = sigs.foldLeft(script)(removeSignature)
 
+  def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int) : Boolean = {
+    // There are two times of nLockTime: lock-by-blockheight
+    // and lock-by-blocktime, distinguished by whether
+    // nLockTime < LOCKTIME_THRESHOLD.
+    //
+    // We want to compare apples to apples, so fail the script
+    // unless the type of nLockTime being tested is the same as
+    // the nLockTime in the transaction.
+    if (!((tx.lockTime <  LocktimeThreshold && lockTime <  LocktimeThreshold) || (tx.lockTime >= LocktimeThreshold && lockTime >= LocktimeThreshold))) {
+      false
+    }
+    // Now that we know we're comparing apples-to-apples, the
+    // comparison is a simple numeric one.
+    else if (lockTime > tx.lockTime) {
+      false
+    }
+    // Finally the nLockTime feature can be disabled and thus
+    // CHECKLOCKTIMEVERIFY bypassed if every txin has been
+    // finalized by setting nSequence to maxint. The
+    // transaction would be allowed into the blockchain, making
+    // the opcode ineffective.
+    //
+    // Testing if this vin is not final is sufficient to
+    // prevent this condition. Alternatively we could test all
+    // inputs, but testing just this input minimizes the data
+    // required to prove correct CHECKLOCKTIMEVERIFY execution.
+    else if (tx.txIn(inputIndex).isFinal) false
+    else true
+  }
+
   /**
    * execution context of a tx script
    * @param tx current transaction
@@ -307,7 +339,7 @@ object Script {
 
     def checkMinimalEncoding: Boolean = (scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0
 
-    def decodeNumber(input: IndexedSeq[Byte]): Long = Script.decodeNumber(input, checkMinimalEncoding)
+    def decodeNumber(input: IndexedSeq[Byte], maximumSize: Int = 4): Long = Script.decodeNumber(input, checkMinimalEncoding, maximumSize)
 
     def run(script: Array[Byte]): Stack = run(parse(script))
 
@@ -355,8 +387,9 @@ object Script {
         // and now, things that are checked only in an executed IF branch
         case OP_0 :: tail => run(tail, Array.empty[Byte] :: stack, state)
         case op :: tail if isSimpleValue(op) => run(tail, encodeNumber(simpleValue(op)) :: stack, state)
+        case OP_NOP :: tail => run(tail, stack, state.copy(opCount = opCount + 1))
         case op :: tail if isUpgradableNop(op) && ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
-        case op :: tail if isNop(op) => run(tail, stack, state.copy(opCount = opCount + 1))
+        case op :: tail if isUpgradableNop(op) => run(tail, stack, state.copy(opCount = opCount + 1))
         case OP_1ADD :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_1ADD on am empty stack")
         case OP_1ADD :: tail => run(tail, encodeNumber(decodeNumber(stack.head) + 1) :: stack.tail, state.copy(opCount = opCount + 1))
         case OP_1SUB :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_1SUB on am empty stack")
@@ -369,7 +402,7 @@ object Script {
             val y = decodeNumber(b)
             val result = x + y
             run(tail, encodeNumber(result) :: stacktail, state.copy(opCount = opCount + 1))
-          case _ => throw new RuntimeException("cannot run OP_ADD on a stack with less then 2 elements")
+          case _ => throw new RuntimeException("cannot run OP_ADD on a stack with less than 2 elements")
         }
         case OP_BOOLAND :: tail => stack match {
           case x1 :: x2 :: stacktail =>
@@ -377,7 +410,7 @@ object Script {
             val n2 = decodeNumber(x2)
             val result = if (n1 != 0 && n2 != 0) 1 else 0
             run(tail, encodeNumber(result) :: stacktail, state.copy(opCount = opCount + 1))
-          case _ => throw new RuntimeException("cannot run OP_BOOLAND on a stack with less then 2 elements")
+          case _ => throw new RuntimeException("cannot run OP_BOOLAND on a stack with less than 2 elements")
         }
         case OP_BOOLOR :: tail => stack match {
           case x1 :: x2 :: stacktail =>
@@ -385,8 +418,19 @@ object Script {
             val n2 = decodeNumber(x2)
             val result = if (n1 != 0 || n2 != 0) 1 else 0
             run(tail, encodeNumber(result) :: stacktail, state.copy(opCount = opCount + 1))
-          case _ => throw new RuntimeException("cannot run OP_BOOLOR on a stack with less then 2 elements")
+          case _ => throw new RuntimeException("cannot run OP_BOOLOR on a stack with less than 2 elements")
         }
+        case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0)  => stack match {
+          case head :: stacktail =>
+            val locktime = decodeNumber(head, maximumSize = 5)
+            if (locktime < 0) throw new RuntimeException("lock time cannot be negative")
+            if (!checkLockTime(locktime, context.tx, context.inputIndex)) throw new RuntimeException("unsatisfied lock time")
+            // stack is not popped: we use stack here and not stacktail !!
+            run(tail, stack, state.copy(opCount = opCount + 1))
+          case _ => throw new RuntimeException("cannot run OP_CHECKLOCKTIMEVERIFY on an empty stack")
+        }
+        case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
+        case OP_CHECKLOCKTIMEVERIFY :: tail => run(tail, stack, state.copy(opCount = opCount + 1))
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
             // remove signature from script
