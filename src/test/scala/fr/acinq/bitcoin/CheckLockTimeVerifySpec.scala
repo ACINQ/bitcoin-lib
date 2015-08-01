@@ -30,7 +30,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
     val tx = {
       val tmpTx = Transaction(
         version = 1L,
-        txIn = TxIn(OutPoint(previousTx, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
+        txIn = TxIn(OutPoint(previousTx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
         txOut = TxOut(amount = 100, publicKeyScript = scriptPubKey) :: Nil,
         lockTime = 100L
       )
@@ -48,7 +48,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
     val tx1 = {
       val tmpTx = Transaction(
         version = 1L,
-        txIn = TxIn(OutPoint(tx, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
+        txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
         txOut = TxOut(amount = 100, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 100L
       )
@@ -58,7 +58,8 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       // our script sig is simple our signature followed by "true"
       val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_1 :: Nil)
 
-      tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = sigScript)))
+      tmpTx.updateSigScript(0, sigScript)
+      //tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = sigScript)))
     }
     Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS | ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)
 
@@ -67,7 +68,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
     val tx3 = {
       val tmpTx = Transaction(
         version = 1L,
-        txIn = TxIn(OutPoint(tx, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
+        txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
         txOut = TxOut(amount = 100, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 99L
       )
@@ -77,7 +78,8 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       // our script sig is simple our signature followed by "true"
       val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_1 :: Nil)
 
-      tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = sigScript)))
+      tmpTx.updateSigScript(0, sigScript)
+      //tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = sigScript)))
     }
 
     intercept[RuntimeException] {
@@ -88,16 +90,17 @@ class CheckLockTimeVerifySpec extends FlatSpec {
     val tx2 = {
       val tmpTx = Transaction(
         version = 1L,
-        txIn = TxIn(OutPoint(tx, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
+        txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
         txOut = TxOut(amount = 100, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 0L
       )
 
       val sig1 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, keyAlice)
       val sig2 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, keyBob)
-      val scriptSig = Script.write(OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_0 :: Nil)
+      val sigScript = Script.write(OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_0 :: Nil)
 
-      tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = scriptSig)))
+      tmpTx.updateSigScript(0, sigScript)
+      //tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = scriptSig)))
     }
     Transaction.correctlySpends(tx2, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS | ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)
   }

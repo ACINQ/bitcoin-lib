@@ -332,7 +332,7 @@ object Transaction extends BtcMessage[Transaction] {
       val prevOutputScript = prevoutScripts(tx.txIn(i).outPoint)
       val ctx = new Script.Context(tx, i)
       val runner = new Script.Runner(ctx, scriptFlags)
-      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)) throw new RuntimeException(s"cannot tx ${tx.txid} does not spend its input # $i")
+      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
     }
   }
 }
@@ -372,6 +372,14 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
     case _ if txIn.exists(!_.isFinal) => false
     case _ => true
   }
+
+  /**
+   *
+   * @param i index of the tx input to update
+   * @param sigScript new signature script
+   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+   */
+  def updateSigScript(i: Int, sigScript: Seq[Byte]) : Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(signatureScript = sigScript)))
 }
 
 object BlockHeader extends BtcMessage[BlockHeader] {
