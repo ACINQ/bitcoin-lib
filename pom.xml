@@ -108,7 +108,7 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.2.2</version>
                 <executions>
                     <execution>
                         <id>process-resources</id>
@@ -172,12 +172,6 @@
             <version>2.5.0</version>
         </dependency>
         <dependency>
-            <groupId>com.chuusai</groupId>
-            <artifactId>shapeless_2.11</artifactId>
-            <version>2.1.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>18.0</version>
@@ -233,5 +227,3 @@
     </profiles>
 
 </project>
-
-

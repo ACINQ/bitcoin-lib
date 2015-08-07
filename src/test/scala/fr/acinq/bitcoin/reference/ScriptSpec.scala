@@ -87,7 +87,7 @@ class ScriptSpec extends FlatSpec {
   implicit val format = DefaultFormats
 
   "Script" should "pass reference client valid script tests" in {
-    val stream = classOf[ScriptSpec].getResourceAsStream("/script_valid.json")
+    val stream = classOf[ScriptSpec].getResourceAsStream("/data/script_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
     // use tail to skip the first line of the .json file
     json.extract[List[List[String]]].tail.foreach(_ match {
@@ -97,7 +97,7 @@ class ScriptSpec extends FlatSpec {
     })
   }
   it should "pass reference client invalid script tests" in {
-    val stream = classOf[ScriptSpec].getResourceAsStream("/script_invalid.json")
+    val stream = classOf[ScriptSpec].getResourceAsStream("/data/script_invalid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
     // use tail to skip the first line of the .json file
     json.extract[List[List[String]]].tail.foreach(_ match {

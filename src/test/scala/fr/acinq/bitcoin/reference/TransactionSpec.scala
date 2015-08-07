@@ -18,7 +18,7 @@ class TransactionSpec extends FlatSpec with Matchers {
   "Bitcoins library" should "pass reference tx valid tests" in {
     implicit val format = DefaultFormats
 
-    val stream = classOf[ScriptSpec].getResourceAsStream("/tx_valid.json")
+    val stream = classOf[ScriptSpec].getResourceAsStream("/data/tx_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
 
     json.extract[List[List[JValue]]].filter(_.size > 1).map(_.reverse).map(_ match {
@@ -48,7 +48,7 @@ class TransactionSpec extends FlatSpec with Matchers {
   it should "pass reference tx invalid tests" in {
     implicit val format = DefaultFormats
 
-    val stream = classOf[ScriptSpec].getResourceAsStream("/tx_invalid.json")
+    val stream = classOf[ScriptSpec].getResourceAsStream("/data/tx_invalid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
 
     json.extract[List[List[JValue]]].filter(_.size > 1).map(_.reverse).map(_ match {

@@ -5,6 +5,7 @@ import java.util
 
 import fr.acinq.bitcoin._
 import org.json4s.DefaultFormats
+import org.json4s.JsonAST.{JBool, JString, JObject, JValue}
 import org.json4s.jackson.{JsonMethods, Serialization}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -20,7 +21,7 @@ class Base58Spec extends FlatSpec {
   def resourceReader(resource: String) = new InputStreamReader(resourceStream(resource))
 
   "Base58" should "pass reference client encode/decode tests" in {
-    val data = Serialization.read[List[List[String]]](resourceReader("/base58_encode_decode.json"))
+    val data = Serialization.read[List[List[String]]](resourceReader("/data/base58_encode_decode.json"))
     data.map(_ match {
       case hex :: expected :: Nil =>
         assert(Base58.encode(fromHexString(hex)) === expected)
@@ -31,19 +32,16 @@ class Base58Spec extends FlatSpec {
   }
 
   it should "pass reference client valid keys tests" in {
-    import shapeless._
-    import syntax.std.traversable._
-    import HList._
-
-    val stream = classOf[Base58Spec].getResourceAsStream("/base58_keys_valid.json")
+    val stream = classOf[Base58Spec].getResourceAsStream("/data/base58_keys_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
-    json.extract[List[List[Any]]].map(_.toHList[String::String::Map[String, Any]::HNil]).map(_ match {
-      case Some(base58 :: hex :: map :: HNil) => {
+
+    json.extract[List[List[JValue]]].map(_ match {
+      case JString(base58) :: JString(hex) :: obj :: Nil => {
+        val JBool(isPrivkey) = obj \ "isPrivkey"
+        val JBool(isTestnet) = obj \ "isTestnet"
         val (version, data) = Address.decode(base58)
-        val isPrivkey = map.get("isPrivkey").getOrElse(false).asInstanceOf[Boolean]
-        val isTestnet = map.get("isTestnet").getOrElse(false).asInstanceOf[Boolean]
         if (isPrivkey) {
-          val isCompressed = map.get("isCompressed").getOrElse(false).asInstanceOf[Boolean]
+          val JBool(isCompressed) = obj \ "isCompressed"
           isCompressed match {
             case true =>
               assert(data.length == 33)
@@ -54,7 +52,7 @@ class Base58Spec extends FlatSpec {
               assert(toHexString(data) == hex)
           }
         } else {
-          val addrType = map("addrType").asInstanceOf[String]
+          val JString(addrType) = obj \ "addrType"
           assert(toHexString(data) == hex)
           (addrType, isTestnet) match {
             case ("pubkey", false) => assert(version == Address.LivenetPubkeyVersion)
@@ -66,7 +64,7 @@ class Base58Spec extends FlatSpec {
         }
         assert(Address.encode(version, data) == base58)
       }
-      case None => println("warning: could not parse base58_keys_valid.json properly!")
+      case unexpected => println(s"don't know how to parse $unexpected")
     })
   }
 }
