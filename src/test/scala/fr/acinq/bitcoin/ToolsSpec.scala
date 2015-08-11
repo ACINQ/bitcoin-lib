@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import Protocol._
 
 @RunWith(classOf[JUnitRunner])
 class ToolsSpec extends FlatSpec {

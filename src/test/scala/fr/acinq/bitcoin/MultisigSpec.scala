@@ -3,10 +3,10 @@ package fr.acinq.bitcoin
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
+import Protocol._
 
 @RunWith(classOf[JUnitRunner])
 class MultisigSpec extends FlatSpec with Matchers {
-
   val pub1 = fromHexString("0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A")
   val key1 = fromHexString("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA")
 

@@ -6,6 +6,7 @@ import java.util
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
+import Protocol._
 
 @RunWith(classOf[JUnitRunner])
 class TransactionSpec extends FlatSpec with Matchers {

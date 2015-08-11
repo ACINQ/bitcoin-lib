@@ -2,7 +2,7 @@ package fr.acinq.bitcoin
 
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
-
+import Protocol._
 import org.bouncycastle.crypto.digests.SHA512Digest
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter

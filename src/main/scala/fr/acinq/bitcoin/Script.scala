@@ -94,6 +94,7 @@ object Script {
 
   import fr.acinq.bitcoin.ScriptElt._
   import ScriptFlags._
+  import Protocol._
 
   type Stack = List[Array[Byte]]
 

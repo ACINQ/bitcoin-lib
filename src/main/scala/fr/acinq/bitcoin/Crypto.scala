@@ -12,7 +12,7 @@ import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameter
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.bouncycastle.math.ec.ECPoint
 
-import scala.util.Try
+import Protocol._
 
 object Crypto {
   val params = SECNamedCurves.getByName("secp256k1")
