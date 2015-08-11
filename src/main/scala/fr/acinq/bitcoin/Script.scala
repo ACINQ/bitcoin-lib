@@ -62,6 +62,9 @@ object ScriptFlags {
   // See BIP65 for details.
   val SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY = (1 << 9)
 
+
+  val SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1 << 10)
+
   /**
    * Mandatory script verification flags that all new blocks must comply with for
    * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -144,7 +147,7 @@ object Script {
   }
 
   def isUpgradableNop(op: ScriptElt) = op match {
-    case OP_NOP1 | OP_NOP3 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 | OP_NOP9 | OP_NOP10 => true
+    case OP_NOP1 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 | OP_NOP9 | OP_NOP10 => true
     case _ => false
   }
 
@@ -266,20 +269,30 @@ object Script {
 
   def removeSignatures(script: List[ScriptElt], sigs: List[BinaryData]): List[ScriptElt] = sigs.foldLeft(script)(removeSignature)
 
-  def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int) : Boolean = {
-    // There are two times of nLockTime: lock-by-blockheight
+  def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int, isSequence: Boolean = false) : Boolean = {
+    // Relative lock times are supported by comparing the passed
+    // in lock time to the sequence number of the input. All other
+    // logic is the same, all that differs is what we are comparing
+    // the lock time to.
+    val txToLockTime = if (isSequence) {
+      val value = ~tx.txIn(inputIndex).sequence & 0xffffffffL
+      if (value >= SequenceThreshold) return false
+      value
+    } else tx.lockTime
+
+      // There are two times of nLockTime: lock-by-blockheight
     // and lock-by-blocktime, distinguished by whether
     // nLockTime < LOCKTIME_THRESHOLD.
     //
     // We want to compare apples to apples, so fail the script
     // unless the type of nLockTime being tested is the same as
     // the nLockTime in the transaction.
-    if (!((tx.lockTime <  LocktimeThreshold && lockTime <  LocktimeThreshold) || (tx.lockTime >= LocktimeThreshold && lockTime >= LocktimeThreshold))) {
+    if (!((txToLockTime <  LocktimeThreshold && lockTime <  LocktimeThreshold) || (txToLockTime >= LocktimeThreshold && lockTime >= LocktimeThreshold))) {
       false
     }
     // Now that we know we're comparing apples-to-apples, the
     // comparison is a simple numeric one.
-    else if (lockTime > tx.lockTime) {
+    else if (lockTime > txToLockTime) {
       false
     }
     // Finally the nLockTime feature can be disabled and thus
@@ -292,7 +305,7 @@ object Script {
     // prevent this condition. Alternatively we could test all
     // inputs, but testing just this input minimizes the data
     // required to prove correct CHECKLOCKTIMEVERIFY execution.
-    else if (tx.txIn(inputIndex).isFinal) false
+    else if (!isSequence && tx.txIn(inputIndex).isFinal) false
     else true
   }
 
@@ -432,6 +445,33 @@ object Script {
         }
         case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
         case OP_CHECKLOCKTIMEVERIFY :: tail => run(tail, stack, state.copy(opCount = opCount + 1))
+        case OP_CHECKSEQUENCEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0)  => stack match {
+          case head :: stacktail =>
+            // Note that unlike CHECKLOCKTIMEVERIFY we do not need to
+            // accept 5-byte bignums since any value greater than or
+            // equal to SEQUENCE_THRESHOLD (= 1 << 31) will be rejected
+            // anyway. This limitation just happens to coincide with
+            // CScriptNum's default 4-byte limit with an explicit sign
+            // bit.
+            //
+            // This means there is a maximum relative lock time of 52
+            // years, even though the nSequence field in transactions
+            // themselves is uint32_t and could allow a relative lock
+            // time of up to 120 years.
+            val invertedSequence = decodeNumber(head)
+            // In the rare event that the argument may be < 0 due to
+            // some arithmetic being done first, you can always use
+            // 0 MAX CHECKSEQUENCEVERIFY.
+            if (invertedSequence < 0) throw new RuntimeException("inverted sequence cannot be negative")
+            // Actually compare the specified inverse sequence number
+            // with the input.
+            if (!checkLockTime(invertedSequence, context.tx, context.inputIndex, isSequence = true)) throw new RuntimeException("unsatisfied lock time")
+            // stack is not popped: we use stack here and not stacktail !!
+            run(tail, stack, state.copy(opCount = opCount + 1))
+          case _ => throw new RuntimeException("cannot run OP_CHECKSEQUENCEVERIFY on an empty stack")
+        }
+        case OP_CHECKSEQUENCEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
+        case OP_CHECKSEQUENCEVERIFY :: tail => run(tail, stack, state.copy(opCount = opCount + 1))
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
             // remove signature from script

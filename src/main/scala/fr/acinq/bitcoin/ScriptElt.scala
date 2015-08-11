@@ -208,7 +208,7 @@ case object OP_NOP1 extends ScriptElt
 
 case object OP_CHECKLOCKTIMEVERIFY extends ScriptElt
 
-case object OP_NOP3 extends ScriptElt
+case object OP_CHECKSEQUENCEVERIFY extends ScriptElt
 
 case object OP_NOP4 extends ScriptElt
 
@@ -360,7 +360,7 @@ object ScriptElt {
     0xaf -> OP_CHECKMULTISIGVERIFY,
     0xb0 -> OP_NOP1,
     0xb1 -> OP_CHECKLOCKTIMEVERIFY,
-    0xb2 -> OP_NOP3,
+    0xb2 -> OP_CHECKSEQUENCEVERIFY,
     0xb3 -> OP_NOP4,
     0xb4 -> OP_NOP5,
     0xb5 -> OP_NOP6,
@@ -375,7 +375,7 @@ object ScriptElt {
   val elt2code: Map[ScriptElt, Int] = code2elt.map(_.swap)
 
   // name -> code
-  val name2code = code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap) + ("NOP2" -> 0xb1)
+  val name2code = code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap) + ("NOP2" -> 0xb1) + ("NOP3" -> 0xb2)
 
   def getCode(op: ScriptElt): Int = Script.write(op :: Nil).head
 }
