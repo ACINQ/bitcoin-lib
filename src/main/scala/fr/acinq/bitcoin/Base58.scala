@@ -3,6 +3,8 @@ package fr.acinq.bitcoin
 import java.math.BigInteger
 import java.util
 
+import scala.annotation.tailrec
+
 /*
  * see https://en.bitcoin.it/wiki/Base58Check_encoding
  *
@@ -15,6 +17,16 @@ import java.util
  * <li>Doubleclicking selects the whole number as one word if it's all alphanumeric.</li>
  */
 object Base58 {
+
+  object Prefix {
+    val PubkeyAddress = 0.toByte
+    val ScriptAddress = 5.toByte
+    val SecretKey = 128.toByte
+    val PubkeyAddressTestnet = 111.toByte
+    val ScriptAddressTestnet = 196.toByte
+    val SecretKeyTestnet = 239.toByte
+  }
+
   val alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   // char -> value
   val map = alphabet.zipWithIndex.toMap
@@ -30,6 +42,7 @@ object Base58 {
       val big = new BigInteger(1, input.toArray)
       val builder = new StringBuilder
 
+      @tailrec
       def encode1(current: BigInteger): Unit = current match {
         case BigInteger.ZERO => ()
         case _ =>
@@ -49,14 +62,10 @@ object Base58 {
    * @return the decoded data
    */
   def decode(input: String) : Array[Byte] = {
-    def decode1(in: List[Char], current: BigInteger = BigInteger.ZERO) : BigInteger = in match {
-      case Nil => current
-      case head :: tail => decode1(tail, current.multiply(BigInteger.valueOf(58L)).add(BigInteger.valueOf(map(head).toLong)))
-    }
     val zeroes = input.takeWhile(_ == '1').map(_ => 0:Byte).toArray
     val trim  = input.dropWhile(_ == '1').toList
-    val decoded = decode1(trim).toByteArray.dropWhile(_ == 0) // BigInteger.toByteArray may add a leading 0x00
-    if (trim.isEmpty) zeroes else zeroes ++ decoded
+    val decoded = trim.foldLeft(BigInteger.ZERO)((a, b) => a.multiply(BigInteger.valueOf(58L)).add(BigInteger.valueOf(map(b))))
+    if (trim.isEmpty) zeroes else zeroes ++ decoded.toByteArray.dropWhile(_ == 0) // BigInteger.toByteArray may add a leading 0x00
   }
 }
 

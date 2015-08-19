@@ -63,7 +63,7 @@ class TransactionSpec extends FlatSpec with Matchers {
   it should "create and verify pay2pk transactions with 1 input/1 output" in {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val amount = 10000
-    val (_, privateKey) = Address.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
+    val (_, privateKey) = Base58Check.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
 
     val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
     // create a transaction where the sig script is the pubkey script of the tx we want to redeem
@@ -82,7 +82,7 @@ class TransactionSpec extends FlatSpec with Matchers {
       txOut = List(
         TxOut(
           amount = amount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
       ),
       lockTime = 0L
     )
@@ -100,7 +100,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     // this is the public key that is associated to the private key we used for signing
     val publicKey = Crypto.publicKeyFromPrivateKey(privateKey)
     // we check that is really is the public key that is encoded in the address the previous tx was paid to
-    val providedHash = Address.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2
+    val providedHash = Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2
     val computedHash = Crypto.hash160(publicKey)
     assert(util.Arrays.equals(providedHash, computedHash))
 
@@ -124,7 +124,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val amount = 10000
 
-    val (_, privateKey) = Address.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
+    val (_, privateKey) = Base58Check.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
 
     val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
 
@@ -144,7 +144,7 @@ class TransactionSpec extends FlatSpec with Matchers {
       txOut = List(
         TxOut(
           amount = amount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
       ),
       lockTime = 0L
     )
@@ -168,8 +168,8 @@ class TransactionSpec extends FlatSpec with Matchers {
     )
 
     val keys = List(
-      SignData(previousTx(0).txOut(0).publicKeyScript, Address.decode("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs")._2),
-      SignData(previousTx(1).txOut(0).publicKeyScript, Address.decode("93NJN4mhL21FxRbfHZJ2Cou1YnrJmWNkujmZxeT7CPKauJkGv5g")._2)
+      SignData(previousTx(0).txOut(0).publicKeyScript, Base58Check.decode("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs")._2),
+      SignData(previousTx(1).txOut(0).publicKeyScript, Base58Check.decode("93NJN4mhL21FxRbfHZJ2Cou1YnrJmWNkujmZxeT7CPKauJkGv5g")._2)
     )
 
     // create a tx with empty input signature scripts
@@ -179,10 +179,10 @@ class TransactionSpec extends FlatSpec with Matchers {
       txOut = List(
         TxOut(
           amount = destAmount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(destAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(destAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
         TxOut(
           amount = changeAmount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(changeAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(changeAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
       lockTime = 0L
     )
 
@@ -202,9 +202,9 @@ class TransactionSpec extends FlatSpec with Matchers {
       Transaction.read("01000000016d1f1a7f8c1307139ef78080ba8442852c6766d3fbb826d2ac0e6fb2f72dd8dc000000008b483045022100bdd23d0f98a4173a64fa432b8bf4ac41261a671f2c6c690d57ac839866d78bb202207bddb87ca95c9cef45de30a75144e5513571aa7938635b9e051b1c20f01088a60141044aec194c55c97f4519535f50f5539c6915045ecb79a36281dee6db55ffe1ad2e55f4a1c0e0950d3511e8f205b45cafa348a4a2ab2359246cb3c93f6532c4e8f5ffffffff0140548900000000001976a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac00000000")
     )
     val keys = List(
-      SignData(previousTx(0).txOut(1).publicKeyScript, Address.decode("cW6bSKtH3oMPA18cXSMR8ASHztrmbwmCyqvvN8x3Tc7WG6TyrJDg")._2),
-      SignData(previousTx(1).txOut(0).publicKeyScript, Address.decode("93Ag8t83NW9WmPbhqLCSUNckARpbpgWtp4EWGidtj6h6pVQgGN4")._2),
-      SignData(previousTx(2).txOut(0).publicKeyScript, Address.decode("921vnTeSQCN7GMHdiHyaoZ1JSugTtzvg8rqyXH9HmFtBgrNDxCT")._2)
+      SignData(previousTx(0).txOut(1).publicKeyScript, Base58Check.decode("cW6bSKtH3oMPA18cXSMR8ASHztrmbwmCyqvvN8x3Tc7WG6TyrJDg")._2),
+      SignData(previousTx(1).txOut(0).publicKeyScript, Base58Check.decode("93Ag8t83NW9WmPbhqLCSUNckARpbpgWtp4EWGidtj6h6pVQgGN4")._2),
+      SignData(previousTx(2).txOut(0).publicKeyScript, Base58Check.decode("921vnTeSQCN7GMHdiHyaoZ1JSugTtzvg8rqyXH9HmFtBgrNDxCT")._2)
     )
 
     val dest1 = "n2Jrcf7cJH7wMJdhKZGVi2jaSnV2BwYE9m" //priv: 926iWgQDq5dN84BJ4q2fu4wjSSaVWFxwanE8EegzMh3vGCUBJ94
@@ -223,10 +223,10 @@ class TransactionSpec extends FlatSpec with Matchers {
       ),
       txOut = List(TxOut(
         amount = amount1,
-        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(dest1)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest1)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
         TxOut(
           amount = amount2,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(dest2)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest2)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
       lockTime = 0L
     )
 

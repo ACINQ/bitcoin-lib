@@ -4,6 +4,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
 import Protocol._
+import Base58.Prefix
 
 @RunWith(classOf[JUnitRunner])
 class MultisigSpec extends FlatSpec with Matchers {
@@ -25,7 +26,7 @@ class MultisigSpec extends FlatSpec with Matchers {
     toHexString(redeemScript) should equal("52210394d30868076ab1ea7736ed3bdbec99497a6ad30b25afd709cdf3804cd389996a21032c58bc9615a6ff24e9132cef33f1ef373d97dc6da7933755bc8bb86dbee9f55c2102c4d72d99ca5ad12c17c9cfe043dc4e777075e8835af96f46d8e3ccd929fe192653ae")
 
     // 196 = prefix for P2SH adress on testnet
-    Address.encode(Address.TestnetScriptVersion, multisigAddress) should equal("2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
+    Base58Check.encode(Prefix.ScriptAddressTestnet, multisigAddress) should equal("2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
 
     // we want to redeem the first output of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
@@ -44,7 +45,7 @@ class MultisigSpec extends FlatSpec with Matchers {
 
     val signData = SignData(
       fromHexString("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
-      Address.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
+      Base58Check.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
 
     val signedTx = Transaction.sign(tx, List(signData), randomize = false)
 
@@ -68,25 +69,16 @@ class MultisigSpec extends FlatSpec with Matchers {
       txIn = List(TxIn(OutPoint(previousTx, 0), Array.empty[Byte], 0xffffffffL)),
       txOut = List(TxOut(
         amount = amount,
-        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(dest)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
+        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
       lockTime = 0L
     )
 
-    // replace the empty sig script by the redeem script
-    val tmpTx = tx.copy(txIn = List(tx.txIn(0).copy(signatureScript = redeemScript)))
-    val hashed = Crypto.hash256(Transaction.write(tmpTx) ++ writeUInt32(1))
-
     // we only need 2 signatures because this is a 2-on-3 multisig
-    val sig1 = {
-      val (r, s) = Crypto.sign(hashed, key1, randomize = false)
-      Crypto.encodeSignature(r, s) // DER encoded
-    }
-    val sig2 = {
-      val (r, s) = Crypto.sign(hashed, key2, randomize = false)
-      Crypto.encodeSignature(r, s) // DER encoded
-    }
+    val sig1 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, key1, randomize = false)
+    val sig2 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, key2, randomize = false)
+
     // OP_0 because of a bug in OP_CHECKMULTISIG
-    val scriptSig = Script.write(OP_0 :: OP_PUSHDATA(sig1 :+ 1.toByte) :: OP_PUSHDATA(sig2 :+ 1.toByte) :: OP_PUSHDATA(redeemScript) :: Nil)
+    val scriptSig = Script.write(OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil)
     val signedTx = tx.copy(txIn = List(tx.txIn(0).copy(signatureScript = scriptSig)))
 
     //this works because signature is not randomized

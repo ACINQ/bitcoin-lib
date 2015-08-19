@@ -24,14 +24,15 @@ object Json {
 
   object ScriptPubKey {
     def apply(input: Array[Byte], testnet: Boolean) = {
+      import Base58.Prefix
       val script = Script.parse(input)
       val asm = script.mkString(" ")
       val hex = toHexString(input)
       script match {
         case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hash, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil =>
-          new ScriptPubKey(asm, hex, 1, "pubkeyhash", List(Address.encode(if (testnet) Address.TestnetPubkeyVersion else Address.LivenetPubkeyVersion, hash)))
+          new ScriptPubKey(asm, hex, 1, "pubkeyhash", List(Base58Check.encode(if (testnet) Prefix.PubkeyAddressTestnet else Prefix.PubkeyAddress, hash)))
         case OP_HASH160 :: OP_PUSHDATA(hash, _) :: OP_EQUAL :: Nil if hash.size == 20 =>
-          new ScriptPubKey(asm, hex, 1, "scripthash", List(Address.encode(if (testnet) Address.TestnetScriptVersion else Address.LivenetScriptVersion, hash)))
+          new ScriptPubKey(asm, hex, 1, "scripthash", List(Base58Check.encode(if (testnet) Prefix.ScriptAddressTestnet else Prefix.ScriptAddress, hash)))
       }
     }
   }

@@ -4,7 +4,7 @@ import com.google.common.io.BaseEncoding
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-
+import Base58.Prefix
 
 @RunWith(classOf[JUnitRunner])
 class ScriptSpec extends FlatSpec {
@@ -13,19 +13,19 @@ class ScriptSpec extends FlatSpec {
     val script = Script.parse(blob)
     val pk = Script.publicKey(script)
     val hash = Crypto.hash160(pk)
-    assert(Address.encode(0x6f, hash) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
+    assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
   }
   it should "parse 'pay to public key' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("76a91433e81a941e64cda12c6a299ed322ddbdd03f8d0e88ac")
     val script = Script.parse(blob)
     val hash = Script.publicKeyHash(script)
-    assert(Address.encode(0x6f, hash) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
+    assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
   }
   it should "parse 'pay to script' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("a914a90003b4ddef4be46fc61e7f2167da9d234944e287")
     val script = Script.parse(blob)
     val OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil = script
-    val multisigAddress = Address.encode(Address.TestnetScriptVersion, scriptHash)
+    val multisigAddress = Base58Check.encode(Prefix.ScriptAddressTestnet, scriptHash)
     assert(multisigAddress === "2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
   }
   it should "detect 'pay to script' scripts" in {

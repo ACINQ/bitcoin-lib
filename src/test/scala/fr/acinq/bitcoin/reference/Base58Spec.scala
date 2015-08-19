@@ -10,6 +10,7 @@ import org.json4s.jackson.{JsonMethods, Serialization}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import Base58.Prefix
 
 @RunWith(classOf[JUnitRunner])
 class Base58Spec extends FlatSpec {
@@ -39,7 +40,7 @@ class Base58Spec extends FlatSpec {
       case JString(base58) :: JString(hex) :: obj :: Nil => {
         val JBool(isPrivkey) = obj \ "isPrivkey"
         val JBool(isTestnet) = obj \ "isTestnet"
-        val (version, data) = Address.decode(base58)
+        val (version, data) = Base58Check.decode(base58)
         if (isPrivkey) {
           val JBool(isCompressed) = obj \ "isCompressed"
           isCompressed match {
@@ -55,14 +56,14 @@ class Base58Spec extends FlatSpec {
           val JString(addrType) = obj \ "addrType"
           assert(toHexString(data) == hex)
           (addrType, isTestnet) match {
-            case ("pubkey", false) => assert(version == Address.LivenetPubkeyVersion)
-            case ("pubkey", true) => assert(version == Address.TestnetPubkeyVersion)
-            case ("script", false) => assert(version == Address.LivenetScriptVersion)
-            case ("script", true) => assert(version == Address.TestnetScriptVersion)
+            case ("pubkey", false) => assert(version ==  Prefix.PubkeyAddress)
+            case ("pubkey", true) => assert(version == Prefix.PubkeyAddressTestnet)
+            case ("script", false) => assert(version == Prefix.ScriptAddress)
+            case ("script", true) => assert(version == Prefix.ScriptAddressTestnet)
             case unexpected => println(s"wasn't expecting $unexpected")
           }
         }
-        assert(Address.encode(version, data) == base58)
+        assert(Base58Check.encode(version, data) == base58)
       }
       case unexpected => println(s"don't know how to parse $unexpected")
     })

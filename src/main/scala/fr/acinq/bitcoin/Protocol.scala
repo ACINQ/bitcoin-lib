@@ -711,28 +711,6 @@ case class Block(header: BlockHeader, tx: Seq[Transaction]) {
   lazy val blockId = BinaryData(hash.reverse)
 }
 
-object Address {
-  val LivenetPubkeyVersion = 0.toByte
-  val LivenetScriptVersion = 5.toByte
-  val TestnetPubkeyVersion = 111.toByte
-  val TestnetScriptVersion = 196.toByte
-
-  /**
-   * an address is just an encoded public key hash
-   * @param version 0 for livenet pubkey, 111 for the testnet pubkey, 5 for livenet script, 196 for testnet script
-   * @param publicKeyHash public key hash
-   * @return the address associated to he public key
-   */
-  def encode(version: Byte, publicKeyHash: Array[Byte]): String = Base58Check.encode(version, publicKeyHash)
-
-  /**
-   *
-   * @param address btc address
-   * @return a (version, public key hash) tuple
-   */
-  def decode(address: String): (Byte, Array[Byte]) = Base58Check.decode(address)
-}
-
 object Message extends BtcMessage[Message] {
   val MagicMain = 0xD9B4BEF9L
   val MagicTestNet = 0xDAB5BFFAL
