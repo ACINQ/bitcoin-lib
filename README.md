@@ -40,12 +40,12 @@ This is a very early beta release and should not be used in production. If you'r
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.3</version>
+    <version>0.9.4</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.4-SNAPSHOT, the latest released version is 0.9.3
+The latest snapshot (development) version is 0.9.5-SNAPSHOT, the latest released version is 0.9.4
 
 ## Usage
 
