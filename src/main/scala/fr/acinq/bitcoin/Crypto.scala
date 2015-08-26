@@ -196,7 +196,8 @@ object Crypto {
   /**
    * Sign data with a private key
    * @param data data to sign
-   * @param privateKey private key
+   * @param privateKey private key. If you are using bitcoin "compressed" private keys make sure to only use the first 32 bytes of
+   *                   the key (there is an extra "1" appended to the key)
    * @param randomize if true, signing the same data with the same key multiple times will produce different results. Default is 'true'
    *                  and you should specify 'false' for testing purposes only
    * @return a (r, s) ECDSA signature pair

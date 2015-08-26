@@ -469,7 +469,7 @@ object Transaction extends BtcMessage[Transaction] {
    * @param tx input transaction
    * @param inputIndex index of the tx input that is being processed
    * @param previousOutputScript public key script of the output claimed by this tx input
-   * @param sighashType signature hash type
+   * @param sighashType signature hash type, which will be appended to the signature
    * @param privateKey private key
    * @param randomize if false, the output signature will not be randomized (use for testing only)
    * @return the encoded signature of this tx for this specific tx input
