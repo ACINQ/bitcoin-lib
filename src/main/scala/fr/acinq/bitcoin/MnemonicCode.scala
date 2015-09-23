@@ -27,14 +27,7 @@ object MnemonicCode {
 
   private def toBinary(x: Seq[Byte]): List[Boolean] = x.map(toBinary).flatten.toList
 
-  private def fromBinary(bin: Seq[Boolean]): Int = {
-    @tailrec
-    def loop(bin: Seq[Boolean], acc: Int): Int = bin match {
-      case Nil => acc
-      case head :: tail => loop(tail, if (head) 2 * acc + 1 else 2 * acc)
-    }
-    loop(bin, 0)
-  }
+  private def fromBinary(bin: Seq[Boolean]): Int = bin.foldLeft(0) { case (acc, flag) => if (flag) 2 * acc + 1 else 2 * acc }
 
   /**
    * BIP39 entropy encoding

@@ -310,9 +310,10 @@ object Script {
   }
 
   /**
-   * execution context of a tx script
-   * @param tx current transaction
-   * @param inputIndex 0-based index of the input that is being processed
+   * Execution context of a tx script. A script is always executed in the "context" of a transaction that is being
+   * verified.
+   * @param tx transaction that is being verified
+   * @param inputIndex 0-based index of the tx input that is being processed
    */
   case class Context(tx: Transaction, inputIndex: Int) {
     require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
@@ -355,21 +356,51 @@ object Script {
 
     def decodeNumber(input: IndexedSeq[Byte], maximumSize: Int = 4): Long = Script.decodeNumber(input, checkMinimalEncoding, maximumSize)
 
-    def run(script: Array[Byte]): Stack = run(parse(script))
+    /**
+     * execute a serialized script, starting from an empty stack
+     * @param script serialized script
+     * @return the stack created by the script
+     */
+    def run(script: BinaryData): Stack = run(parse(script))
 
+    /**
+     * execute a script, starting from an empty stack
+     * @param script
+     * @return the stack created by the script
+     */
     def run(script: List[ScriptElt]): Stack = run(script, List.empty[Array[Byte]])
 
-    def run(script: Array[Byte], stack: Stack): Stack = run(parse(script), stack)
+    /**
+     * execute a serialized script, starting from an existing stack
+     * @param script serialized script
+     * @param stack initial stack
+     * @return the stack updated by the script
+     */
+    def run(script: BinaryData, stack: Stack): Stack = run(parse(script), stack)
 
+    /**
+     * execute a script, starting from an existing stack
+     * @param script serialized script
+     * @param stack initial stack
+     * @return the stack updated by the script
+     */
     def run(script: List[ScriptElt], stack: Stack): Stack = run(script, stack, State(conditions = List.empty[Boolean], altstack = List.empty[Array[Byte]], opCount = 0, scriptCode = script))
 
+    /**
+     * This class represents the state of the script execution engine
+     * @param conditions current "position" wrt if/notif/else/endif
+     * @param altstack initial alternate stack
+     * @param opCount initial op count
+     * @param scriptCode initial script (can be modified by OP_CODESEPARATOR for example)
+     */
     case class State(conditions: List[Boolean], altstack: Stack, opCount: Int, scriptCode: List[ScriptElt])
 
     /**
-     * run a bitcoin script
-     * @param script command stack
-     * @param stack data stack
-     * @return an updated data stack
+     * execute a bitcoin script
+     * @param script script
+     * @param stack initial stack
+     * @param state initial state
+     * @return the stack updated by the script
      */
     @tailrec
     final def run(script: List[ScriptElt], stack: Stack, state: State): Stack = {

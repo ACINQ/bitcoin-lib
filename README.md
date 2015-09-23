@@ -51,65 +51,81 @@ The latest snapshot (development) version is 0.9.5-SNAPSHOT, the latest released
 
 Please have a look at unit tests, more samples will be added soon.
 
+### Public keys, private keys, addresses
+
+```shell
+
+mvn scala:console
+scala> import fr.acinq.bitcoin._
+import fr.acinq.bitcoin._
+
+scala> val priv:BinaryData = "1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd"
+priv: fr.acinq.bitcoin.BinaryData = 1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd
+
+scala> val pubUncompressed:BinaryData = Crypto.publicKeyFromPrivateKey(priv)
+pubUncompressed: fr.acinq.bitcoin.BinaryData = 04f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a07cf33da18bd734c600b96a72bbc4749d5141c90ec8ac328ae52ddfe2e505bdb
+
+scala> val pubCompressed:BinaryData = Crypto.publicKeyFromPrivateKey(priv :+ 1.toByte)
+pubCompressed: fr.acinq.bitcoin.BinaryData = 03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a
+
+scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pubUncompressed))
+res0: String = 1424C2F4bC9JidNjjTUZCbUxv6Sa1Mt62x
+
+scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pubCompressed))
+res1: String = 1J7mdg5rbQyUHENYdx39WVWK7fsLpEoXZy
+
+scala> Base58Check.encode(Base58.Prefix.SecretKey, priv)
+res2: String = 5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn
+
+scala> Base58Check.encode(Base58.Prefix.SecretKey, priv :+ 1.toByte)
+res3: String = KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ
+
+```
+
 ### Pay to Public Key
 
 ```scala
   // simple pay to PK tx
 
-  // we own a public/key private key pair
-  val (_, publicKeyHash) = Address.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")
-  val (_, privateKey) = Address.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
+  // we have a tx that was sent to a public key that we own
+  val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
+  val (Base58.Prefix.SecretKeyTestnet, privateKey) = Base58Check.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
 
-  // we want to redeem the output of a previous transaction that was sent to mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY. The id of this tx is
-  // dd2218b50eb64b0d1d0d2d4c31c1a9308966e22ebebe0ffae7035b592e39bc14
-  val previousTxPubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(publicKeyHash) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
-  // this is our input:
-  val txIn = TxIn(
-    OutPoint(hash = fromHexString("dd2218b50eb64b0d1d0d2d4c31c1a9308966e22ebebe0ffae7035b592e39bc14").reverse, 0),
-    signatureScript = previousTxPubKeyScript,
-    sequence = 0xFFFFFFFFL
-  )
-
-  // we want to send 10 BTC from the previous tx output to mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3
+  // we want to send money from the previous tx output to mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3
   val destinationAddress = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
-  val amount = 10
-  // this is our output:
-  val txOut = TxOut(
-    amount = amount,
-    publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Address.decode(destinationAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
-  )
 
   // step  #1: creation a new transaction that reuses the previous transaction's output pubkey script
-  val tx1 = Transaction(
+  val unsignedTx = Transaction(
     version = 1L,
-    txIn = List(txIn),
-    txOut = List(txOut),
-    lockTime = 0L
-  )
+    txIn =  TxIn(OutPoint(previousTx.hash, 0), signatureScript = Array.emptyByteArray, sequence = 0xFFFFFFFFL) :: Nil,
+    txOut = TxOut(amount = 10000, OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(destinationAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+    lockTime = 0L)
 
-  // step #2: sign the tx
-  val tx2 = Transaction.sign(tx1, List(SignData(previousTxPubKeyScript, privateKey)))
+  // step #2: sign it
+  val signedTx = Transaction.sign(unsignedTx, SignData(previousTx.txOut(0).publicKeyScript, privateKey) :: Nil)
 
-  // this is what we would send over the BTC network
-  println(s"raw tx: ${toHexString(Transaction.write(tx2))}")
-
-  // and a more readable JSON version
-  println(s"json tx: ${Json.toJson(tx2, testnet = true)}")
+  // check that it actually spends the previous tx
+  Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 ```
 
 ### Pay to Script: multisig transactions
 
 ```scala
 
-  val pub1 = fromHexString("0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A")
-  val key1 = fromHexString("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA")
-  val pub2 = fromHexString("032C58BC9615A6FF24E9132CEF33F1EF373D97DC6DA7933755BC8BB86DBEE9F55C")
-  val key2 = fromHexString("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C")
-  val pub3 = fromHexString("02C4D72D99CA5AD12C17C9CFE043DC4E777075E8835AF96F46D8E3CCD929FE1926")
-  val key3 = fromHexString("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C")
+  val pub1: BinaryData = "0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A"
+  val key1: BinaryData = "C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA"
+  val pub2: BinaryData = "032C58BC9615A6FF24E9132CEF33F1EF373D97DC6DA7933755BC8BB86DBEE9F55C"
+  val key2: BinaryData = "5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C"
+  val pub3: BinaryData = "02C4D72D99CA5AD12C17C9CFE043DC4E777075E8835AF96F46D8E3CCD929FE1926"
+  val key3: BinaryData = "29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C"
+
+  // we want to spend the first output of this tx
+  val previousTx = Transaction.read("01000000014100d6a4d20ff14dfffd772aa3610881d66332ed160fc1094a338490513b0cf800000000fc0047304402201182201b586c6bfe6fd0346382900834149674d3cbb4081c304965440b1c0af20220023b62a997f4385e9279dc1078590556c6c6a85c3ec20fda407e95eb270e4de90147304402200c75f91f8bd741a8e71d11ff6a3e931838e32ceead34ccccfe3f73f01a81e45f02201795881473644b5f5ee6a8d8a90fe16e60eacace40e88900c375af2e0c51e26d014c69522103bd95bfc136869e2e5e3b0491e45c32634b0201a03903e210b01be248e04df8702103e04f714a4010ca5bb1423ef97012cb1008fb0dfd2f02acbcd3650771c46e4a8f2102913bd21425454688bdc2df2f0e518c5f3109b1c1be56e6e783a41c394c95dc0953aeffffffff0140420f00000000001976a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac00000000")
+  val (Base58.Prefix.SecretKeyTestnet, privateKey) = Base58Check.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")
+  val publicKey = Crypto.publicKeyFromPrivateKey(privateKey)
 
   // create a "2 out of 3" multisig script
-  val redeemScript = Script.createMultiSigMofN(2, List(pub1, pub2, pub3))
+  val redeemScript = Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3 ))
 
   // the multisig adress is just that hash of this script
   val multisigAddress = Crypto.hash160(redeemScript)
@@ -117,25 +133,40 @@ Please have a look at unit tests, more samples will be added soon.
   // we want to send money to our multisig adress by redeeming the first output
   // of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
   // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
-  val txIn = TxIn(
-    OutPoint(fromHexString("41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea").reverse, 0),
-    signatureScript = Array(), // empy signature script
-    sequence = 0xFFFFFFFFL)
-
-  // and we want to sent the output to our multisig address
-  val txOut = TxOut(
-    amount = 900000, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
-    publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil))
 
   // create a tx with empty input signature scripts
-  val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
+  val tx = Transaction(version = 1L,
+    txIn = TxIn(OutPoint(previousTx.hash, 0), signatureScript = Array.emptyByteArray, sequence = 0xFFFFFFFFL) :: Nil,
+    txOut = TxOut(
+      amount = 900000, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
+      publicKeyScript = OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil) :: Nil,
+    lockTime = 0L)
 
   // and sign it
   val signData = SignData(
     fromHexString("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
-    Address.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
+    Base58Check.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
 
-  val signedTx = Transaction.sign(tx, List(signData))
+  val signedTx = Transaction.sign(tx, Seq(SignData(previousTx.txOut(0).publicKeyScript, privateKey)))
+  Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+
+
+  // how to spend our tx ? let's try to sent its output to our public key
+  val spendingTx = Transaction(version = 1L,
+    txIn = TxIn(OutPoint(signedTx.hash, 0), signatureScript = Array.emptyByteArray, sequence = 0xFFFFFFFFL) :: Nil,
+    txOut = TxOut(
+      amount = 900000,
+      publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(publicKey)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+    lockTime = 0L)
+
+  // we need at least 2 signatures
+  val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key1)
+  val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key2)
+
+  // update our tx with the correct sig script
+  val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
+  val signedSpendingTx = spendingTx.updateSigScript(0, Script.write(sigScript))
+  Transaction.correctlySpends(signedSpendingTx, signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
 ```
 ### HD Wallet (BIP32)
