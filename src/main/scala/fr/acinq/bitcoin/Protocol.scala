@@ -5,6 +5,8 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.util
 
+import fr.acinq.bitcoin.Script.Runner
+
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -514,24 +516,26 @@ object Transaction extends BtcMessage[Transaction] {
    * @param scriptFlags script execution flags
    * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
    */
-  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = {
+  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
     val txMap = inputs.map(t => t.txid -> t).toMap
     val prevoutMap = for (i <- 0 until tx.txIn.length) yield tx.txIn(i).outPoint -> txMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
-    correctlySpends(tx, prevoutMap.toMap, scriptFlags)
+    correctlySpends(tx, prevoutMap.toMap, scriptFlags, callback)
   }
 
-  /**
+  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = correctlySpends(tx, inputs, scriptFlags, None)
+
+    /**
    * checks that a transaction correctly spends its inputs (i.e sis properly signed)
    * @param tx transaction to be checked
    * @param prevoutScripts map where keys are OutPoint (previous tx ids and vout index) and values are previous output pubkey scripts)
    * @param scriptFlags script execution flags
    * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
    */
-  def correctlySpends(tx: Transaction, prevoutScripts: Map[OutPoint, BinaryData], scriptFlags: Int): Unit = {
+  def correctlySpends(tx: Transaction, prevoutScripts: Map[OutPoint, BinaryData], scriptFlags: Int, callback: Option[Runner.Callback] = None): Unit = {
     for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
       val prevOutputScript = prevoutScripts(tx.txIn(i).outPoint)
       val ctx = new Script.Context(tx, i)
-      val runner = new Script.Runner(ctx, scriptFlags)
+      val runner = new Script.Runner(ctx, scriptFlags, callback)
       if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
     }
   }

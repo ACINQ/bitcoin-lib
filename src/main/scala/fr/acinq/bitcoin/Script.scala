@@ -207,7 +207,7 @@ object Script {
     }
   }
 
-  def decodeNumber(input: IndexedSeq[Byte], checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long = {
+  def decodeNumber(input: Seq[Byte], checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long = {
     if (input.isEmpty) 0
     else if (input.length > maximumSize) throw new RuntimeException(s"number cannot be encoded on more than $maximumSize bytes")
     else {
@@ -319,11 +319,28 @@ object Script {
     require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
   }
 
-  /**
-   * Bitcoin script runner
-   * @param context script execution context
-   */
-  class Runner(context: Context, scriptFlag: Int = MANDATORY_SCRIPT_VERIFY_FLAGS) {
+  object Runner {
+    /**
+     * This class represents the state of the script execution engine
+     * @param conditions current "position" wrt if/notif/else/endif
+     * @param altstack initial alternate stack
+     * @param opCount initial op count
+     * @param scriptCode initial script (can be modified by OP_CODESEPARATOR for example)
+     */
+    case class State(conditions: List[Boolean], altstack: Stack, opCount: Int, scriptCode: List[ScriptElt])
+
+    type Callback = (List[ScriptElt], Stack, State) => Boolean
+  }
+
+   /**
+    * Bitcoin script runner
+    * @param context script execution context
+    * @param scriptFlag script flags
+    * @param callback optional callback
+    */
+  class Runner(context: Context, scriptFlag: Int = MANDATORY_SCRIPT_VERIFY_FLAGS, callback: Option[Runner.Callback] = None) {
+
+    import Runner._
 
     def checkSignature(pubKey: Array[Byte], sigBytes: Array[Byte], scriptCode: Array[Byte]): Boolean = {
       if (sigBytes.isEmpty) false
@@ -354,7 +371,7 @@ object Script {
 
     def checkMinimalEncoding: Boolean = (scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0
 
-    def decodeNumber(input: IndexedSeq[Byte], maximumSize: Int = 4): Long = Script.decodeNumber(input, checkMinimalEncoding, maximumSize)
+    def decodeNumber(input: Seq[Byte], maximumSize: Int = 4): Long = Script.decodeNumber(input, checkMinimalEncoding, maximumSize)
 
     /**
      * execute a serialized script, starting from an empty stack
@@ -384,16 +401,8 @@ object Script {
      * @param stack initial stack
      * @return the stack updated by the script
      */
-    def run(script: List[ScriptElt], stack: Stack): Stack = run(script, stack, State(conditions = List.empty[Boolean], altstack = List.empty[Array[Byte]], opCount = 0, scriptCode = script))
-
-    /**
-     * This class represents the state of the script execution engine
-     * @param conditions current "position" wrt if/notif/else/endif
-     * @param altstack initial alternate stack
-     * @param opCount initial op count
-     * @param scriptCode initial script (can be modified by OP_CODESEPARATOR for example)
-     */
-    case class State(conditions: List[Boolean], altstack: Stack, opCount: Int, scriptCode: List[ScriptElt])
+    def run(script: List[ScriptElt], stack: Stack): Stack =
+      run(script, stack, State(conditions = List.empty[Boolean], altstack = List.empty[Array[Byte]], opCount = 0, scriptCode = script))
 
     /**
      * execute a bitcoin script
@@ -405,6 +414,7 @@ object Script {
     @tailrec
     final def run(script: List[ScriptElt], stack: Stack, state: State): Stack = {
       import state._
+      callback.map(f => f(script, stack, state))
       if ((stack.length + altstack.length) > 1000) throw new RuntimeException(s"stack is too large: stack size = ${stack.length} alt stack size = ${altstack.length}")
       if (opCount > 201) throw new RuntimeException("operation count is over the limit")
       script match {
