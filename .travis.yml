@@ -1,7 +1,6 @@
 language: scala
 script: mvn test
 scala:
-- 2.11.2
+- 2.11.7
 jdk:
-- oraclejdk7
-- openjdk7
+- oraclejdk8
