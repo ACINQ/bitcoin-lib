@@ -103,12 +103,13 @@ object Script {
 
   val LocktimeThreshold = 500000000L
 
-  private val True = Array(1:Byte)
+  private val True = Array(1: Byte)
 
   private val False = Array.empty[Byte]
 
   /**
    * parse a script from a input stream of binary data
+   *
    * @param input input stream
    * @param stack initial command stack
    * @return an updated command stack
@@ -269,32 +270,25 @@ object Script {
 
   def removeSignatures(script: List[ScriptElt], sigs: List[BinaryData]): List[ScriptElt] = sigs.foldLeft(script)(removeSignature)
 
-  def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int, isSequence: Boolean = false) : Boolean = {
-    // Relative lock times are supported by comparing the passed
-    // in lock time to the sequence number of the input. All other
-    // logic is the same, all that differs is what we are comparing
-    // the lock time to.
-    val txToLockTime = if (isSequence) {
-      val value = ~tx.txIn(inputIndex).sequence & 0xffffffffL
-      if (value >= SequenceThreshold) return false
-      value
-    } else tx.lockTime
-
-      // There are two times of nLockTime: lock-by-blockheight
+  def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int): Boolean = {
+    // There are two kinds of nLockTime: lock-by-blockheight
     // and lock-by-blocktime, distinguished by whether
     // nLockTime < LOCKTIME_THRESHOLD.
     //
     // We want to compare apples to apples, so fail the script
     // unless the type of nLockTime being tested is the same as
     // the nLockTime in the transaction.
-    if (!((txToLockTime <  LocktimeThreshold && lockTime <  LocktimeThreshold) || (txToLockTime >= LocktimeThreshold && lockTime >= LocktimeThreshold))) {
-      false
-    }
+    if (!(
+      (tx.lockTime < LocktimeThreshold && lockTime < LocktimeThreshold) ||
+        (tx.lockTime >= LocktimeThreshold && lockTime >= LocktimeThreshold)
+      ))
+      return false
+
     // Now that we know we're comparing apples-to-apples, the
     // comparison is a simple numeric one.
-    else if (lockTime > txToLockTime) {
-      false
-    }
+    if (lockTime > tx.lockTime)
+      return false
+
     // Finally the nLockTime feature can be disabled and thus
     // CHECKLOCKTIMEVERIFY bypassed if every txin has been
     // finalized by setting nSequence to maxint. The
@@ -305,14 +299,62 @@ object Script {
     // prevent this condition. Alternatively we could test all
     // inputs, but testing just this input minimizes the data
     // required to prove correct CHECKLOCKTIMEVERIFY execution.
-    else if (!isSequence && tx.txIn(inputIndex).isFinal) false
-    else true
+    if (tx.txIn(inputIndex).isFinal)
+      return false
+
+    true
+  }
+
+  def checkSequence(sequence: Long, tx: Transaction, inputIndex: Int): Boolean = {
+    // Relative lock times are supported by comparing the passed
+    // in operand to the sequence number of the input.
+    val txToSequence = tx.txIn(inputIndex).sequence
+
+    // Fail if the transaction's version number is not set high
+    // enough to trigger BIP 68 rules.
+    if (tx.version < 2)
+      return false
+
+    // Sequence numbers with their most significant bit set are not
+    // consensus constrained. Testing that the transaction's sequence
+    // number do not have this bit set prevents using this property
+    // to get around a CHECKSEQUENCEVERIFY check.
+    if ((txToSequence & TxIn.SEQUENCE_LOCKTIME_DISABLE_FLAG) != 0)
+      return false
+
+    // Mask off any bits that do not have consensus-enforced meaning
+    // before doing the integer comparisons
+    val nLockTimeMask = TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG | TxIn.SEQUENCE_LOCKTIME_MASK
+    val txToSequenceMasked = txToSequence & nLockTimeMask;
+    val nSequenceMasked = sequence & nLockTimeMask
+
+    // There are two kinds of nSequence: lock-by-blockheight
+    // and lock-by-blocktime, distinguished by whether
+    // nSequenceMasked < CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG.
+    //
+    // We want to compare apples to apples, so fail the script
+    // unless the type of nSequenceMasked being tested is the same as
+    // the nSequenceMasked in the transaction.
+    if (!(
+      (txToSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked < TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG) ||
+        (txToSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG && nSequenceMasked >= TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG)
+      )) {
+      return false
+    }
+
+    // Now that we know we're comparing apples-to-apples, the
+    // comparison is a simple numeric one.
+    if (nSequenceMasked > txToSequenceMasked)
+      return false
+
+    true
   }
 
   /**
    * Execution context of a tx script. A script is always executed in the "context" of a transaction that is being
    * verified.
-   * @param tx transaction that is being verified
+   *
+   * @param tx         transaction that is being verified
    * @param inputIndex 0-based index of the tx input that is being processed
    */
   case class Context(tx: Transaction, inputIndex: Int) {
@@ -320,11 +362,13 @@ object Script {
   }
 
   object Runner {
+
     /**
      * This class represents the state of the script execution engine
+     *
      * @param conditions current "position" wrt if/notif/else/endif
-     * @param altstack initial alternate stack
-     * @param opCount initial op count
+     * @param altstack   initial alternate stack
+     * @param opCount    initial op count
      * @param scriptCode initial script (can be modified by OP_CODESEPARATOR for example)
      */
     case class State(conditions: List[Boolean], altstack: Stack, opCount: Int, scriptCode: List[ScriptElt])
@@ -332,12 +376,13 @@ object Script {
     type Callback = (List[ScriptElt], Stack, State) => Boolean
   }
 
-   /**
-    * Bitcoin script runner
-    * @param context script execution context
-    * @param scriptFlag script flags
-    * @param callback optional callback
-    */
+  /**
+   * Bitcoin script runner
+   *
+   * @param context    script execution context
+   * @param scriptFlag script flags
+   * @param callback   optional callback
+   */
   class Runner(context: Context, scriptFlag: Int = MANDATORY_SCRIPT_VERIFY_FLAGS, callback: Option[Runner.Callback] = None) {
 
     import Runner._
@@ -375,6 +420,7 @@ object Script {
 
     /**
      * execute a serialized script, starting from an empty stack
+     *
      * @param script serialized script
      * @return the stack created by the script
      */
@@ -382,6 +428,7 @@ object Script {
 
     /**
      * execute a script, starting from an empty stack
+     *
      * @param script
      * @return the stack created by the script
      */
@@ -389,16 +436,18 @@ object Script {
 
     /**
      * execute a serialized script, starting from an existing stack
+     *
      * @param script serialized script
-     * @param stack initial stack
+     * @param stack  initial stack
      * @return the stack updated by the script
      */
     def run(script: BinaryData, stack: Stack): Stack = run(parse(script), stack)
 
     /**
      * execute a script, starting from an existing stack
+     *
      * @param script serialized script
-     * @param stack initial stack
+     * @param stack  initial stack
      * @return the stack updated by the script
      */
     def run(script: List[ScriptElt], stack: Stack): Stack =
@@ -406,9 +455,10 @@ object Script {
 
     /**
      * execute a bitcoin script
+     *
      * @param script script
-     * @param stack initial stack
-     * @param state initial state
+     * @param stack  initial stack
+     * @param state  initial state
      * @return the stack updated by the script
      */
     @tailrec
@@ -475,38 +525,51 @@ object Script {
             run(tail, encodeNumber(result) :: stacktail, state.copy(opCount = opCount + 1))
           case _ => throw new RuntimeException("cannot run OP_BOOLOR on a stack with less than 2 elements")
         }
-        case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0)  => stack match {
+        case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0) => stack match {
           case head :: stacktail =>
+            // Note that elsewhere numeric opcodes are limited to
+            // operands in the range -2**31+1 to 2**31-1, however it is
+            // legal for opcodes to produce results exceeding that
+            // range. This limitation is implemented by CScriptNum's
+            // default 4-byte limit.
+            //
+            // If we kept to that limit we'd have a year 2038 problem,
+            // even though the nLockTime field in transactions
+            // themselves is uint32 which only becomes meaningless
+            // after the year 2106.
+            //
+            // Thus as a special case we tell CScriptNum to accept up
+            // to 5-byte bignums, which are good until 2**39-1, well
+            // beyond the 2**32-1 limit of the nLockTime field itself.
             val locktime = decodeNumber(head, maximumSize = 5)
-            if (locktime < 0) throw new RuntimeException("lock time cannot be negative")
-            if (!checkLockTime(locktime, context.tx, context.inputIndex)) throw new RuntimeException("unsatisfied lock time")
+            if (locktime < 0) throw new RuntimeException("CLTV lock time cannot be negative")
+            if (!checkLockTime(locktime, context.tx, context.inputIndex)) throw new RuntimeException("unsatisfied CLTV lock time")
             // stack is not popped: we use stack here and not stacktail !!
             run(tail, stack, state.copy(opCount = opCount + 1))
           case _ => throw new RuntimeException("cannot run OP_CHECKLOCKTIMEVERIFY on an empty stack")
         }
         case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
         case OP_CHECKLOCKTIMEVERIFY :: tail => run(tail, stack, state.copy(opCount = opCount + 1))
-        case OP_CHECKSEQUENCEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0)  => stack match {
+        case OP_CHECKSEQUENCEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0) => stack match {
           case head :: stacktail =>
-            // Note that unlike CHECKLOCKTIMEVERIFY we do not need to
-            // accept 5-byte bignums since any value greater than or
-            // equal to SEQUENCE_THRESHOLD (= 1 << 31) will be rejected
-            // anyway. This limitation just happens to coincide with
-            // CScriptNum's default 4-byte limit with an explicit sign
-            // bit.
-            //
-            // This means there is a maximum relative lock time of 52
-            // years, even though the nSequence field in transactions
-            // themselves is uint32_t and could allow a relative lock
-            // time of up to 120 years.
-            val invertedSequence = decodeNumber(head)
+            // nSequence, like nLockTime, is a 32-bit unsigned integer
+            // field. See the comment in CHECKLOCKTIMEVERIFY regarding
+            // 5-byte numeric operands.
+            val sequence = decodeNumber(head, maximumSize = 5)
             // In the rare event that the argument may be < 0 due to
             // some arithmetic being done first, you can always use
             // 0 MAX CHECKSEQUENCEVERIFY.
-            if (invertedSequence < 0) throw new RuntimeException("inverted sequence cannot be negative")
-            // Actually compare the specified inverse sequence number
-            // with the input.
-            if (!checkLockTime(invertedSequence, context.tx, context.inputIndex, isSequence = true)) throw new RuntimeException("unsatisfied lock time")
+            if (sequence < 0) throw new RuntimeException("CSV lock time cannot be negative")
+
+            // To provide for future soft-fork extensibility, if the
+            // operand has the disabled lock-time flag set,
+            // CHECKSEQUENCEVERIFY behaves as a NOP.
+            if ((sequence & TxIn.SEQUENCE_LOCKTIME_DISABLE_FLAG) == 0) {
+              // Actually compare the specified inverse sequence number
+              // with the input.
+              if (!checkSequence(sequence, context.tx, context.inputIndex)) throw new RuntimeException("unsatisfied CSV lock time")
+            }
+
             // stack is not popped: we use stack here and not stacktail !!
             run(tail, stack, state.copy(opCount = opCount + 1))
           case _ => throw new RuntimeException("cannot run OP_CHECKSEQUENCEVERIFY on an empty stack")
@@ -729,7 +792,8 @@ object Script {
      * <li>check the final stack</li>
      * <li>extract and run embedded pay2sh scripts if any and check the stack again</li>
      * </ul>
-     * @param scriptSig signature script
+     *
+     * @param scriptSig    signature script
      * @param scriptPubKey public key script
      * @return true if the scripts were successfully verified
      */
@@ -772,6 +836,7 @@ object Script {
 
   /**
    * extract a public key hash from a public key script
+   *
    * @param script public key script
    * @return the public key hash wrapped in the script
    */
@@ -785,6 +850,7 @@ object Script {
 
   /**
    * extract a public key from a signature script
+   *
    * @param script signature script
    * @return the public key wrapped in the script
    */
@@ -795,7 +861,8 @@ object Script {
 
   /**
    * Creates a m-of-n multisig script.
-   * @param m is the number of required signatures
+   *
+   * @param m       is the number of required signatures
    * @param pubkeys are the public keys signatures will be checked against (there should be at least as many public keys
    *                as required signatures)
    * @return a multisig redeem script

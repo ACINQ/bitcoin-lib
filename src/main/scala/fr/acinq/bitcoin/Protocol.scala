@@ -319,6 +319,31 @@ case class OutPoint(hash: BinaryData, index: Long) {
 object TxIn extends BtcMessage[TxIn] {
   def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long): TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
 
+  /* Setting nSequence to this value for every input in a transaction disables nLockTime. */
+  val SEQUENCE_FINAL = 0xffffffffL
+
+  /* Below flags apply in the context of BIP 68*/
+  /* If this flag set, CTxIn::nSequence is NOT interpreted as a relative lock-time. */
+  val SEQUENCE_LOCKTIME_DISABLE_FLAG = (1L << 31)
+
+  /* If CTxIn::nSequence encodes a relative lock-time and this flag
+   * is set, the relative lock-time has units of 512 seconds,
+   * otherwise it specifies blocks with a granularity of 1. */
+  val SEQUENCE_LOCKTIME_TYPE_FLAG = (1L << 22)
+
+  /* If CTxIn::nSequence encodes a relative lock-time, this mask is
+   * applied to extract that lock-time from the sequence field. */
+  val SEQUENCE_LOCKTIME_MASK = 0x0000ffffL
+
+  /* In order to use the same number of bits to encode roughly the
+   * same wall-clock duration, and because blocks are naturally
+   * limited to occur every 600s on average, the minimum granularity
+   * for time-based relative lock-time is fixed at 512 seconds.
+   * Converting from CTxIn::nSequence to seconds is performed by
+   * multiplying by 512 = 2^9, or equivalently shifting up by
+   * 9 bits. */
+  val SEQUENCE_LOCKTIME_GRANULARITY = 9
+
   override def read(input: InputStream): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
 
   override def write(input: TxIn, out: OutputStream) = {
@@ -345,7 +370,7 @@ object TxIn extends BtcMessage[TxIn] {
  *                 information is updated before inclusion into a block. Unused for now.
  */
 case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long) {
-  def isFinal: Boolean = sequence == 0xffffffffL
+  def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
 }
 
 object TxOut extends BtcMessage[TxOut] {
