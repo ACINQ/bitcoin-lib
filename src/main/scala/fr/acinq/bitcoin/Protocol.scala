@@ -2,7 +2,7 @@ package fr.acinq.bitcoin
 
 import java.io._
 import java.math.BigInteger
-import java.net.InetAddress
+import java.net.{Inet4Address, Inet6Address, InetAddress}
 import java.util
 
 import fr.acinq.bitcoin.Script.Runner
@@ -789,8 +789,7 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
     val services = uint64(in)
     val raw = new Array[Byte](16)
     in.read(raw)
-    require(toHexString(raw.take(12)) == "00000000000000000000ffff", "IPV4 only")
-    val address = InetAddress.getByAddress(raw.takeRight(4))
+    val address = InetAddress.getByAddress(raw)
     val port = uint16BigEndian(in)
     NetworkAddressWithTimestamp(time, services, address, port)
   }
@@ -798,7 +797,10 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
   override def write(input: NetworkAddressWithTimestamp, out: OutputStream) = {
     writeUInt32(input.time, out)
     writeUInt64(input.services, out)
-    out.write(fromHexString("00000000000000000000ffff"))
+    input.address match {
+      case _: Inet4Address => out.write(fromHexString("00000000000000000000ffff"))
+      case _: Inet6Address => ()
+    }
     out.write(input.address.getAddress)
     writeUInt16BigEndian(input.port, out)
   }
@@ -811,15 +813,17 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
     val services = uint64(in)
     val raw = new Array[Byte](16)
     in.read(raw)
-    //require(toHexString(raw.take(12)) == "00000000000000000000ffff", "IPV4 only")
-    val address = InetAddress.getByAddress(raw.takeRight(4))
+    val address = InetAddress.getByAddress(raw)
     val port = uint16BigEndian(in)
     NetworkAddress(services, address, port)
   }
 
   override def write(input: NetworkAddress, out: OutputStream) = {
     writeUInt64(input.services, out)
-    out.write(fromHexString("00000000000000000000ffff"))
+    input.address match {
+      case _: Inet4Address => out.write(fromHexString("00000000000000000000ffff"))
+      case _: Inet6Address => ()
+    }
     out.write(input.address.getAddress)
     writeUInt16BigEndian(input.port, out) // wtf ?? why BE there ?
   }

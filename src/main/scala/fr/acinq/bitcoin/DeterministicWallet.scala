@@ -33,9 +33,15 @@ object DeterministicWallet {
 
   def isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-  case class ExtendedPrivateKey(secretkey: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long)
+  case class ExtendedPrivateKey(secretkey: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+    require(secretkey.length == 32)
+    require(chaincode.length == 32)
+  }
 
-  case class ExtendedPublicKey(publickey: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long)
+  case class ExtendedPublicKey(publickey: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+    require(publickey.length == 33)
+    require(chaincode.length == 32)
+  }
 
   def encode(input: ExtendedPrivateKey, testnet: Boolean): String = {
     val out = new ByteArrayOutputStream()
@@ -69,7 +75,7 @@ object DeterministicWallet {
    * @param seed random seed
    * @return a "master" private key
    */
-  def generate(seed: IndexedSeq[Byte]): ExtendedPrivateKey = {
+  def generate(seed: Seq[Byte]): ExtendedPrivateKey = {
     val I = Crypto.hmac512("Bitcoin seed".getBytes("UTF-8"), seed)
     val IL = I.take(32)
     val IR = I.takeRight(32)
