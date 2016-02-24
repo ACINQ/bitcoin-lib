@@ -11,7 +11,7 @@ This is a simple scala library which implements most of the bitcoin protocol:
 * base58 encoding/decoding
 * block headers, block and tx parsing
 * tx signature and verification
-* script parsing and execution
+* script parsing and execution (including OP_CLTV and OP_CSV)
 * pay to public key tx
 * pay to script tx / multisig tx
 * BIP 32 (deterministic wallets)
@@ -40,12 +40,12 @@ This is a very early beta release and should not be used in production. If you'r
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.4</version>
+    <version>0.9.5</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.5-SNAPSHOT, the latest released version is 0.9.4
+The latest snapshot (development) version is 0.9.6-SNAPSHOT, the latest released version is 0.9.5
 
 ## Usage
 
