@@ -134,9 +134,6 @@ case class OP_PUSHDATA(data: BinaryData, code: Int) extends ScriptElt {
   override def toString = data.toString
 }
 case class OP_INVALID(code: Int) extends ScriptElt
-case class OP_COINBASE_SCRIPT(data: Array[Byte]) extends ScriptElt {
-  override def toString = s"OP_COINBASE_SCRIPT(${toHexString(data)})"
-}
 // @formatter:off
 
 object ScriptElt {

@@ -876,7 +876,3 @@ object Script {
     Script.write(op_m :: pubkeys.toList.map(OP_PUSHDATA(_)) ::: op_n :: OP_CHECKMULTISIG :: Nil)
   }
 }
-
-object CoinbaseScript {
-  def parse(blob: Array[Byte]): List[ScriptElt] = List(OP_COINBASE_SCRIPT(blob))
-}
