@@ -608,7 +608,15 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @param sigScript new signature script
    * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
    */
-  def updateSigScript(i: Int, sigScript: Seq[Byte]) : Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(signatureScript = sigScript)))
+  def updateSigScript(i: Int, sigScript: BinaryData) : Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(signatureScript = sigScript)))
+
+  /**
+   *
+   * @param i index of the tx input to update
+   * @param sigScript new signature script
+   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+   */
+  def updateSigScript(i: Int, sigScript: Seq[ScriptElt]) : Transaction = updateSigScript(i, Script.write(sigScript))
 }
 
 object BlockHeader extends BtcMessage[BlockHeader] {
