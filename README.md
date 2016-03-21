@@ -20,8 +20,14 @@ This is a simple scala library which implements most of the bitcoin protocol:
 
 ## Objectives
 
-Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We also use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example).  
-This is a very early beta release and should not be used in production. If you're looking for a mature bitcoin library for the JVM you should have a look at [bitcoinj](https://github.com/bitcoinj/bitcoinj) instead.
+Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We also use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes.
+
+## Status
+- [X] Message parsing (blocks, transactions, inv, ...)
+- [X] Building transactions (P2PK, P2PKH, P2SH)
+- [X] Signing transactions
+- [X] Verifying signatures
+- [X] Passing core reference tests (scripts & transactions)
 
 ## Configuring maven/sbt
 
