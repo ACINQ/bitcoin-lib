@@ -60,12 +60,12 @@ object ScriptSpec {
 
   def creditTx(scriptPubKey: Array[Byte]) = Transaction(version = 1,
     txIn = TxIn(OutPoint(new Array[Byte](32), -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
-    txOut = TxOut(0, scriptPubKey) :: Nil,
+    txOut = TxOut(0 satoshi, scriptPubKey) :: Nil,
     lockTime = 0)
 
   def spendingTx(scriptSig: Array[Byte], tx: Transaction) = Transaction(version = 1,
     txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
-    txOut = TxOut(0, Array.empty[Byte]) :: Nil,
+    txOut = TxOut(0 satoshi, Array.empty[Byte]) :: Nil,
     lockTime = 0)
 
   def runTest(scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedResult: Boolean): Unit = {

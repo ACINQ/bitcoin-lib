@@ -28,6 +28,35 @@ package object bitcoin {
     val One: BinaryData = "0100000000000000000000000000000000000000000000000000000000000000"
   }
 
+  sealed trait BtcAmount
+  case class Satoshi(amount: Long) extends BtcAmount
+  case class MilliBtc(amount: BigDecimal) extends BtcAmount
+  case class Btc(amount: BigDecimal) extends BtcAmount
+
+  implicit final class SatoshiLong(private val n: Long) extends AnyVal {
+    def satoshi = Satoshi(n)
+  }
+
+  implicit final class BtcDouble(private val n: Double) extends AnyVal {
+    def btc = Btc(n)
+  }
+
+  implicit final class MilliBtcDouble(private val n: Double) extends AnyVal {
+    def millibtc = MilliBtc(n)
+  }
+
+  implicit def satoshi2btc(input: Satoshi): Btc = Btc(BigDecimal(input.amount) / Coin)
+
+  implicit def btc2satoshi(input: Btc): Satoshi = Satoshi((input.amount * Coin).toLong)
+
+  implicit def satoshi2millibtc(input: Satoshi): MilliBtc = btc2millibtc(satoshi2btc(input))
+
+  implicit def millibtc2satoshi(input: MilliBtc): Satoshi = btc2satoshi(millibtc2btc(input))
+
+  implicit def btc2millibtc(input: Btc): MilliBtc = MilliBtc(input.amount * 1000L)
+
+  implicit def millibtc2btc(input: MilliBtc): Btc = Btc(input.amount / 1000L)
+
   def toHexString(blob: Seq[Byte]) = blob.map("%02x".format(_)).mkString
 
   def fromHexString(hex: String): Array[Byte] = hex.stripPrefix("0x").sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)

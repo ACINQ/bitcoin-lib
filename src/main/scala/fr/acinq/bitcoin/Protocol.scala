@@ -374,19 +374,19 @@ case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long)
 }
 
 object TxOut extends BtcMessage[TxOut] {
-  def apply(amount: Long, publicKeyScript: Seq[ScriptElt]): TxOut = new TxOut(amount, Script.write(publicKeyScript))
+  def apply(amount: Satoshi, publicKeyScript: Seq[ScriptElt]): TxOut = new TxOut(amount, Script.write(publicKeyScript))
 
-  override def read(input: InputStream): TxOut = TxOut(uint64(input), script(input))
+  override def read(input: InputStream): TxOut = TxOut(Satoshi(uint64(input)), script(input))
 
   override def write(input: TxOut, out: OutputStream) = {
-    writeUInt64(input.amount, out)
+    writeUInt64(input.amount.amount, out)
     writeScript(input.publicKeyScript, out)
   }
 
   override def validate(input: TxOut): Unit = {
     import input._
-    require(amount >= 0, s"invalid txout amount: $amount")
-    require(amount <= MaxMoney, s"invalid txout amount: $amount")
+    require(amount.amount >= 0, s"invalid txout amount: $amount")
+    require(amount.amount <= MaxMoney, s"invalid txout amount: $amount")
     require(publicKeyScript.length < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
   }
 }
@@ -396,7 +396,7 @@ object TxOut extends BtcMessage[TxOut] {
  * @param amount amount in Satoshis
  * @param publicKeyScript Usually contains the public key as a Bitcoin script setting up conditions to claim this output.
  */
-case class TxOut(amount: Long, publicKeyScript: BinaryData)
+case class TxOut(amount: Satoshi, publicKeyScript: BinaryData)
 
 object Transaction extends BtcMessage[Transaction] {
   override def read(input: InputStream): Transaction = Transaction(version = uint32(input), txIn = readCollection[TxIn](input), txOut = readCollection[TxOut](input), lockTime = uint32(input))
@@ -412,7 +412,7 @@ object Transaction extends BtcMessage[Transaction] {
     require(input.txIn.nonEmpty, "input list cannot be empty")
     require(input.txOut.nonEmpty, "output list cannot be empty")
     require(Transaction.write(input).size <= MaxBlockSize)
-    require(input.txOut.map(_.amount).sum <= MaxMoney, "sum of outputs amount is invalid")
+    require(input.txOut.map(_.amount.amount).sum <= MaxMoney, "sum of outputs amount is invalid")
     input.txIn.map(TxIn.validate)
     input.txOut.map(TxOut.validate)
     val outPoints = input.txIn.map(_.outPoint)
@@ -462,7 +462,7 @@ object Transaction extends BtcMessage[Transaction] {
         val inputs = resetSequence(tx2.txIn, inputIndex)
         val outputs = for (i <- 0 to inputIndex) yield {
           if (i == inputIndex) tx2.txOut(inputIndex)
-          else TxOut(-1, Array.empty[Byte])
+          else TxOut(Satoshi(-1), Array.empty[Byte])
         }
         tx2.copy(txIn = inputs, txOut = outputs)
       }
@@ -713,7 +713,7 @@ object Block extends BtcMessage[Block] {
       List(
         Transaction(version = 1,
           txIn = List(TxIn.coinbase(Script.write(script))),
-          txOut = List(TxOut(amount = 50 * Coin, publicKeyScript = Script.write(scriptPubKey))),
+          txOut = List(TxOut(amount = 50 btc, publicKeyScript = Script.write(scriptPubKey))),
           lockTime = 0))
     )
   }
