@@ -356,10 +356,12 @@ object TxIn extends BtcMessage[TxIn] {
     require(input.signatureScript.length <= MaxScriptElementSize, s"signature script is ${input.signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
   }
 
-  def coinbase(script: Array[Byte]): TxIn = {
+  def coinbase(script: BinaryData): TxIn = {
     require(script.length >= 2 && script.length <= 100, "coinbase script length must be between 2 and 100")
     TxIn(OutPoint(new Array[Byte](32), 0xffffffffL), script, sequence = 0xffffffffL)
   }
+
+  def coinbase(script: Seq[ScriptElt]): TxIn = coinbase(Script.write(script))
 }
 
 /**
@@ -671,18 +673,11 @@ case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleR
  * see https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
  */
 object MerkleTree {
-  def computeRootRaw(tree: Seq[Array[Byte]]): Array[Byte] = tree.length match {
+  def computeRoot(tree: Seq[Array[Byte]]): Array[Byte] = tree.length match {
     case 1 => tree(0)
-    case n if n % 2 != 0 => computeRootRaw(tree :+ tree.last) // append last element again
-    case _ => computeRootRaw(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1))).toSeq)
+    case n if n % 2 != 0 => computeRoot(tree :+ tree.last) // append last element again
+    case _ => computeRoot(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1))).toSeq)
   }
-
-  /**
-   *
-   * @param transactions list of transactions
-   * @return the Merkle root of the treed built from the input transactions
-   */
-  def computeRoot(transactions: Seq[Transaction]): Array[Byte] = computeRootRaw(transactions.map(t => Crypto.hash256(Transaction.write(t))))
 }
 
 object Block extends BtcMessage[Block] {
@@ -699,7 +694,7 @@ object Block extends BtcMessage[Block] {
 
   override def validate(input: Block): Unit = {
     BlockHeader.validate(input.header)
-    require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx)), "invalid block:  merkle root mismatch")
+    require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx.map(_.hash.toArray))), "invalid block:  merkle root mismatch")
     require(input.tx.map(_.txid).toSet.size == input.tx.size, "invalid block: duplicate transactions")
     input.tx.map(Transaction.validate)
   }
@@ -709,11 +704,11 @@ object Block extends BtcMessage[Block] {
     val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(writeUInt8(4)) :: OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8")) :: Nil
     val scriptPubKey = OP_PUSHDATA("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") :: OP_CHECKSIG :: Nil
     Block(
-      BlockHeader(version = 1, hashPreviousBlock = new Array[Byte](32), hashMerkleRoot = fromHexString("3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"), time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
+      BlockHeader(version = 1, hashPreviousBlock = Hash.Zeroes, hashMerkleRoot = "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a", time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
       List(
         Transaction(version = 1,
-          txIn = List(TxIn.coinbase(Script.write(script))),
-          txOut = List(TxOut(amount = 50 btc, publicKeyScript = Script.write(scriptPubKey))),
+          txIn = List(TxIn.coinbase(script)),
+          txOut = List(TxOut(amount = 50 btc, publicKeyScript = scriptPubKey)),
           lockTime = 0))
     )
   }
