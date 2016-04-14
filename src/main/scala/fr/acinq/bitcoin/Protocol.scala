@@ -251,7 +251,8 @@ import Protocol._
 trait BtcMessage[T] {
   /**
    * write a message to a stream
-   * @param t message
+    *
+    * @param t message
    * @param out output stream
    */
   def write(t: T, out: OutputStream, protocolVersion: Long): Unit
@@ -260,7 +261,8 @@ trait BtcMessage[T] {
 
   /**
    * write a message to a byte array
-   * @param t message
+    *
+    * @param t message
    * @return a serialized message
    */
   def write(t: T, protocolVersion: Long): Array[Byte] = {
@@ -273,7 +275,8 @@ trait BtcMessage[T] {
 
     /**
    * read a message from a stream
-   * @param in input stream
+      *
+      * @param in input stream
    * @return a deserialized message
    */
   def read(in: InputStream, protocolVersion: Long): T
@@ -282,7 +285,8 @@ trait BtcMessage[T] {
 
   /**
    * read a message from a byte array
-   * @param in serialized message
+    *
+    * @param in serialized message
    * @return a deserialized message
    */
   def read(in: Seq[Byte], protocolVersion: Long): T = read(new ByteArrayInputStream(in.toArray), protocolVersion)
@@ -291,7 +295,8 @@ trait BtcMessage[T] {
 
   /**
    * read a message from a hex string
-   * @param in message binary data in hex format
+    *
+    * @param in message binary data in hex format
    * @return a deserialized message of type T
    */
   def read(in: String, protocolVersion: Long): T = read(fromHexString(in), protocolVersion)
@@ -320,7 +325,8 @@ object OutPoint extends BtcMessage[OutPoint] {
 
 /**
  * an out point is a reference to a specific output in a specific transaction that we want to claim
- * @param hash reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
+  *
+  * @param hash reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
  * @param index index of the output in tx that we want to refer to
  */
 case class OutPoint(hash: BinaryData, index: Long) {
@@ -384,7 +390,8 @@ object TxIn extends BtcMessage[TxIn] {
 
 /**
  * Transaction input
- * @param outPoint Previous output transaction reference
+  *
+  * @param outPoint Previous output transaction reference
  * @param signatureScript Computational Script for confirming transaction authorization
  * @param sequence Transaction version as defined by the sender. Intended for "replacement" of transactions when
  *                 information is updated before inclusion into a block. Unused for now.
@@ -413,25 +420,31 @@ object TxOut extends BtcMessage[TxOut] {
 
 /**
  * Transaction output
- * @param amount amount in Satoshis
+  *
+  * @param amount amount in Satoshis
  * @param publicKeyScript Usually contains the public key as a Bitcoin script setting up conditions to claim this output.
  */
 case class TxOut(amount: Satoshi, publicKeyScript: BinaryData)
 
 object ScriptWitness extends BtcMessage[ScriptWitness] {
+  val empty = ScriptWitness(Seq.empty[BinaryData])
+
   override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit =
     writeCollection[BinaryData](t.stack, (b:BinaryData, o:OutputStream, _: Long) => writeScript(b, o), out, protocolVersion)
 
   override def read(in: InputStream, protocolVersion: Long): ScriptWitness =
     ScriptWitness(readCollection[BinaryData](in, (i: InputStream, _:Long) => script(i), None, protocolVersion))
 }
+
 /**
   * a script witness is just a stack of data
   * there is one script witness per transaction input
+  *
   * @param stack items to be pushed on the stack
   */
 case class ScriptWitness(stack: Seq[BinaryData]) {
   def isNull = stack.isEmpty
+  def isNotNull = !isNull
 }
 
 object Transaction extends BtcMessage[Transaction] {
@@ -439,17 +452,50 @@ object Transaction extends BtcMessage[Transaction] {
 
   def serializeTxWitness(version: Long): Boolean = (version & SERIALIZE_TRANSACTION_WITNESS) != 0
 
+  def isNotNull(witness: Seq[ScriptWitness]) = witness.exists(_.isNotNull)
+
+  def isNull(witness: Seq[ScriptWitness]) = !isNotNull(witness)
+
+  def apply(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) = new Transaction(version, txIn, txOut, lockTime, Seq.fill(txIn.size)(ScriptWitness.empty))
+
   override def read(input: InputStream, protocolVersion: Long): Transaction = {
-    val version = uint32(input)
-    val txIn = readCollection[TxIn](input, protocolVersion)
-    Transaction(version, txIn, txOut = readCollection[TxOut](input, protocolVersion), lockTime = uint32(input))
+    val tx = Transaction(uint32(input), readCollection[TxIn](input, protocolVersion), Seq.empty[TxOut], 0)
+    val (flags, tx1) = if (tx.txIn.isEmpty && serializeTxWitness(protocolVersion)) {
+      // we just read the 0x00 marker
+      val flags = uint8(input)
+      val txIn = readCollection[TxIn](input, protocolVersion)
+      if (flags == 0 && !txIn.isEmpty) throw new RuntimeException("Extended transaction format unnecessarily used")
+      val txOut = readCollection[TxOut](input, protocolVersion)
+      (flags, tx.copy(txIn = txIn, txOut = txOut))
+    } else (0, tx.copy(txOut = readCollection[TxOut](input, protocolVersion)))
+
+    val tx2 = flags match {
+      case 0 => tx1.copy(lockTime = uint32(input))
+      case 1 =>
+        val witness = new ArrayBuffer[ScriptWitness]()
+        for (i <- 0 until tx1.txIn.size) witness += ScriptWitness.read(input, protocolVersion)
+        tx1.copy(witness = witness.toSeq, lockTime = uint32(input))
+      case _ => throw new RuntimeException(s"Unknown transaction optional data $flags")
+    }
+
+    tx2
   }
 
-  override def write(input: Transaction, out: OutputStream, protocolVersion: Long) = {
-    writeUInt32(input.version, out)
-    writeCollection(input.txIn, out, protocolVersion)
-    writeCollection(input.txOut, out, protocolVersion)
-    writeUInt32(input.lockTime, out)
+  override def write(tx: Transaction, out: OutputStream, protocolVersion: Long) = {
+    if (serializeTxWitness(protocolVersion) && isNotNull(tx.witness)) {
+      writeUInt32(tx.version, out)
+      writeUInt8(0x00, out)
+      writeUInt8(0x01, out)
+      writeCollection(tx.txIn, out, protocolVersion)
+      writeCollection(tx.txOut, out, protocolVersion)
+      for (i <- 0 until tx.txIn.size) ScriptWitness.write(tx.witness(i), out, protocolVersion)
+      writeUInt32(tx.lockTime, out)
+    } else {
+      writeUInt32(tx.version, out)
+      writeCollection(tx.txIn, out, protocolVersion)
+      writeCollection(tx.txOut, out, protocolVersion)
+      writeUInt32(tx.lockTime, out)
+    }
   }
 
   override def validate(input: Transaction): Unit = {
@@ -473,7 +519,8 @@ object Transaction extends BtcMessage[Transaction] {
 
   /**
    * prepare a transaction for signing a specific input
-   * @param tx input transaction
+    *
+    * @param tx input transaction
    * @param inputIndex index of the tx input that is being processed
    * @param previousOutputScript public key script of the output claimed by this tx input
    * @param sighashType signature hash type
@@ -520,7 +567,8 @@ object Transaction extends BtcMessage[Transaction] {
 
   /**
    * hash a tx for signing
-   * @param tx input transaction
+    *
+    * @param tx input transaction
    * @param inputIndex index of the tx input that is being processed
    * @param previousOutputScript public key script of the output claimed by this tx input
    * @param sighashType signature hash type
@@ -554,7 +602,8 @@ object Transaction extends BtcMessage[Transaction] {
 
   /**
    * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
-   * @param input transaction to sign
+    *
+    * @param input transaction to sign
    * @param signData list of data for signing: previous tx output script and associated private key
    * @param randomize if false, signature will not be randomized. Use for debugging purposes only!
    * @return a new signed transaction
@@ -580,7 +629,8 @@ object Transaction extends BtcMessage[Transaction] {
 
   /**
    * checks that a transaction correctly spends its inputs (i.e is properly signed)
-   * @param tx transaction to be checked
+    *
+    * @param tx transaction to be checked
    * @param inputs previous tx that are being spent
    * @param scriptFlags script execution flags
    * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
@@ -595,7 +645,8 @@ object Transaction extends BtcMessage[Transaction] {
 
     /**
    * checks that a transaction correctly spends its inputs (i.e sis properly signed)
-   * @param tx transaction to be checked
+      *
+      * @param tx transaction to be checked
    * @param prevoutScripts map where keys are OutPoint (previous tx ids and vout index) and values are previous output pubkey scripts)
    * @param scriptFlags script execution flags
    * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
@@ -616,19 +667,21 @@ object SignData {
 
 /**
  * data for signing pay2pk transaction
- * @param prevPubKeyScript previous output public key script
+  *
+  * @param prevPubKeyScript previous output public key script
  * @param privateKey private key associated with the previous output public key
  */
 case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
 
 /**
  * Transaction
- * @param version Transaction data format version
+  *
+  * @param version Transaction data format version
  * @param txIn Transaction inputs
  * @param txOut Transaction outputs
  * @param lockTime The block number or timestamp at which this transaction is locked
  */
-case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long, witness: Seq[ScriptWitness] = Seq.empty[ScriptWitness]) {
+case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long, witness: Seq[ScriptWitness]) {
   lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this))
   lazy val txid = BinaryData(hash.reverse)
 
@@ -763,7 +816,8 @@ object Block extends BtcMessage[Block] {
   // mine.header.copy(bits = 0x0x207fffffL, nonce = 2, time = 1296688602)
   /**
    * Proof of work: hash(block) <= target difficulty
-   * @param block
+    *
+    * @param block
    * @return true if the input block validates its expected proof of work
    */
   def checkProofOfWork(block: Block): Boolean = {
@@ -775,7 +829,8 @@ object Block extends BtcMessage[Block] {
 
 /**
  * Bitcoin block
- * @param header block header
+  *
+  * @param header block header
  * @param tx transactions
  */
 case class Block(header: BlockHeader, tx: Seq[Transaction]) {
@@ -820,7 +875,8 @@ object Message extends BtcMessage[Message] {
 
 /**
  * Bitcoin message exchanged by nodes over the network
- * @param magic Magic value indicating message origin network, and used to seek to next message when stream state is unknown
+  *
+  * @param magic Magic value indicating message origin network, and used to seek to next message when stream state is unknown
  * @param command ASCII string identifying the packet content, NULL padded (non-NULL padding results in packet rejected)
  * @param payload The actual data
  */
