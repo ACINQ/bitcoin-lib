@@ -5,6 +5,7 @@ import java.math.BigInteger
 import java.net.{Inet4Address, Inet6Address, InetAddress}
 import java.util
 
+import com.typesafe.config.ConfigFactory
 import fr.acinq.bitcoin.Script.Runner
 
 import scala.collection.mutable.ArrayBuffer
@@ -27,6 +28,8 @@ object Protocol {
   /**
    * basic serialization functions
    */
+
+  val PROTOCOL_VERSION = ConfigFactory.load().getLong("bitcoin-lib.protocol-version")
 
   def uint8(blob: Seq[Byte]) = blob(0) & 0xffl
 
@@ -195,46 +198,51 @@ object Protocol {
 
   def hash(input: InputStream): Array[Byte] = bytes(input, 32) // a hash is always 256 bits
 
-  def script(input: InputStream): Array[Byte] = {
+  def script(input: InputStream): BinaryData = {
     val length = varint(input) // read size
     bytes(input, length.toInt) // read bytes
   }
 
-  def writeScript(input: Array[Byte], out: OutputStream) = {
+  //def writeScript(input: BinaryData, out: OutputStream): Unit = writeScript(input.toArray, out)
+
+  def writeScript(input: Array[Byte], out: OutputStream): Unit = {
     writeVarint(input.length.toLong, out)
     out.write(input)
   }
 
   implicit val txInSer = TxIn
   implicit val txOutSer = TxOut
+  implicit val scriptWitnessSer = ScriptWitness
   implicit val txSer = Transaction
   implicit val networkAddressWithTimestampSer = NetworkAddressWithTimestamp
   implicit val inventoryVectorOutSer = InventoryVector
 
-  def readCollection[T](input: InputStream, maxElement: Option[Int])(implicit ser: BtcMessage[T]) : Seq[T] = readCollection(input, ser.read, maxElement)
+  def readCollection[T](input: InputStream, maxElement: Option[Int], protocolVersion: Long)(implicit ser: BtcMessage[T]) : Seq[T] =
+    readCollection(input, ser.read, maxElement, protocolVersion)
 
-  def readCollection[T](input: InputStream)(implicit ser: BtcMessage[T]): Seq[T] = readCollection(input, None)(ser)
+  def readCollection[T](input: InputStream, protocolVersion: Long)(implicit ser: BtcMessage[T]): Seq[T] =
+    readCollection(input, None, protocolVersion)(ser)
 
-  def readCollection[T](input: InputStream, reader: InputStream => T, maxElement: Option[Int]) : Seq[T] = {
+  def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, maxElement: Option[Int], protocolVersion: Long) : Seq[T] = {
     val count = varint(input)
     maxElement.map(max => require(count <= max, "invalid length"))
     val items = ArrayBuffer.empty[T]
     for (i <- 1L to count) {
-      items += reader(input)
+      items += reader(input, protocolVersion)
     }
     items.toSeq
   }
 
-  def readCollection[T](input: InputStream, reader: InputStream => T) : Seq[T] = readCollection(input, reader, None)
+  def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, protocolVersion: Long) : Seq[T] = readCollection(input, reader, None, protocolVersion)
 
-  def writeCollection[T](seq: Seq[T], out: OutputStream)(implicit ser: BtcMessage[T]) : Unit = {
+  def writeCollection[T](seq: Seq[T], out: OutputStream, protocolVersion: Long)(implicit ser: BtcMessage[T]) : Unit = {
     writeVarint(seq.length, out)
-    seq.map(t => ser.write(t, out))
+    seq.map(t => ser.write(t, out, protocolVersion))
   }
 
-  def writeCollection[T](seq: Seq[T], writer: (T, OutputStream) => Unit, out: OutputStream) : Unit = {
+  def writeCollection[T](seq: Seq[T], writer: (T, OutputStream, Long) => Unit, out: OutputStream, protocolVersion: Long) : Unit = {
     writeVarint(seq.length, out)
-    seq.map(t => writer(t, out))
+    seq.map(t => writer(t, out, protocolVersion))
   }
 }
 
@@ -246,39 +254,49 @@ trait BtcMessage[T] {
    * @param t message
    * @param out output stream
    */
-  def write(t: T, out: OutputStream): Unit
+  def write(t: T, out: OutputStream, protocolVersion: Long): Unit
+
+  def write(t:T, out: OutputStream): Unit = write(t, out, PROTOCOL_VERSION)
 
   /**
    * write a message to a byte array
    * @param t message
    * @return a serialized message
    */
-  def write(t: T): Array[Byte] = {
+  def write(t: T, protocolVersion: Long): Array[Byte] = {
     val out = new ByteArrayOutputStream()
-    write(t, out)
+    write(t, out, protocolVersion)
     out.toByteArray
   }
 
-  /**
+  def write(t: T): Array[Byte] = write(t, PROTOCOL_VERSION)
+
+    /**
    * read a message from a stream
    * @param in input stream
    * @return a deserialized message
    */
-  def read(in: InputStream): T
+  def read(in: InputStream, protocolVersion: Long): T
+
+  def read(in: InputStream): T = read(in, PROTOCOL_VERSION)
 
   /**
    * read a message from a byte array
    * @param in serialized message
    * @return a deserialized message
    */
-  def read(in: Seq[Byte]): T = read(new ByteArrayInputStream(in.toArray))
+  def read(in: Seq[Byte], protocolVersion: Long): T = read(new ByteArrayInputStream(in.toArray), protocolVersion)
+
+  def read(in: Seq[Byte]): T = read(in, PROTOCOL_VERSION)
 
   /**
    * read a message from a hex string
    * @param in message binary data in hex format
    * @return a deserialized message of type T
    */
-  def read(in: String): T = read(fromHexString(in))
+  def read(in: String, protocolVersion: Long): T = read(fromHexString(in), protocolVersion)
+
+  def read(in: String): T = read(in, PROTOCOL_VERSION)
 
   def validate(t: T): Unit = {}
 }
@@ -287,9 +305,9 @@ trait BtcMessage[T] {
 object OutPoint extends BtcMessage[OutPoint] {
   def apply(tx: Transaction, index: Int) = new OutPoint(tx.hash, index)
 
-  override def read(input: InputStream): OutPoint = OutPoint(hash(input), uint32(input))
+  override def read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
 
-  override def write(input: OutPoint, out: OutputStream) = {
+  override def write(input: OutPoint, out: OutputStream, protocolVersion: Long) = {
     out.write(input.hash)
     writeUInt32(input.index, out)
   }
@@ -344,9 +362,9 @@ object TxIn extends BtcMessage[TxIn] {
    * 9 bits. */
   val SEQUENCE_LOCKTIME_GRANULARITY = 9
 
-  override def read(input: InputStream): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
+  override def read(input: InputStream, protocolVersion: Long): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
 
-  override def write(input: TxIn, out: OutputStream) = {
+  override def write(input: TxIn, out: OutputStream, protocolVersion: Long) = {
     OutPoint.write(input.outPoint, out)
     writeScript(input.signatureScript, out)
     writeUInt32(input.sequence, out)
@@ -378,9 +396,9 @@ case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long)
 object TxOut extends BtcMessage[TxOut] {
   def apply(amount: Satoshi, publicKeyScript: Seq[ScriptElt]): TxOut = new TxOut(amount, Script.write(publicKeyScript))
 
-  override def read(input: InputStream): TxOut = TxOut(Satoshi(uint64(input)), script(input))
+  override def read(input: InputStream, protocolVersion: Long): TxOut = TxOut(Satoshi(uint64(input)), script(input))
 
-  override def write(input: TxOut, out: OutputStream) = {
+  override def write(input: TxOut, out: OutputStream, protocolVersion: Long) = {
     writeUInt64(input.amount.amount, out)
     writeScript(input.publicKeyScript, out)
   }
@@ -400,13 +418,37 @@ object TxOut extends BtcMessage[TxOut] {
  */
 case class TxOut(amount: Satoshi, publicKeyScript: BinaryData)
 
-object Transaction extends BtcMessage[Transaction] {
-  override def read(input: InputStream): Transaction = Transaction(version = uint32(input), txIn = readCollection[TxIn](input), txOut = readCollection[TxOut](input), lockTime = uint32(input))
+object ScriptWitness extends BtcMessage[ScriptWitness] {
+  override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit =
+    writeCollection[BinaryData](t.stack, (b:BinaryData, o:OutputStream, _: Long) => writeScript(b, o), out, protocolVersion)
 
-  override def write(input: Transaction, out: OutputStream) = {
+  override def read(in: InputStream, protocolVersion: Long): ScriptWitness =
+    ScriptWitness(readCollection[BinaryData](in, (i: InputStream, _:Long) => script(i), None, protocolVersion))
+}
+/**
+  * a script witness is just a stack of data
+  * there is one script witness per transaction input
+  * @param stack items to be pushed on the stack
+  */
+case class ScriptWitness(stack: Seq[BinaryData]) {
+  def isNull = stack.isEmpty
+}
+
+object Transaction extends BtcMessage[Transaction] {
+  val SERIALIZE_TRANSACTION_WITNESS = 0x40000000L
+
+  def serializeTxWitness(version: Long): Boolean = (version & SERIALIZE_TRANSACTION_WITNESS) != 0
+
+  override def read(input: InputStream, protocolVersion: Long): Transaction = {
+    val version = uint32(input)
+    val txIn = readCollection[TxIn](input, protocolVersion)
+    Transaction(version, txIn, txOut = readCollection[TxOut](input, protocolVersion), lockTime = uint32(input))
+  }
+
+  override def write(input: Transaction, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.version, out)
-    writeCollection(input.txIn, out)
-    writeCollection(input.txOut, out)
+    writeCollection(input.txIn, out, protocolVersion)
+    writeCollection(input.txOut, out, protocolVersion)
     writeUInt32(input.lockTime, out)
   }
 
@@ -586,7 +628,7 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
  * @param txOut Transaction outputs
  * @param lockTime The block number or timestamp at which this transaction is locked
  */
-case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
+case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long, witness: Seq[ScriptWitness] = Seq.empty[ScriptWitness]) {
   lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this))
   lazy val txid = BinaryData(hash.reverse)
 
@@ -622,7 +664,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
 }
 
 object BlockHeader extends BtcMessage[BlockHeader] {
-  override def read(input: InputStream): BlockHeader = {
+  override def read(input: InputStream, protocolVersion: Long): BlockHeader = {
     val version = uint32(input)
     val hashPreviousBlock = hash(input)
     val hashMerkleRoot = hash(input)
@@ -632,7 +674,7 @@ object BlockHeader extends BtcMessage[BlockHeader] {
     BlockHeader(version, hashPreviousBlock, hashMerkleRoot, time, bits, nonce)
   }
 
-  override def write(input: BlockHeader, out: OutputStream) = {
+  override def write(input: BlockHeader, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.version, out)
     out.write(input.hashPreviousBlock)
     out.write(input.hashMerkleRoot)
@@ -681,15 +723,15 @@ object MerkleTree {
 }
 
 object Block extends BtcMessage[Block] {
-  override def read(input: InputStream): Block = {
+  override def read(input: InputStream, protocolVersion: Long): Block = {
     val raw = bytes(input, 80)
     val header = BlockHeader.read(raw)
-    Block(header, readCollection[Transaction](input))
+    Block(header, readCollection[Transaction](input, protocolVersion))
   }
 
-  override def write(input: Block, out: OutputStream) = {
+  override def write(input: Block, out: OutputStream, protocolVersion: Long) = {
     BlockHeader.write(input.header, out)
-    writeCollection(input.tx, out)
+    writeCollection(input.tx, out, protocolVersion)
   }
 
   override def validate(input: Block): Unit = {
@@ -749,7 +791,7 @@ object Message extends BtcMessage[Message] {
   val MagicTestnet3 = 0x0709110BL
   val MagicNamecoin = 0xFEB4BEF9L
 
-  override def read(in: InputStream): Message = {
+  override def read(in: InputStream, protocolVersion: Long): Message = {
     val magic = uint32(in)
     val buffer = new Array[Byte](12)
     in.read(buffer)
@@ -764,7 +806,7 @@ object Message extends BtcMessage[Message] {
     Message(magic, command, payload)
   }
 
-  override def write(input: Message, out: OutputStream) = {
+  override def write(input: Message, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.magic, out)
     val buffer = new Array[Byte](12)
     input.command.getBytes("ISO-8859-1").copyToArray(buffer)
@@ -787,7 +829,7 @@ case class Message(magic: Long, command: String, payload: BinaryData) {
 }
 
 object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestamp] {
-  override def read(in: InputStream): NetworkAddressWithTimestamp = {
+  override def read(in: InputStream, protocolVersion: Long): NetworkAddressWithTimestamp = {
     val time = uint32(in)
     val services = uint64(in)
     val raw = new Array[Byte](16)
@@ -797,7 +839,7 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
     NetworkAddressWithTimestamp(time, services, address, port)
   }
 
-  override def write(input: NetworkAddressWithTimestamp, out: OutputStream) = {
+  override def write(input: NetworkAddressWithTimestamp, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.time, out)
     writeUInt64(input.services, out)
     input.address match {
@@ -812,7 +854,7 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
 case class NetworkAddressWithTimestamp(time: Long, services: Long, address: InetAddress, port: Long)
 
 object NetworkAddress extends BtcMessage[NetworkAddress] {
-  override def read(in: InputStream): NetworkAddress = {
+  override def read(in: InputStream, protocolVersion: Long): NetworkAddress = {
     val services = uint64(in)
     val raw = new Array[Byte](16)
     in.read(raw)
@@ -821,7 +863,7 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
     NetworkAddress(services, address, port)
   }
 
-  override def write(input: NetworkAddress, out: OutputStream) = {
+  override def write(input: NetworkAddress, out: OutputStream, protocolVersion: Long) = {
     writeUInt64(input.services, out)
     input.address match {
       case _: Inet4Address => out.write(fromHexString("00000000000000000000ffff"))
@@ -835,7 +877,7 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
 case class NetworkAddress(services: Long, address: InetAddress, port: Long)
 
 object Version extends BtcMessage[Version] {
-  override def read(in: InputStream): Version = {
+  override def read(in: InputStream, protocolVersion: Long): Version = {
     val version = uint32(in)
     val services = uint64(in)
     val timestamp = uint64(in)
@@ -851,7 +893,7 @@ object Version extends BtcMessage[Version] {
     Version(version, services, timestamp, addr_recv, addr_from, nonce, user_agent, start_height, relay)
   }
 
-  override def write(input: Version, out: OutputStream) = {
+  override def write(input: Version, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.version, out)
     writeUInt64(input.services, out)
     writeUInt64(input.timestamp, out)
@@ -882,9 +924,10 @@ object Version extends BtcMessage[Version] {
 case class Version(version: Long, services: Long, timestamp: Long, addr_recv: NetworkAddress, addr_from: NetworkAddress, nonce: Long, user_agent: String, start_height: Long, relay: Boolean)
 
 object Addr extends BtcMessage[Addr] {
-  override def write(t: Addr, out: OutputStream): Unit = writeCollection(t.addresses, out)
+  override def write(t: Addr, out: OutputStream, protocolVersion: Long): Unit = writeCollection(t.addresses, out, protocolVersion)
 
-  override def read(in: InputStream): Addr = Addr(readCollection[NetworkAddressWithTimestamp](in, Some(1000)))
+  override def read(in: InputStream, protocolVersion: Long): Addr =
+    Addr(readCollection[NetworkAddressWithTimestamp](in, Some(1000), protocolVersion))
 }
 
 case class Addr(addresses: Seq[NetworkAddressWithTimestamp])
@@ -894,12 +937,12 @@ object InventoryVector extends BtcMessage[InventoryVector] {
   val MSG_TX = 1L
   val MSG_BLOCK = 2L
 
-  override def write(t: InventoryVector, out: OutputStream): Unit = {
+  override def write(t: InventoryVector, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.`type`, out)
     out.write(t.hash)
   }
 
-  override def read(in: InputStream): InventoryVector = InventoryVector(uint32(in), hash(in))
+  override def read(in: InputStream, protocolVersion: Long): InventoryVector = InventoryVector(uint32(in), hash(in))
 }
 
 case class InventoryVector(`type`: Long, hash: BinaryData) {
@@ -907,22 +950,22 @@ case class InventoryVector(`type`: Long, hash: BinaryData) {
 }
 
 object Inventory extends BtcMessage[Inventory] {
-  override def write(t: Inventory, out: OutputStream): Unit = writeCollection(t.inventory, out)
+  override def write(t: Inventory, out: OutputStream, protocolVersion: Long): Unit = writeCollection(t.inventory, out, protocolVersion)
 
-  override def read(in: InputStream): Inventory = Inventory(readCollection[InventoryVector](in, Some(1000)))
+  override def read(in: InputStream, protocolVersion: Long): Inventory = Inventory(readCollection[InventoryVector](in, Some(1000), protocolVersion))
 }
 
 case class Inventory(inventory: Seq[InventoryVector])
 
 object Getheaders extends BtcMessage[Getheaders] {
-  override def write(t: Getheaders, out: OutputStream): Unit = {
+  override def write(t: Getheaders, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.version, out)
-    writeCollection(t.locatorHashes, (h:BinaryData, o:OutputStream) => o.write(h), out)
+    writeCollection(t.locatorHashes, (h:BinaryData, o:OutputStream, _: Long) => o.write(h), out, protocolVersion)
     out.write(t.stopHash)
   }
 
-  override def read(in: InputStream): Getheaders = {
-    Getheaders(version = uint32(in), locatorHashes = readCollection[BinaryData](in, (i: InputStream) => BinaryData(hash(i))), stopHash = hash(in))
+  override def read(in: InputStream, protocolVersion: Long): Getheaders = {
+    Getheaders(version = uint32(in), locatorHashes = readCollection[BinaryData](in, (i: InputStream, _: Long) => BinaryData(hash(i)), protocolVersion), stopHash = hash(in))
   }
 }
 
@@ -932,34 +975,34 @@ case class Getheaders(version: Long, locatorHashes: Seq[BinaryData], stopHash: B
 }
 
 object Headers extends BtcMessage[Headers] {
-  override def write(t: Headers, out: OutputStream): Unit = {
-    writeCollection(t.headers, (t:BlockHeader, o:OutputStream) => {
-      BlockHeader.write(t, o)
+  override def write(t: Headers, out: OutputStream, protocolVersion: Long): Unit = {
+    writeCollection(t.headers, (t:BlockHeader, o:OutputStream, v: Long) => {
+      BlockHeader.write(t, o, v)
       writeVarint(0, o)
-    }, out)
+    }, out, protocolVersion)
   }
 
-  override def read(in: InputStream): Headers = {
-    Headers(readCollection(in, (i: InputStream) => {
-      val header = BlockHeader.read(i)
+  override def read(in: InputStream, protocolVersion: Long): Headers = {
+    Headers(readCollection(in, (i: InputStream, v: Long) => {
+      val header = BlockHeader.read(i, v)
       val dummy = varint(in)
       require(dummy == 0, s"header in headers message ends with $dummy, should be 0 instead")
       header
-    }))
+    }, protocolVersion))
   }
 }
 
 case class Headers(headers: Seq[BlockHeader])
 
 object Getblocks extends BtcMessage[Getblocks] {
-  override def write(t: Getblocks, out: OutputStream): Unit = {
+  override def write(t: Getblocks, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.version, out)
-    writeCollection(t.locatorHashes, (h: BinaryData, o:OutputStream) => o.write(h), out)
+    writeCollection(t.locatorHashes, (h: BinaryData, o:OutputStream, _: Long) => o.write(h), out, protocolVersion)
     out.write(t.stopHash)
   }
 
-  override def read(in: InputStream): Getblocks = {
-    Getblocks(version =  uint32(in), locatorHashes = readCollection(in, (i: InputStream) => BinaryData(hash(i))), stopHash = hash(in))
+  override def read(in: InputStream, protocolVersion: Long): Getblocks = {
+    Getblocks(version =  uint32(in), locatorHashes = readCollection(in, (i: InputStream, _: Long) => BinaryData(hash(i)), protocolVersion), stopHash = hash(in))
   }
 }
 
@@ -969,21 +1012,21 @@ case class Getblocks(version: Long, locatorHashes: Seq[BinaryData], stopHash: Bi
 }
 
 object Getdata extends BtcMessage[Getdata] {
-  override def write(t: Getdata, out: OutputStream): Unit = writeCollection(t.inventory, out)
+  override def write(t: Getdata, out: OutputStream, protocolVersion: Long): Unit = writeCollection(t.inventory, out, protocolVersion)
 
-  override def read(in: InputStream): Getdata = Getdata(readCollection[InventoryVector](in))
+  override def read(in: InputStream, protocolVersion: Long): Getdata = Getdata(readCollection[InventoryVector](in, protocolVersion))
 }
 
 case class Getdata(inventory: Seq[InventoryVector])
 
 object Reject extends BtcMessage[Reject] {
-  override def write(t: Reject, out: OutputStream): Unit = {
+  override def write(t: Reject, out: OutputStream, protocolVersion: Long): Unit = {
     writeVarstring(t.message, out)
     writeUInt8(t.code, out)
     writeVarstring(t.reason, out)
   }
 
-  override def read(in: InputStream): Reject = {
+  override def read(in: InputStream, protocolVersion: Long): Reject = {
     Reject(message = varstring(in), code = uint8(in), reason =  varstring(in), Array.empty[Byte])
   }
 }
