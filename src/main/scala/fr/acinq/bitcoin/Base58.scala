@@ -25,6 +25,9 @@ object Base58 {
     val PubkeyAddressTestnet = 111.toByte
     val ScriptAddressTestnet = 196.toByte
     val SecretKeyTestnet = 239.toByte
+    val PubkeyAddressSegnet = 30.toByte
+    val ScriptAddressSegnet = 50.toByte
+    val SecretKeySegnet = 158.toByte
   }
 
   val alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
