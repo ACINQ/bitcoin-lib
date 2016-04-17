@@ -35,7 +35,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val sig = Crypto.encodeSignature(r, s) // DER encoded
     val sigOut = new ByteArrayOutputStream()
     writeUInt8(sig.length + 1, sigOut) // +1 because of the hash code
-    sigOut.write(sig)
+    sigOut.write(sig.toArray)
     writeUInt8(1, sigOut) // hash code type
     val pub = Crypto.publicKeyFromPrivateKey(pkey)
     writeUInt8(pub.length, sigOut)
@@ -102,7 +102,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     // we check that is really is the public key that is encoded in the address the previous tx was paid to
     val providedHash = Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2
     val computedHash = Crypto.hash160(publicKey)
-    assert(util.Arrays.equals(providedHash, computedHash))
+    assert(providedHash == computedHash)
 
     // step #5: now we replace the sigscript with sig + public key, and we get what would be sent to the btc network
     val tx2 = tx1.copy(txIn = List(

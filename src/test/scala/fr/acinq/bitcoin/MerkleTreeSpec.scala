@@ -9,6 +9,6 @@ class MerkleTreeSpec extends FlatSpec {
   "MerkleTree" should "compute the root of a merkle tree" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/block1.dat")
     val block = Block.read(stream)
-    assert(toHexString(MerkleTree.computeRoot(block.tx.map(_.hash.toArray))) === toHexString(block.header.hashMerkleRoot))
+    assert(toHexString(MerkleTree.computeRoot(block.tx.map(_.hash))) === toHexString(block.header.hashMerkleRoot))
   }
 }

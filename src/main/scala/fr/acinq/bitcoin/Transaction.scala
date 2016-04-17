@@ -37,7 +37,7 @@ case class OutPoint(hash: BinaryData, index: Long) {
     *
     * @return the id of the transaction this output belongs to
     */
-  def txid = toHexString(hash.data.reverse)
+  def txid = hash.data.reverse
 }
 
 object TxIn extends BtcMessage[TxIn] {
@@ -266,7 +266,7 @@ object Transaction extends BtcMessage[Transaction] {
   }
 
   /**
-    * hash a tx for signing
+    * hash a tx for signing (pre-segwit)
     *
     * @param tx input transaction
     * @param inputIndex index of the tx input that is being processed
@@ -274,7 +274,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @param sighashType signature hash type
     * @return a hash which can be used to sign the referenced tx input
     */
-  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Array[Byte] = {
+  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int): Seq[Byte] = {
     if (isHashSingle(sighashType) && inputIndex >= tx.txOut.length) {
       Hash.One
     } else {
@@ -283,34 +283,49 @@ object Transaction extends BtcMessage[Transaction] {
     }
   }
 
-  def hashForSigning(tx: Transaction, inputIndex: Int, scriptCode: BinaryData, sighashType: Int, amount: Long): Array[Byte] = {
-    val hashPrevOut: BinaryData = if (!isAnyoneCanPay(sighashType)) {
-      Crypto.hash256(tx.txIn.map(_.outPoint).map(OutPoint.write(_, Protocol.PROTOCOL_VERSION)).flatten)
-    } else Hash.Zeroes
+  /**
+    * hash a tx for signing
+    * @param tx input transaction
+    * @param inputIndex index of the tx input that is being processed
+    * @param previousOutputScript public key script of the output claimed by this tx input
+    * @param sighashType signature hash type
+    * @param sighashType
+    * @param amount
+    * @return
+    */
+  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Long, signatureVersion: Int): Seq[Byte] = {
+    signatureVersion match {
+      case 1 =>
+        val hashPrevOut: BinaryData = if (!isAnyoneCanPay(sighashType)) {
+          Crypto.hash256(tx.txIn.map(_.outPoint).map(OutPoint.write(_, Protocol.PROTOCOL_VERSION)).flatten)
+        } else Hash.Zeroes
 
-    val hashSequence: BinaryData = if (!isAnyoneCanPay(sighashType) && !isHashSingle(sighashType) && !isHashNone(sighashType)) {
-      Crypto.hash256(tx.txIn.map(_.sequence).map(Protocol.writeUInt32).flatten)
-    } else Hash.Zeroes
+        val hashSequence: BinaryData = if (!isAnyoneCanPay(sighashType) && !isHashSingle(sighashType) && !isHashNone(sighashType)) {
+          Crypto.hash256(tx.txIn.map(_.sequence).map(Protocol.writeUInt32).flatten)
+        } else Hash.Zeroes
 
-    val hashOutputs: BinaryData =  if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
-      Crypto.hash256(tx.txOut.map(TxOut.write(_, Protocol.PROTOCOL_VERSION)).flatten)
-    } else if (isHashSingle(sighashType) && inputIndex < tx.txOut.size) {
-      Crypto.hash256(TxOut.write(tx.txOut(inputIndex), Protocol.PROTOCOL_VERSION))
-    } else Hash.Zeroes
+        val hashOutputs: BinaryData =  if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
+          Crypto.hash256(tx.txOut.map(TxOut.write(_, Protocol.PROTOCOL_VERSION)).flatten)
+        } else if (isHashSingle(sighashType) && inputIndex < tx.txOut.size) {
+          Crypto.hash256(TxOut.write(tx.txOut(inputIndex), Protocol.PROTOCOL_VERSION))
+        } else Hash.Zeroes
 
-    val out = new ByteArrayOutputStream()
-    Protocol.writeUInt32(tx.version, out)
-    out.write(hashPrevOut)
-    out.write(hashSequence)
-    out.write(OutPoint.write(tx.txIn(inputIndex).outPoint, Protocol.PROTOCOL_VERSION))
-    out.write(scriptCode)
-    Protocol.writeUInt64(amount, out)
-    Protocol.writeUInt32(tx.txIn(inputIndex).sequence, out)
-    out.write(hashOutputs)
-    Protocol.writeUInt32(tx.lockTime, out)
-    Protocol.writeUInt32(sighashType, out)
-    val preimage: BinaryData = out.toByteArray
-    Crypto.hash256(preimage)
+        val out = new ByteArrayOutputStream()
+        Protocol.writeUInt32(tx.version, out)
+        out.write(hashPrevOut)
+        out.write(hashSequence)
+        out.write(OutPoint.write(tx.txIn(inputIndex).outPoint, Protocol.PROTOCOL_VERSION))
+        out.write(previousOutputScript)
+        Protocol.writeUInt64(amount, out)
+        Protocol.writeUInt32(tx.txIn(inputIndex).sequence, out)
+        out.write(hashOutputs)
+        Protocol.writeUInt32(tx.lockTime, out)
+        Protocol.writeUInt32(sighashType, out)
+        val preimage: BinaryData = out.toByteArray
+        Crypto.hash256(preimage)
+      case _ =>
+        hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
+    }
   }
 
   /**
@@ -323,7 +338,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @param randomize if false, the output signature will not be randomized (use for testing only)
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int, privateKey: Array[Byte], randomize: Boolean = true): Array[Byte] = {
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, privateKey: Seq[Byte], randomize: Boolean = true): Seq[Byte] = {
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
     val (r, s) = Crypto.sign(hash, privateKey.take(32), randomize)
     val sig = Crypto.encodeSignature(r, s)
@@ -367,28 +382,17 @@ object Transaction extends BtcMessage[Transaction] {
     */
   def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
     val txMap = inputs.map(t => t.txid -> t).toMap
-    val prevoutMap = for (i <- 0 until tx.txIn.length) yield tx.txIn(i).outPoint -> txMap(tx.txIn(i).outPoint.txid).txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
-    correctlySpends(tx, prevoutMap.toMap, scriptFlags, callback)
+    for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
+      val prevTx = txMap(tx.txIn(i).outPoint.txid)
+      val prevOutputScript = prevTx.txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
+      val amount = prevTx.txOut(tx.txIn(i).outPoint.index.toInt).amount
+      val ctx = new Script.Context(tx, i, amount.amount)
+      val runner = new Script.Runner(ctx, scriptFlags, callback)
+      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.witness(i))) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
+    }
   }
 
   def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = correctlySpends(tx, inputs, scriptFlags, None)
-
-  /**
-    * checks that a transaction correctly spends its inputs (i.e sis properly signed)
-    *
-    * @param tx transaction to be checked
-    * @param prevoutScripts map where keys are OutPoint (previous tx ids and vout index) and values are previous output pubkey scripts)
-    * @param scriptFlags script execution flags
-    * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
-    */
-  def correctlySpends(tx: Transaction, prevoutScripts: Map[OutPoint, BinaryData], scriptFlags: Int, callback: Option[Runner.Callback] = None): Unit = {
-    for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
-      val prevOutputScript = prevoutScripts(tx.txIn(i).outPoint)
-      val ctx = new Script.Context(tx, i)
-      val runner = new Script.Runner(ctx, scriptFlags, callback)
-      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
-    }
-  }
 }
 
 object SignData {
@@ -412,8 +416,8 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
   * @param lockTime The block number or timestamp at which this transaction is locked
   */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long, witness: Seq[ScriptWitness]) {
-  lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this))
-  lazy val txid = BinaryData(hash.reverse)
+  lazy val hash = Crypto.hash256(Transaction.write(this))
+  lazy val txid = hash.reverse
 
   /**
     *

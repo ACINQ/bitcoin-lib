@@ -72,7 +72,7 @@ object ScriptSpec {
     val scriptPubKey = parseFromText(scriptPubKeyText)
     val scriptSig = parseFromText(scriptSigText)
     val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
-    val ctx = Script.Context(tx, 0)
+    val ctx = Script.Context(tx, 0, 0)
     val runner = new Script.Runner(ctx, parseScriptFlags(flags))
 
     val result = Try(runner.verifyScripts(scriptSig, scriptPubKey)).getOrElse(false)

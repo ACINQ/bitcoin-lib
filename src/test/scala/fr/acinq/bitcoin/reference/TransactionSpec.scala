@@ -29,10 +29,16 @@ class TransactionSpec extends FlatSpec with Matchers {
           }
         })
 
-        val tx = Transaction.read(serializedTransaction)
+        val tx = Transaction.read(serializedTransaction, Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_WITNESS)
         Try {
           Transaction.validate(tx)
-          Transaction.correctlySpends(tx, prevoutMap.toMap, ScriptSpec.parseScriptFlags(verifyFlags))
+          for(i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
+            val prevOutputScript = prevoutMap(tx.txIn(i).outPoint)
+            val amount = 0
+            val ctx = new Script.Context(tx, i, amount)
+            val runner = new Script.Runner(ctx, ScriptSpec.parseScriptFlags(verifyFlags))
+            if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.witness(i))) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
+          }
         } match {
           case Success(_) if valid => ()
           case Success(_) if !valid => throw new RuntimeException(s"$serializedTransaction should not be valid")

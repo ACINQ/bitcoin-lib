@@ -37,19 +37,19 @@ class ScriptSpec extends FlatSpec {
       txIn = TxIn(OutPoint(new Array[Byte](32), 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
       txOut = TxOut(0x12a05f200L satoshi, Array.empty[Byte]) :: Nil,
       lockTime = 0)
-    val ctx = Script.Context(tx, 0)
+    val ctx = Script.Context(tx, 0, 0)
     val runner = new Script.Runner(ctx)
     val script = OP_1 :: OP_2 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack = runner.run(script)
-    val List(Array(check)) = stack
+    val List(Seq(check)) = stack
     assert(check === 4)
     val script1 = OP_1 :: OP_1 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack1 = runner.run(script1)
-    val List(Array(check1)) = stack1
+    val List(Seq(check1)) = stack1
     assert(check1 === 3)
     val script2 = OP_1 :: OP_1 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_3 :: OP_EQUAL :: OP_IF :: OP_5 :: OP_ENDIF :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack2 = runner.run(script2)
-    val List(Array(check2)) = stack2
+    val List(Seq(check2)) = stack2
     assert(check2 === 5)
   }
   it should "encode/decode simple numbers" in {
@@ -59,7 +59,7 @@ class ScriptSpec extends FlatSpec {
   }
   it should "encode/decode booleans" in {
     assert(Script.castToBoolean(Array.empty[Byte]) === false)
-    assert(Script.castToBoolean(Array(0, 0, 0)) === false)
+    assert(Script.castToBoolean(Seq(0, 0, 0)) === false)
     assert(Script.castToBoolean(Array(0x80.toByte)) === false)
   }
 }
