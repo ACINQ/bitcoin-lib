@@ -315,7 +315,7 @@ object Transaction extends BtcMessage[Transaction] {
         out.write(hashPrevOut)
         out.write(hashSequence)
         out.write(OutPoint.write(tx.txIn(inputIndex).outPoint, Protocol.PROTOCOL_VERSION))
-        out.write(previousOutputScript)
+        Protocol.writeScript(previousOutputScript, out)
         Protocol.writeUInt64(amount, out)
         Protocol.writeUInt32(tx.txIn(inputIndex).sequence, out)
         out.write(hashOutputs)
