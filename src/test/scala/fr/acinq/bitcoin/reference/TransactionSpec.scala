@@ -15,8 +15,9 @@ import scala.util.{Failure, Success, Try}
 object TransactionSpec {
   def process(json: JValue, valid: Boolean): Unit = {
     implicit val format = DefaultFormats
-
-    json.extract[List[List[JValue]]].filter(_.size > 1).map(_ match {
+    var comment = ""
+    json.extract[List[List[JValue]]].map(_ match {
+      case JString(value) :: Nil => comment = value
       case JArray(m) :: JString(serializedTransaction) :: JString(verifyFlags) :: Nil => {
         val prevoutMap = collection.mutable.HashMap.empty[OutPoint, BinaryData]
         val prevamountMap = collection.mutable.HashMap.empty[OutPoint, Long]
@@ -44,9 +45,9 @@ object TransactionSpec {
           }
         } match {
           case Success(_) if valid => ()
-          case Success(_) if !valid => throw new RuntimeException(s"$serializedTransaction should not be valid")
+          case Success(_) if !valid => throw new RuntimeException(s"$serializedTransaction should not be valid, [$comment]")
           case Failure(t) if !valid => ()
-          case Failure(t) if valid => throw new RuntimeException(s"$serializedTransaction should be valid", t)
+          case Failure(t) if valid => throw new RuntimeException(s"$serializedTransaction should be valid, [$comment]", t)
         }
       }
       case unexpected => throw new RuntimeException(s"unexpected: $unexpected")

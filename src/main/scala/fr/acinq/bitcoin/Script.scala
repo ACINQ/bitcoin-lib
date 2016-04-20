@@ -813,7 +813,7 @@ object Script {
           (witness.stack, OP_DUP :: OP_HASH160 :: OP_PUSHDATA(program) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
         case 0 if program.length == 32 =>
           // P2WPSH, program is the hash of the script, and witness is the stack + the script
-          val check: BinaryData = Crypto.hash256(witness.stack.last)
+          val check: BinaryData = Crypto.sha256(witness.stack.last)
           require(check == program, "witness program mismatch")
           (witness.stack.dropRight(1), Script.parse(witness.stack.last))
         case 0 =>
@@ -826,6 +826,7 @@ object Script {
       }
       stack.foreach(item => require(item.length <= MaxScriptElementSize, "item is bigger than maximum push size"))
 
+      // FIXME: stack.map(...) is fugly
       val stack1 = run(scriptPubKey, stack.map(_.toSeq).toList.reverse, signatureVersion = 1)
       require(stack1.length == 1)
       require(castToBoolean(stack1.head))
@@ -868,7 +869,7 @@ object Script {
 
       val stack1 = if ((scriptFlag & SCRIPT_VERIFY_WITNESS) != 0) {
         spub match {
-          case op :: OP_PUSHDATA(program, _) :: Nil if isSimpleValue(op) && program.length >= 2 && program.length <= 32 => {
+          case op :: OP_PUSHDATA(program, code) :: Nil if isSimpleValue(op) && OP_PUSHDATA.isMinimal(program, code) && program.length >= 2 && program.length <= 32 => {
             val witnessVersion = simpleValue(op)
             require(ssig.isEmpty, "Malleated segwit script")
             verifyWitnessProgram(witness, witnessVersion, program)
