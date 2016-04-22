@@ -822,7 +822,7 @@ object Script {
           throw new IllegalArgumentException(s"Invalid witness version: ${witnessVersion}")
         case _ =>
           // Higher version witness scripts return true for future softfork compatibility
-          return true
+          return
       }
       stack.foreach(item => require(item.length <= MaxScriptElementSize, "item is bigger than maximum push size"))
 

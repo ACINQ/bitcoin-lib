@@ -381,7 +381,7 @@ object Block extends BtcMessage[Block] {
 
   override def validate(input: Block): Unit = {
     BlockHeader.validate(input.header)
-    require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx.map(_.hash))), "invalid block:  merkle root mismatch")
+    require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx.map(_.hash.toSeq))), "invalid block:  merkle root mismatch")
     require(input.tx.map(_.txid).toSet.size == input.tx.size, "invalid block: duplicate transactions")
     input.tx.map(Transaction.validate)
   }

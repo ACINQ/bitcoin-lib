@@ -79,7 +79,7 @@ object Crypto {
     bos.toByteArray
   }
 
-  def encodeSignature(t: (BigInteger, BigInteger)): Array[Byte] = encodeSignature(t._1, t._2)
+  def encodeSignature(t: (BigInteger, BigInteger)): Seq[Byte] = encodeSignature(t._1, t._2)
 
   def isDERSignature(sig: Seq[Byte]): Boolean = {
     require(sig.length >= 9 && sig.length <= 73)

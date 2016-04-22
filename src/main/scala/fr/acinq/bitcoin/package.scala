@@ -29,7 +29,9 @@ package object bitcoin {
   }
 
   sealed trait BtcAmount
-  case class Satoshi(amount: Long) extends BtcAmount
+  case class Satoshi(amount: Long) extends BtcAmount {
+    def toLong = amount
+  }
   case class MilliBtc(amount: BigDecimal) extends BtcAmount
   case class Btc(amount: BigDecimal) extends BtcAmount
 

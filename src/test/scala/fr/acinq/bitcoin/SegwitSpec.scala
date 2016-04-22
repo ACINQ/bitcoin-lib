@@ -45,4 +45,57 @@ class SegwitSpec extends FunSuite {
     val runner = new Script.Runner(new Script.Context(tx, 1, 600000000), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(runner.verifyScripts(tx.txIn(1).signatureScript, pubKeyScript, tx.witness(1)))
   }
+
+  test("tx p2pkh verification") {
+    val tx1 = Transaction.read("01000000016e21b8c625d9955e48de0a6bbcd57b03624620a93536ddacabc19d024c330f04010000006a47304402204d34da42ad349a1c93e2bea2933c0bfb3dae6b06b01fa800315231139d3a8f8002204b5984f64b2564ff4fcdb67ae28ba94172681dead36e2ba64532795e30d4a030012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac019ffffffff0180f0fa02000000001600140f66351d05269952302a607b4d6fb69517387a9700000000", Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_WITNESS)
+    val tx2 = Transaction.read("0100000000010146cf03f5df6e9a36b1409e66791dea53b22cb330e51239ebd15f12d269e0adc40000000000ffffffff0180f0fa02000000001600140f66351d05269952302a607b4d6fb69517387a9702483045022100b2b47d485f897c428b284eefc5f0e0bf854aac0ac9de21d5eb4984eec8bd21d702206ab2c763bf8c95e2aa924c628dd696adff659fed9cff1d7ed2bc617206ab06e5012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac01900000000", Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_WITNESS)
+    Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+  }
+
+  test("create p2pkh tx") {
+    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
+    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1))
+
+    assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
+
+    val pversion = Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_WITNESS
+
+    // this is a standard tx that sends 0.5 BTC to D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap
+    val tx1 = Transaction.read("0100000001b5bace8f333a944977dbd9eb0904c81baa1b4e5a5863f4948747663bef1ff89b010000006b48304502210093b6ed5b0f3c27752e5cc12f608e7dc4feff2c2e515eddc078b7ef87ad715d94022061c7247608cbacc96e9238f3b965180f38ffdefb368d7c6231d7bacc511d863e012103c628be57db41f24d84abd5a4d05bf2eb0c7ceb064066c2aeeedf2f05ffc7463cfeffffff02e0b8f505000000001976a914f01addb5b6ca589b176a173efb0e6a3a247ec8b288ac80f0fa02000000001976a9140f66351d05269952302a607b4d6fb69517387a9788ac58460000", pversion)
+
+    // now let's create a simple tx that spends tx1 and send 0.5 BTC to P2WPK output
+    val tx2 = {
+      val tmp = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx1.hash, 1), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.5 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      Transaction.sign(tmp, Seq(SignData(tx1.txOut(1).publicKeyScript, priv1)))
+    }
+    Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    println(BinaryData(Transaction.write(tx2, pversion)))
+    // was published as 01000000016e21b8c625d9955e48de0a6bbcd57b03624620a93536ddacabc19d024c330f04010000006a47304402204d34da42ad349a1c93e2bea2933c0bfb3dae6b06b01fa800315231139d3a8f8002204b5984f64b2564ff4fcdb67ae28ba94172681dead36e2ba64532795e30d4a030012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac019ffffffff0180f0fa02000000001600140f66351d05269952302a607b4d6fb69517387a9700000000
+    // id c4ade069d2125fd1eb3912e530b32cb253ea1d79669e40b1369a6edff503cf46
+
+
+    // and now we create a segwit tx that spends the P2WPK output
+    val tx3 = {
+      val tmp = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.5 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      val pubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
+      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount.amount, 1)
+      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1.take(32)))
+      val witness = ScriptWitness(Seq(sig :+ SIGHASH_ALL.toByte, pub1))
+      tmp.copy(witness = Seq(witness))
+    }
+
+    Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    println(BinaryData(Transaction.write(tx3, pversion)))
+    // was published as 0100000000010146cf03f5df6e9a36b1409e66791dea53b22cb330e51239ebd15f12d269e0adc40000000000ffffffff0180f0fa02000000001600140f66351d05269952302a607b4d6fb69517387a9702483045022100b2b47d485f897c428b284eefc5f0e0bf854aac0ac9de21d5eb4984eec8bd21d702206ab2c763bf8c95e2aa924c628dd696adff659fed9cff1d7ed2bc617206ab06e5012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac01900000000
+    // id 4350becf32be78d09597fe597e948b4ce3b97ce9d9bafcdd1269fb14c792fbfb
+  }
 }

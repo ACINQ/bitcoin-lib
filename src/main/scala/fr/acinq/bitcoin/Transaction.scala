@@ -37,7 +37,7 @@ case class OutPoint(hash: BinaryData, index: Long) {
     *
     * @return the id of the transaction this output belongs to
     */
-  def txid = hash.data.reverse
+  val txid: BinaryData = hash.data.reverse
 }
 
 object TxIn extends BtcMessage[TxIn] {
@@ -416,8 +416,8 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
   * @param lockTime The block number or timestamp at which this transaction is locked
   */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long, witness: Seq[ScriptWitness]) {
-  lazy val hash = Crypto.hash256(Transaction.write(this))
-  lazy val txid = hash.reverse
+  lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this))
+  lazy val txid: BinaryData = hash.reverse
 
   /**
     *
