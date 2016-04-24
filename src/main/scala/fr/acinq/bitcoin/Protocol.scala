@@ -386,7 +386,7 @@ object Block extends BtcMessage[Block] {
     input.tx.map(Transaction.validate)
   }
 
-  // genesis block
+  // genesis blocks
   val LivenetGenesisBlock = {
     val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(writeUInt8(4)) :: OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8")) :: Nil
     val scriptPubKey = OP_PUSHDATA("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") :: OP_CHECKSIG :: Nil
@@ -400,12 +400,12 @@ object Block extends BtcMessage[Block] {
     )
   }
 
-  // testnet genesis block
   val TestnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
 
   val RegtestGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 0x207fffffL, nonce = 2, time = 1296688602))
 
-  // mine.header.copy(bits = 0x0x207fffffL, nonce = 2, time = 1296688602)
+  val SegnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 503447551, time = 1452831101, nonce = 0))
+  
   /**
    * Proof of work: hash(block) <= target difficulty
     *
