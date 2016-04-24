@@ -92,7 +92,7 @@ class SegwitSpec extends FunSuite {
         txOut = TxOut(0.38 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
         lockTime = 0
       )
-      // mid this: the pubkey script used for signing is not the prevout pubscript (which is just a push
+      // mind this: the pubkey script used for signing is not the prevout pubscript (which is just a push
       // of the pubkey hash), but the actual script that is evaluated by the script engine
       val pubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
       val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount.toLong, 1, priv1, randomize = false)
