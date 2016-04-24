@@ -150,10 +150,25 @@ case class ScriptWitness(stack: Seq[BinaryData]) {
 object Transaction extends BtcMessage[Transaction] {
   val SERIALIZE_TRANSACTION_WITNESS = 0x40000000L
 
+  /**
+    *
+    * @param version protocol version (and NOT transaction version !)
+    * @return true if protocol version specifies that witness data is to be serialized
+    */
   def serializeTxWitness(version: Long): Boolean = (version & SERIALIZE_TRANSACTION_WITNESS) != 0
 
+  /**
+    *
+    * @param witness transaction witness data
+    * @return true if witness is not empty
+    */
   def isNotNull(witness: Seq[ScriptWitness]) = witness.exists(_.isNotNull)
 
+  /**
+    *
+    * @param witness transaction witness data
+    * @return true if witness is empty
+    */
   def isNull(witness: Seq[ScriptWitness]) = !isNotNull(witness)
 
   def apply(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) = new Transaction(version, txIn, txOut, lockTime, Seq.fill(txIn.size)(ScriptWitness.empty))
@@ -289,9 +304,8 @@ object Transaction extends BtcMessage[Transaction] {
     * @param inputIndex index of the tx input that is being processed
     * @param previousOutputScript public key script of the output claimed by this tx input
     * @param sighashType signature hash type
-    * @param sighashType
-    * @param amount
-    * @return
+    * @param amount amount of the output claimed by this input
+    * @return a hash which can be used to sign the referenced tx input
     */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Long, signatureVersion: Int): Seq[Byte] = {
     signatureVersion match {
@@ -328,7 +342,30 @@ object Transaction extends BtcMessage[Transaction] {
     }
   }
 
+
   /**
+    * sign a tx input
+    * @param tx input transaction
+    * @param inputIndex index of the tx input that is being processed
+    * @param previousOutputScript public key script of the output claimed by this tx input
+    * @param sighashType signature hash type, which will be appended to the signature
+    * @param amount amount of the output claimed by this tx input
+    * @param signatureVersion signature version (1: segwit, 0: pre-segwit)
+    * @param privateKey private key
+    * @param randomize if false, the output signature will not be randomized (use for testing only)
+    * @return the encoded signature of this tx for this specific tx input
+    */
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, amount: Long, signatureVersion: Int, privateKey: Seq[Byte], randomize: Boolean): Seq[Byte] = {
+    val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
+    val (r, s) = Crypto.sign(hash, privateKey.take(32), randomize)
+    val sig = Crypto.encodeSignature(r, s)
+    sig :+ (sighashType.toByte)
+  }
+
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, amount: Long, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] =
+    signInput(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion, privateKey, true)
+
+    /**
     *
     * @param tx input transaction
     * @param inputIndex index of the tx input that is being processed
@@ -338,14 +375,13 @@ object Transaction extends BtcMessage[Transaction] {
     * @param randomize if false, the output signature will not be randomized (use for testing only)
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, privateKey: Seq[Byte], randomize: Boolean = true): Seq[Byte] = {
-    val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
-    val (r, s) = Crypto.sign(hash, privateKey.take(32), randomize)
-    val sig = Crypto.encodeSignature(r, s)
-    sig :+ (sighashType.toByte)
-  }
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, privateKey: Seq[Byte], randomize: Boolean): Seq[Byte] =
+      signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0, signatureVersion = 0, privateKey, randomize)
 
-  /**
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, privateKey: Seq[Byte]): Seq[Byte] =
+    signInput(tx, inputIndex, previousOutputScript, sighashType, privateKey, true)
+
+    /**
     * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
     *
     * @param input transaction to sign

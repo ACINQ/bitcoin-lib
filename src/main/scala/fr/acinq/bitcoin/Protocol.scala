@@ -405,7 +405,7 @@ object Block extends BtcMessage[Block] {
   val RegtestGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 0x207fffffL, nonce = 2, time = 1296688602))
 
   val SegnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 503447551, time = 1452831101, nonce = 0))
-  
+
   /**
    * Proof of work: hash(block) <= target difficulty
     *
@@ -437,6 +437,7 @@ object Message extends BtcMessage[Message] {
   val MagicTestNet = 0xDAB5BFFAL
   val MagicTestnet3 = 0x0709110BL
   val MagicNamecoin = 0xFEB4BEF9L
+  val MagicSegnet =  0xC4A1ABDC
 
   override def read(in: InputStream, protocolVersion: Long): Message = {
     val magic = uint32(in)
