@@ -600,7 +600,7 @@ object Script {
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
             // remove signature from script
-            val scriptCode1 = removeSignature(scriptCode, sigBytes)
+            val scriptCode1 = if (signatureVersion == 0) removeSignature(scriptCode, sigBytes) else scriptCode
             val result = checkSignature(pubKey, sigBytes, Script.write(scriptCode1), signatureVersion)
             run(tail, (if (result) True else False) :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
           }
@@ -857,7 +857,12 @@ object Script {
         }
         else true
       }
-
+      if ((scriptFlag & SCRIPT_VERIFY_WITNESS) != 0) {
+        // We can't check for correct unexpected witness data if P2SH was off, so require
+        // that WITNESS implies P2SH. Otherwise, going from WITNESS->P2SH+WITNESS would be
+        // possible, which is not a softfork.
+        require((scriptFlag & SCRIPT_VERIFY_P2SH) != 0)
+      }
       val ssig = Script.parse(scriptSig)
       if (((scriptFlag & SCRIPT_VERIFY_SIGPUSHONLY) != 0) && !Script.isPushOnly(ssig)) throw new RuntimeException("signature script is not PUSH-only")
       val stack = run(ssig)
@@ -867,9 +872,11 @@ object Script {
       require(!stack0.isEmpty, "Script verification failed, stack should not be empty")
       require(castToBoolean(stack0.head), "Script verification failed, stack starts with 'false'")
 
+      var hadWitness = false
       val stack1 = if ((scriptFlag & SCRIPT_VERIFY_WITNESS) != 0) {
         spub match {
           case op :: OP_PUSHDATA(program, code) :: Nil if isSimpleValue(op) && OP_PUSHDATA.isMinimal(program, code) && program.length >= 2 && program.length <= 32 => {
+            hadWitness = true
             val witnessVersion = simpleValue(op)
             require(ssig.isEmpty, "Malleated segwit script")
             verifyWitnessProgram(witness, witnessVersion, program)
@@ -879,7 +886,7 @@ object Script {
         }
       } else stack0
 
-      if (((scriptFlag & SCRIPT_VERIFY_P2SH) != 0) && Script.isPayToScript(scriptPubKey)) {
+      val stack2 = if (((scriptFlag & SCRIPT_VERIFY_P2SH) != 0) && Script.isPayToScript(scriptPubKey)) {
         // scriptSig must be literals-only or validation fails
         if (!Script.isPushOnly(ssig)) throw new RuntimeException("signature script is not PUSH-only")
 
@@ -889,24 +896,28 @@ object Script {
         // if we got here after running script pubkey, it means that hash == HASH160(serialized script)
         // and stack would be serialized_script :: sigN :: ... :: sig1 :: Nil
         // we pop the first element of the stack, deserialize it and run it against the rest of the stack
-        val stack2 = run(stack.head, stack.tail)
-        require(!stack2.isEmpty, "Script verification failed, stack should not be empty")
-        require(castToBoolean(stack2.head), "Script verification failed, stack starts with 'false'")
+        val stackp2sh = run(stack.head, stack.tail)
+        require(!stackp2sh.isEmpty, "Script verification failed, stack should not be empty")
+        require(castToBoolean(stackp2sh.head), "Script verification failed, stack starts with 'false'")
 
         if ((scriptFlag & SCRIPT_VERIFY_WITNESS) != 0) {
           Script.parse(stack.head) match {
             case op :: OP_PUSHDATA(program, _) :: Nil if isSimpleValue(op) && program.length >= 2 && program.length <= 32 => {
+              hadWitness = true
               val witnessVersion = simpleValue(op)
               //require(ssig.isEmpty, "Malleated segwit script")
               verifyWitnessProgram(witness, witnessVersion, program)
-              true
             }
-            case _ => true
+            case _ => ()
           }
-        } else checkStack(stack2)
-      } else {
-        checkStack(stack1)
+        }
+        stackp2sh
+      } else stack1
+
+      if ((scriptFlag & SCRIPT_VERIFY_WITNESS) != 0 && !hadWitness) {
+        require(witness.isNull)
       }
+      checkStack(stack2)
     }
   }
 
