@@ -33,7 +33,9 @@ package object bitcoin {
     def toLong = amount
   }
   case class MilliBtc(amount: BigDecimal) extends BtcAmount
-  case class Btc(amount: BigDecimal) extends BtcAmount
+  case class Btc(amount: BigDecimal) extends BtcAmount {
+    require(amount.abs <= 21e6, "amount must not be greater than 21 millions")
+  }
 
   implicit final class SatoshiLong(private val n: Long) extends AnyVal {
     def satoshi = Satoshi(n)

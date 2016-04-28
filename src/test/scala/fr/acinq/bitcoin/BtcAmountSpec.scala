@@ -6,6 +6,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class BtcAmountSpec extends FunSuite {
+
   test("btc/satoshi conversions") {
     val x = 12.34567 btc
     val y: MilliBtc = x
@@ -18,5 +19,11 @@ class BtcAmountSpec extends FunSuite {
     assert(x1 === x)
     val x2: MilliBtc = z1
     assert(x2 === y)
+  }
+
+  test("conversions overflow") {
+    intercept[IllegalArgumentException] {
+      val toomany = 22e6 btc
+    }
   }
 }
