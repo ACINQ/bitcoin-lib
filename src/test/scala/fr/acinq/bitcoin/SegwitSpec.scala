@@ -154,4 +154,39 @@ class SegwitSpec extends FunSuite {
     assert(tx3.txid == BinaryData("943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb"))
     // this tx was published on segnet as 943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb
   }
+
+  test("create p2pkh embedded in p2sh") {
+    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
+    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
+
+    // p2wpkh script
+    val script = Script.write(OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil)
+
+    // which we embeed into a standard p2sh script
+    val p2shaddress = Base58Check.encode(Base58.Prefix.ScriptAddressSegnet, Crypto.hash160(script))
+    assert(p2shaddress === "MDbNMghDbaaizHz8pSgMqu9qJXvKwouqkM")
+
+
+    // this tx send 0.5 btc to our p2shaddress
+    val tx = Transaction.read("010000000175dd435bf25e5d77567272f7d6eefcf37b7156b78bb233490140d6fa7545cfca010000006a47304402206e601a482b301141cb3a1712c18729fa1f1731fce5c4205ac9d344af38bb24bf022003fe70edcbd1a5b3957b3c939e583739eadb8de8d3d2cc2ad2903b19c991cb80012102ba2558223d7cd5df2d8decc4506a62ccaa96159f685360335c280952b25e7adefeffffff02692184df000000001976a9148b3ee15d631122010d31e1774aa318ca9ca8b67088ac80f0fa020000000017a9143e73638f202bb880a28e8df1946adc3058227d11878c730000", pversion)
+
+    // let's spend it:
+
+    val tx1 = {
+      val tmp = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx.hash, 1), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.49 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      val pubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
+      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount.toLong, 1)
+      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
+      val witness = ScriptWitness(Seq(sig, pub1))
+      tmp.updateSigScript(0, OP_PUSHDATA(script) :: Nil).copy(witness = Seq(witness))
+    }
+
+    Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    assert(tx1.txid === BinaryData("98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
+    // this tx was published on segnet as 98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5
+  }
 }

@@ -880,7 +880,7 @@ object Script {
             val witnessVersion = simpleValue(op)
             require(ssig.isEmpty, "Malleated segwit script")
             verifyWitnessProgram(witness, witnessVersion, program)
-            List(stack0.head)
+            stack0.take(1)
           }
           case _ => stack0
         }
@@ -907,11 +907,11 @@ object Script {
               val witnessVersion = simpleValue(op)
               //require(ssig.isEmpty, "Malleated segwit script")
               verifyWitnessProgram(witness, witnessVersion, program)
+              stackp2sh.take(1)
             }
-            case _ => ()
+            case _ => stackp2sh
           }
-        }
-        stackp2sh
+        } else stackp2sh
       } else stack1
 
       if ((scriptFlag & SCRIPT_VERIFY_WITNESS) != 0 && !hadWitness) {
