@@ -235,10 +235,10 @@ object Transaction extends BtcMessage[Transaction] {
   /**
     * prepare a transaction for signing a specific input
     *
-    * @param tx input transaction
-    * @param inputIndex index of the tx input that is being processed
+    * @param tx                   input transaction
+    * @param inputIndex           index of the tx input that is being processed
     * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType signature hash type
+    * @param sighashType          signature hash type
     * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
     */
   def prepareForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Array[Byte], sighashType: Int): Transaction = {
@@ -283,10 +283,10 @@ object Transaction extends BtcMessage[Transaction] {
   /**
     * hash a tx for signing (pre-segwit)
     *
-    * @param tx input transaction
-    * @param inputIndex index of the tx input that is being processed
+    * @param tx                   input transaction
+    * @param inputIndex           index of the tx input that is being processed
     * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType signature hash type
+    * @param sighashType          signature hash type
     * @return a hash which can be used to sign the referenced tx input
     */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int): Seq[Byte] = {
@@ -300,11 +300,12 @@ object Transaction extends BtcMessage[Transaction] {
 
   /**
     * hash a tx for signing
-    * @param tx input transaction
-    * @param inputIndex index of the tx input that is being processed
+    *
+    * @param tx                   input transaction
+    * @param inputIndex           index of the tx input that is being processed
     * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType signature hash type
-    * @param amount amount of the output claimed by this input
+    * @param sighashType          signature hash type
+    * @param amount               amount of the output claimed by this input
     * @return a hash which can be used to sign the referenced tx input
     */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Long, signatureVersion: Int): Seq[Byte] = {
@@ -318,7 +319,7 @@ object Transaction extends BtcMessage[Transaction] {
           Crypto.hash256(tx.txIn.map(_.sequence).map(Protocol.writeUInt32).flatten)
         } else Hash.Zeroes
 
-        val hashOutputs: BinaryData =  if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
+        val hashOutputs: BinaryData = if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
           Crypto.hash256(tx.txOut.map(TxOut.write(_, Protocol.PROTOCOL_VERSION)).flatten)
         } else if (isHashSingle(sighashType) && inputIndex < tx.txOut.size) {
           Crypto.hash256(TxOut.write(tx.txOut(inputIndex), Protocol.PROTOCOL_VERSION))
@@ -345,14 +346,15 @@ object Transaction extends BtcMessage[Transaction] {
 
   /**
     * sign a tx input
-    * @param tx input transaction
-    * @param inputIndex index of the tx input that is being processed
+    *
+    * @param tx                   input transaction
+    * @param inputIndex           index of the tx input that is being processed
     * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType signature hash type, which will be appended to the signature
-    * @param amount amount of the output claimed by this tx input
-    * @param signatureVersion signature version (1: segwit, 0: pre-segwit)
-    * @param privateKey private key
-    * @param randomize if false, the output signature will not be randomized (use for testing only)
+    * @param sighashType          signature hash type, which will be appended to the signature
+    * @param amount               amount of the output claimed by this tx input
+    * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+    * @param privateKey           private key
+    * @param randomize            if false, the output signature will not be randomized (use for testing only)
     * @return the encoded signature of this tx for this specific tx input
     */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, amount: Long, signatureVersion: Int, privateKey: Seq[Byte], randomize: Boolean): Seq[Byte] = {
@@ -365,27 +367,27 @@ object Transaction extends BtcMessage[Transaction] {
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, amount: Long, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] =
     signInput(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion, privateKey, true)
 
-    /**
+  /**
     *
-    * @param tx input transaction
-    * @param inputIndex index of the tx input that is being processed
+    * @param tx                   input transaction
+    * @param inputIndex           index of the tx input that is being processed
     * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType signature hash type, which will be appended to the signature
-    * @param privateKey private key
-    * @param randomize if false, the output signature will not be randomized (use for testing only)
+    * @param sighashType          signature hash type, which will be appended to the signature
+    * @param privateKey           private key
+    * @param randomize            if false, the output signature will not be randomized (use for testing only)
     * @return the encoded signature of this tx for this specific tx input
     */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, privateKey: Seq[Byte], randomize: Boolean): Seq[Byte] =
-      signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0, signatureVersion = 0, privateKey, randomize)
+    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0, signatureVersion = 0, privateKey, randomize)
 
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[Byte], sighashType: Int, privateKey: Seq[Byte]): Seq[Byte] =
     signInput(tx, inputIndex, previousOutputScript, sighashType, privateKey, true)
 
-    /**
+  /**
     * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
     *
-    * @param input transaction to sign
-    * @param signData list of data for signing: previous tx output script and associated private key
+    * @param input     transaction to sign
+    * @param signData  list of data for signing: previous tx output script and associated private key
     * @param randomize if false, signature will not be randomized. Use for debugging purposes only!
     * @return a new signed transaction
     */
@@ -407,28 +409,32 @@ object Transaction extends BtcMessage[Transaction] {
 
     input.copy(txIn = signedInputs)
   }
-
-  /**
-    * checks that a transaction correctly spends its inputs (i.e is properly signed)
-    *
-    * @param tx transaction to be checked
-    * @param inputs previous tx that are being spent
-    * @param scriptFlags script execution flags
-    * @throws RuntimeException if the transaction is not valid (i.e executing input and output scripts does not yield "true")
-    */
-  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
-    val txMap = inputs.map(t => t.txid -> t).toMap
+  
+  def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
     for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
-      val prevTx = txMap(tx.txIn(i).outPoint.txid)
-      val prevOutputScript = prevTx.txOut(tx.txIn(i).outPoint.index.toInt).publicKeyScript
-      val amount = prevTx.txOut(tx.txIn(i).outPoint.index.toInt).amount
-      val ctx = new Script.Context(tx, i, amount.amount)
+      val prevOutput = previousOutputs(tx.txIn(i).outPoint)
+      val prevOutputScript = prevOutput.publicKeyScript
+      val amount = prevOutput.amount
+      val ctx = new Script.Context(tx, i, amount.toLong)
       val runner = new Script.Runner(ctx, scriptFlags, callback)
       if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.witness(i))) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
     }
   }
 
-  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = correctlySpends(tx, inputs, scriptFlags, None)
+  def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int): Unit =
+    correctlySpends(tx, previousOutputs, scriptFlags, None)
+
+  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
+    val prevouts = tx.txIn.map(_.outPoint).map(outpoint => {
+      val prevTx = inputs.find(_.txid == outpoint.txid).get
+      val prevOutput = prevTx.txOut(outpoint.index.toInt)
+      outpoint -> prevOutput
+    }).toMap
+    correctlySpends(tx, prevouts, scriptFlags, callback)
+  }
+
+  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit =
+    correctlySpends(tx, inputs, scriptFlags, None)
 }
 
 object SignData {
