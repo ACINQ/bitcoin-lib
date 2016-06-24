@@ -157,9 +157,16 @@ object DeterministicWallet {
 
   def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent)(derivePublicKey)
 
+  // mainnet
   val xprv = 0x0488ade4
-  val tprv = 0x04358394
   val xpub = 0x0488b21e
+
+  // testnet
+  val tprv = 0x04358394
   val tpub = 0x043587cf
+
+  // segnet
+  val sprv = 0x05358394
+  val spub = 0x053587cf
 }
 

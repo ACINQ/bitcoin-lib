@@ -37,7 +37,7 @@ class MultisigSpec extends FlatSpec with Matchers {
 
     // and we want to sent the output to our multisig address
     val txOut = TxOut(
-      amount = 900000, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
+      amount = 900000 satoshi, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
       publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil))
 
     // create a tx with empty input signature scripts
@@ -61,7 +61,7 @@ class MultisigSpec extends FlatSpec with Matchers {
 
     val dest = "msCMyGGJ5eRcUgM5SQkwirVQGbGcr9oaYv" //priv: 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
     // 0.008 BTC in satoshi, meaning the fee will be 0.009-0.008 = 0.001
-    val amount = 800000
+    val amount = 800000 satoshi
 
     // create a tx with empty input signature scripts
     val tx = Transaction(

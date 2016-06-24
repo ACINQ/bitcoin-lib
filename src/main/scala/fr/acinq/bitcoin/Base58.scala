@@ -25,6 +25,9 @@ object Base58 {
     val PubkeyAddressTestnet = 111.toByte
     val ScriptAddressTestnet = 196.toByte
     val SecretKeyTestnet = 239.toByte
+    val PubkeyAddressSegnet = 30.toByte
+    val ScriptAddressSegnet = 50.toByte
+    val SecretKeySegnet = 158.toByte
   }
 
   val alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -61,7 +64,7 @@ object Base58 {
    * @param input base-58 encoded data
    * @return the decoded data
    */
-  def decode(input: String) : Array[Byte] = {
+  def decode(input: String) : BinaryData = {
     val zeroes = input.takeWhile(_ == '1').map(_ => 0:Byte).toArray
     val trim  = input.dropWhile(_ == '1').toList
     val decoded = trim.foldLeft(BigInteger.ZERO)((a, b) => a.multiply(BigInteger.valueOf(58L)).add(BigInteger.valueOf(map(b))))
@@ -119,13 +122,11 @@ object Base58Check {
    * @return a (prefix, data) tuple
    * @throws RuntimeException if the checksum that is part of the encoded data cannot be verified
    */
-  def decode(encoded: String) : (Byte, Array[Byte]) = {
+  def decode(encoded: String) : (Byte, Seq[Byte]) = {
     val raw = Base58.decode(encoded)
     val versionAndHash = raw.dropRight(4)
     val checksum = raw.takeRight(4)
-    if (!util.Arrays.equals(checksum, Base58Check.checksum(versionAndHash))) {
-      throw new RuntimeException(s"invalid Base58Check data $encoded")
-    }
+    require(checksum ==  Base58Check.checksum(versionAndHash), s"invalid Base58Check data $encoded")
     (versionAndHash(0), versionAndHash.tail)
   }
 }

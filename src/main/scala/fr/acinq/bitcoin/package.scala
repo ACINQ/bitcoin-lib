@@ -28,6 +28,64 @@ package object bitcoin {
     val One: BinaryData = "0100000000000000000000000000000000000000000000000000000000000000"
   }
 
+  sealed trait BtcAmount
+
+  case class Satoshi(amount: Long) extends BtcAmount {
+    // @formatter:off
+    def toLong = amount
+    def +(other: Satoshi) = Satoshi(amount + other.amount)
+    def -(other: Satoshi) = Satoshi(amount - other.amount)
+    def *(m: Long) = Satoshi(amount * m)
+    def /(d: Long) = Satoshi(amount / d)
+    def compare(other: Satoshi): Int = if (amount == other.toLong) 0 else if (amount < other.amount) -1 else 1
+    // @formatter:on
+  }
+
+  implicit object NumericSatoshi extends Numeric[Satoshi] {
+    // @formatter:off
+    override def plus(x: Satoshi, y: Satoshi): Satoshi = x + y
+    override def toDouble(x: Satoshi): Double = x.toLong
+    override def toFloat(x: Satoshi): Float = x.toLong
+    override def toInt(x: Satoshi): Int = x.toLong.toInt
+    override def negate(x: Satoshi): Satoshi = Satoshi(-x.amount)
+    override def fromInt(x: Int): Satoshi = Satoshi(x)
+    override def toLong(x: Satoshi): Long = x.toLong
+    override def times(x: Satoshi, y: Satoshi): Satoshi = ???
+    override def minus(x: Satoshi, y: Satoshi): Satoshi = ???
+    override def compare(x: Satoshi, y: Satoshi): Int = x.compare(y)
+    // @formatter:on
+  }
+
+  case class MilliBtc(amount: BigDecimal) extends BtcAmount
+
+  case class Btc(amount: BigDecimal) extends BtcAmount {
+    require(amount.abs <= 21e6, "amount must not be greater than 21 millions")
+  }
+
+  implicit final class SatoshiLong(private val n: Long) extends AnyVal {
+    def satoshi = Satoshi(n)
+  }
+
+  implicit final class BtcDouble(private val n: Double) extends AnyVal {
+    def btc = Btc(n)
+  }
+
+  implicit final class MilliBtcDouble(private val n: Double) extends AnyVal {
+    def millibtc = MilliBtc(n)
+  }
+
+  implicit def satoshi2btc(input: Satoshi): Btc = Btc(BigDecimal(input.amount) / Coin)
+
+  implicit def btc2satoshi(input: Btc): Satoshi = Satoshi((input.amount * Coin).toLong)
+
+  implicit def satoshi2millibtc(input: Satoshi): MilliBtc = btc2millibtc(satoshi2btc(input))
+
+  implicit def millibtc2satoshi(input: MilliBtc): Satoshi = btc2satoshi(millibtc2btc(input))
+
+  implicit def btc2millibtc(input: Btc): MilliBtc = MilliBtc(input.amount * 1000L)
+
+  implicit def millibtc2btc(input: MilliBtc): Btc = Btc(input.amount / 1000L)
+
   def toHexString(blob: Seq[Byte]) = blob.map("%02x".format(_)).mkString
 
   def fromHexString(hex: String): Array[Byte] = hex.stripPrefix("0x").sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)

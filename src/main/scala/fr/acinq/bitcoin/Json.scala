@@ -49,7 +49,7 @@ object Json {
     val txid = transaction.txid
     val ins = transaction.txIn.map(convert)
     val outs = transaction.txOut.zipWithIndex.map { case (out, index) =>
-      TxOut(out.amount, index, ScriptPubKey(out.publicKeyScript, testnet))
+      TxOut(out.amount.amount, index, ScriptPubKey(out.publicKeyScript, testnet))
     }
     Tx(txid.toString, transaction.version, transaction.lockTime, ins, outs)
   }

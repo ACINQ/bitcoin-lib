@@ -10,7 +10,7 @@ This is a simple scala library which implements most of the bitcoin protocol:
 
 * base58 encoding/decoding
 * block headers, block and tx parsing
-* tx signature and verification
+* tx creation, signature and verification
 * script parsing and execution (including OP_CLTV and OP_CSV)
 * pay to public key tx
 * pay to script tx / multisig tx
@@ -20,14 +20,15 @@ This is a simple scala library which implements most of the bitcoin protocol:
 
 ## Objectives
 
-Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We also use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes.
+Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes. And, of course, we use it for our own work on Lightning.
 
 ## Status
 - [X] Message parsing (blocks, transactions, inv, ...)
-- [X] Building transactions (P2PK, P2PKH, P2SH)
+- [X] Building transactions (P2PK, P2PKH, P2SH, P2WPK, P2WSH)
 - [X] Signing transactions
 - [X] Verifying signatures
 - [X] Passing core reference tests (scripts & transactions)
+- [X] Passing core reference segwit tests
 
 ## Configuring maven/sbt
 
@@ -57,7 +58,16 @@ The latest snapshot (development) version is 0.9.6-SNAPSHOT, the latest released
 
 Please have a look at unit tests, more samples will be added soon.
 
-### Public keys, private keys, addresses
+### Basic type: public keys, private keys, addresses
+
+Public keys, private keys, and signature are represented by simple byte sequences. There is a simple BinaryData type
+that can be used to convert to/from Array[Byte], Seq[Byte], and hexadecimal Strings.
+
+As much as possible, the library uses and produces raw binary data, without fancy wrapper types and encoding. This should
+make importing/exporting data from/to other libraries easy. It also makes it easy to use binary data used in examples, books,
+or produced by debugging tools.
+
+The following REPL session shows how to create and use keys and addresses:
 
 ```shell
 
@@ -88,7 +98,22 @@ res3: String = KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ
 
 ```
 
-### Pay to Public Key
+### Building and verifying transactions
+
+The Transaction class can be used to create, serialize, deserialize, sign and validate bitcoin transactions.
+
+#### P2PKH transactions
+
+A P2PKH transactions sends bitcoins to a public key hash, using a standard P2PKH script:
+``` scala
+val pkh = Crypto.hash160(pubKey)
+val pubKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pkh) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
+```
+To spend it, just provide a signature and the public key:
+```scala
+val sigScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil
+```
+This sample demonstrates how to serialize, create and verify simple P2PKH transactions.
 
 ```scala
   // simple pay to PK tx
@@ -114,7 +139,22 @@ res3: String = KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ
   Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 ```
 
-### Pay to Script: multisig transactions
+#### P2SH transactions
+
+A P2SH transactions sends bitcoins to a script hash:
+```scala
+val redeemScript = Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3 ))
+val multisigAddress = Crypto.hash160(redeemScript)
+val publicKeyScript = OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil
+```
+To spend it, you must provide data that will match the public key script, and the actual public key script. In our case,
+we need 2 valid signatures:
+```scala
+val redeemScript = Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3 ))
+val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
+```
+
+This sample demonstrates how to serialize, create and verify a multisig P2SH transaction
 
 ```scala
 
@@ -173,9 +213,133 @@ res3: String = KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ
   val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
   val signedSpendingTx = spendingTx.updateSigScript(0, Script.write(sigScript))
   Transaction.correctlySpends(signedSpendingTx, signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-
 ```
-### HD Wallet (BIP32)
+
+#### P2WPK transactions
+
+This is the simplest segwit transaction, equivalent to standard P2PKH transactions but more compact:
+
+```scala
+val pkh = Crypto.hash160(pubKey)
+val pubKeyScript = OP_0 :: OP_PUSHDATA(pkh) :: Nil
+```
+
+To spend them, you provide a witness that is just a push of a signature and the actual public key:
+```scala
+val witness = ScriptWitness(Seq(sig, pub1))
+```
+
+This sample demonstrates how to serialize, create and verify a P2WPK transaction
+
+```scala
+    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
+    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1))
+
+    assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
+
+    // this is a standard tx that sends 0.4 BTC to D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap
+    val tx1 = Transaction.read("010000000001014d5a1833ddd78613408d66b0189e3171aa3b5d1a5b2df4392749d39291ea73cd0000000000feffffff02005a6202000000001976a9140f66351d05269952302a607b4d6fb69517387a9788ac048b9800000000001976a914eb7c97a96fa9205b8a772d0c1d170e90a8a3098388ac02483045022100e2ccc1ab7e7e0c6bcbbdd4d9935448011b415fc1ec774416aa2760c3ae08431d022064ad6fd7c952df2b3f06a9cf94ddc9856c734c46ad43d0ab45d5ddf3b7deeef0012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac019ae590000", pversion)
+
+    // now let's create a simple tx that spends tx1 and send 0.39 BTC to P2WPK output
+    val tx2 = {
+      val tmp = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.39 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)), randomize = false)
+    }
+    Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    assert(tx2.txid == BinaryData("3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e"))
+    // this tx was published on segnet as 3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e
+
+    // and now we create a segwit tx that spends the P2WPK output
+    val tx3 = {
+      val tmp = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.38 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      // mind this: the pubkey script used for signing is not the prevout pubscript (which is just a push
+      // of the pubkey hash), but the actual script that is evaluated by the script engine
+      val pubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
+      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount.toLong, 1, priv1, randomize = false)
+      val witness = ScriptWitness(Seq(sig, pub1))
+      tmp.copy(witness = Seq(witness))
+    }
+
+    Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    assert(tx3.txid == BinaryData("a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8"))
+```
+#### P2WSH transactions
+
+P2WSH transactions are the segwit version of P2SH transactions:
+```scala
+val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
+val pubKeyScript = OP_0 :: OP_PUSHDATA(Crypto.sha256(redeemScript)) :: Nil) :: Nil,
+```
+To spend them, you provide data that wil match the publick key script, and the actual public key script:
+```scala
+val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
+val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, redeemScript))
+```
+
+This sample demonstrates how to serialize, create and verify a P2WPK transaction
+
+```scala
+    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
+    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1))
+    assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
+
+    val (Base58.Prefix.SecretKeySegnet, priv2) = Base58Check.decode("QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ")
+    val pub2: BinaryData = Crypto.publicKeyFromPrivateKey(priv2)
+
+    val (Base58.Prefix.SecretKeySegnet, priv3) = Base58Check.decode("QX3AN7b3WCAFaiCvAS2UD7HJZBsFU6r5shjfogJu55411hAF3BVx")
+    val pub3: BinaryData = Crypto.publicKeyFromPrivateKey(priv3)
+
+    // this is a standard tx that sends 0.5 BTC to D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap
+    val tx1 = Transaction.read("010000000240b4f27534e9d5529e67e52619c7addc88eff64c8e7afc9b41afe9a01c6e2aea010000006b48304502210091aed7fe956c4b2471778bfef5a323a96fee21ec6d73a9b7f363beaad135c5f302207f63b0ffc08fd905cdb87b109416c2d6d8ec56ca25dd52529c931aa1154277f30121037cb5789f1ca6c640b6d423ef71390e0b002da81db8fad4466bf6c2fdfb79a24cfeffffff6e21b8c625d9955e48de0a6bbcd57b03624620a93536ddacabc19d024c330f04010000006a47304402203fb779df3ae2bf8404e6d89f83af3adee0d0a0c4ec5a01a1e88b3aa4313df6490220608177ca82cf4f7da9820a8e8bf4266ccece9eb004e73926e414296d0635d7c1012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac019feffffff0280f0fa02000000001976a9140f66351d05269952302a607b4d6fb69517387a9788ace06d9800000000001976a91457572594090c298721e8dddcec3ac1ec593c6dcc88ac205a0000", pversion)
+
+    // now let's create a simple tx that spends tx1 and send 0.5 BTC to a P2WSH output
+    val tx2 = {
+      // our script is a 2-of-2 multisig script
+      val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
+      val tmp = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.49 btc, OP_0 :: OP_PUSHDATA(Crypto.sha256(redeemScript)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)), randomize = false)
+    }
+    Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    // this tx was published on segnet as 9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355
+
+    // and now we create a segwit tx that spends the P2WSH output
+    val tx3 = {
+      val tmp = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.48 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      val pubKeyScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
+      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount.toLong, 1)
+      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
+      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
+      val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, pubKeyScript))
+      tmp.copy(witness = Seq(witness))
+    }
+
+    Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    // this tx was published on segnet as 943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb
+```
+
+### Wallet features
+
+Bitcoin-lib provides and simple and complete implementation of BIP32 and BIP39.
+
+#### HD Wallet (BIP32)
 
 Let's play with the scala console and the first test vector from https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
 
@@ -243,7 +407,7 @@ res10: String = xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFg
 
 ```
 
-### Mnemonic code (BIP39)
+#### Mnemonic code (BIP39)
 
 ```shell
 mvn scala:console

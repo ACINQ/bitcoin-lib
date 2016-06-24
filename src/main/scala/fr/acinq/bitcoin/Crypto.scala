@@ -34,7 +34,7 @@ object Crypto {
 
   def serp(p: ECPoint): Array[Byte] = p.getEncoded(true)
 
-  def hash(digest: Digest)(input: Seq[Byte]): Array[Byte] = {
+  def hash(digest: Digest)(input: Seq[Byte]): Seq[Byte] = {
     digest.update(input.toArray, 0, input.length)
     val out = new Array[Byte](digest.getDigestSize)
     digest.doFinal(out, 0)
@@ -53,7 +53,7 @@ object Crypto {
    * @param input array of byte
    * @return the 160 bits BTC hash of input
    */
-  def hash160(input: Seq[Byte]): Array[Byte] = ripemd160(sha256(input))
+  def hash160(input: Seq[Byte]): Seq[Byte] = ripemd160(sha256(input))
 
   /**
    * 256 bits bitcoin hash
@@ -69,7 +69,7 @@ object Crypto {
    * @param s second value
    * @return (r, s) in DER format
    */
-  def encodeSignature(r: BigInteger, s: BigInteger): Array[Byte] = {
+  def encodeSignature(r: BigInteger, s: BigInteger): Seq[Byte] = {
     // Usually 70-72 bytes
     val bos = new ByteArrayOutputStream(72)
     val seq = new DERSequenceGenerator(bos)
@@ -79,7 +79,7 @@ object Crypto {
     bos.toByteArray
   }
 
-  def encodeSignature(t: (BigInteger, BigInteger)): Array[Byte] = encodeSignature(t._1, t._2)
+  def encodeSignature(t: (BigInteger, BigInteger)): Seq[Byte] = encodeSignature(t._1, t._2)
 
   def isDERSignature(sig: Seq[Byte]): Boolean = {
     require(sig.length >= 9 && sig.length <= 73)
@@ -202,7 +202,7 @@ object Crypto {
    *                  and you should specify 'false' for testing purposes only
    * @return a (r, s) ECDSA signature pair
    */
-  def sign(data: Seq[Byte], privateKey: Array[Byte], randomize: Boolean = true): (BigInteger, BigInteger) = {
+  def sign(data: Seq[Byte], privateKey: BinaryData, randomize: Boolean = true): (BigInteger, BigInteger) = {
     val signer = if (randomize) new ECDSASigner() else new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
     val privateKeyParameters = new ECPrivateKeyParameters(new BigInteger(1, privateKey), curve)
     signer.init(true, privateKeyParameters)

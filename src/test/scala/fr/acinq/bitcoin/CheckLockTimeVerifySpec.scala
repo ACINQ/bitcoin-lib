@@ -31,7 +31,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(previousTx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
-        txOut = TxOut(amount = 100, publicKeyScript = scriptPubKey) :: Nil,
+        txOut = TxOut(amount = 100 satoshi, publicKeyScript = scriptPubKey) :: Nil,
         lockTime = 100L
       )
       Transaction.sign(tmpTx, Seq(key))
@@ -49,7 +49,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
-        txOut = TxOut(amount = 100, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 satoshi, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 100L
       )
 
@@ -69,7 +69,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
-        txOut = TxOut(amount = 100, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 satoshi, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 99L
       )
 
@@ -91,7 +91,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = Array.empty[Byte]) :: Nil,
-        txOut = TxOut(amount = 100, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 satoshi, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 0L
       )
 

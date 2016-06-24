@@ -3,13 +3,19 @@ package fr.acinq.bitcoin.reference
 import java.io.InputStreamReader
 
 import fr.acinq.bitcoin._
-import org.json4s.DefaultFormats
+import org.json4s.{DefaultFormats, JValue}
+import org.json4s.JsonAST.{JArray, JDouble, JString}
 import org.json4s.jackson.JsonMethods
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{FlatSpec, FunSuite}
 import org.scalatest.junit.JUnitRunner
 
 import scala.util.Try
+
+/**
+  * bitcoin core reference script tests
+  * see bitcoin/src/test/script_tests.cpp for implementation details
+  */
 
 object ScriptSpec {
   def parseFromText(input: String): Array[Byte] = {
@@ -51,60 +57,91 @@ object ScriptSpec {
     "MINIMALDATA" -> SCRIPT_VERIFY_MINIMALDATA,
     "NULLDUMMY" -> SCRIPT_VERIFY_NULLDUMMY,
     "DISCOURAGE_UPGRADABLE_NOPS" -> SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS,
+    "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM" -> SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM,
     "CLEANSTACK" -> SCRIPT_VERIFY_CLEANSTACK,
     "CHECKLOCKTIMEVERIFY" -> SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY,
-    "CHECKSEQUENCEVERIFY" -> SCRIPT_VERIFY_CHECKSEQUENCEVERIFY
+    "CHECKSEQUENCEVERIFY" -> SCRIPT_VERIFY_CHECKSEQUENCEVERIFY,
+    "WITNESS" -> SCRIPT_VERIFY_WITNESS
   )
 
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
-  def creditTx(scriptPubKey: Array[Byte]) = Transaction(version = 1,
+  def creditTx(scriptPubKey: Array[Byte], amount: Btc) = Transaction(version = 1,
     txIn = TxIn(OutPoint(new Array[Byte](32), -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
-    txOut = TxOut(0, scriptPubKey) :: Nil,
+    txOut = TxOut(amount, scriptPubKey) :: Nil,
     lockTime = 0)
 
   def spendingTx(scriptSig: Array[Byte], tx: Transaction) = Transaction(version = 1,
     txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
-    txOut = TxOut(0, Array.empty[Byte]) :: Nil,
+    txOut = TxOut(tx.txOut(0).amount, Array.empty[Byte]) :: Nil,
     lockTime = 0)
 
-  def runTest(scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedResult: Boolean): Unit = {
+  // use 0 btc if no amount is specified
+  def runTest(witnessText: Seq[String], scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedText: String): Unit =
+    runTest(witnessText, 0 btc, scriptSigText, scriptPubKeyText, flags, comments, expectedText)
+
+  def runTest(witnessText: Seq[String], amount: Btc, scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedText: String): Unit = {
+    val witness = ScriptWitness(witnessText.map(BinaryData(_)))
     val scriptPubKey = parseFromText(scriptPubKeyText)
     val scriptSig = parseFromText(scriptSigText)
-    val tx = spendingTx(scriptSig, creditTx(scriptPubKey))
-    val ctx = Script.Context(tx, 0)
+    val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).copy(witness = Seq(witness))
+    val ctx = Script.Context(tx, 0, amount)
     val runner = new Script.Runner(ctx, parseScriptFlags(flags))
 
-    val result = Try(runner.verifyScripts(scriptSig, scriptPubKey)).getOrElse(false)
-    if (result != expectedResult) {
+    val result = Try(runner.verifyScripts(scriptSig, scriptPubKey, witness)).getOrElse(false)
+    val expected = expectedText == "OK"
+    if (result != expected) {
       throw new RuntimeException(comments.getOrElse(""))
     }
+  }
+
+  def runTest(json: JValue): Int = {
+    implicit val format = DefaultFormats
+
+    var count = 0
+    // use tail to skip the first line of the .json file
+    json.extract[List[List[JValue]]].tail.foreach(_ match {
+      case JString(comment) :: Nil => ()
+      case JString(scriptSig) :: JString(scriptPubKey) :: JString(flags) :: JString(expected) :: JString(comments) :: Nil =>
+        ScriptSpec.runTest(Seq.empty[String], scriptSig, scriptPubKey, flags, Some(comments), expected)
+        count = count + 1
+      case JString(scriptSig) :: JString(scriptPubKey) :: JString(flags) :: JString(expected) :: Nil =>
+        ScriptSpec.runTest(Seq.empty[String], scriptSig, scriptPubKey, flags, None, expected)
+        count = count + 1
+      case JArray(m) :: JString(scriptSig) :: JString(scriptPubKey) :: JString(flags) :: JString(expected) :: JString(comments) :: Nil =>
+        val witnessText: Seq[String] = m.take(m.length - 1).map {
+          case JString(value) => value
+          case unexpected => throw new RuntimeException(s"expected a witness item (string), got $unexpected")
+        }
+        val amount: Btc = m.last match {
+          case JDouble(value) => Btc(value)
+          case unexpected => throw new RuntimeException(s"expected an amount, got $unexpected")
+        }
+        ScriptSpec.runTest(witnessText, amount, scriptSig, scriptPubKey, flags, Some(comments), expected)
+        count = count + 1
+      case JArray(m) :: JString(scriptSig) :: JString(scriptPubKey) :: JString(flags) :: JString(expected) :: Nil =>
+        val witnessText: Seq[String] = m.take(m.length - 1).map {
+          case JString(value) => value
+          case unexpected => throw new RuntimeException(s"expected a witness item (string), got $unexpected")
+        }
+        val amount: Btc = m.last match {
+          case JDouble(value) => Btc(value)
+          case unexpected => throw new RuntimeException(s"expected an amount, got $unexpected")
+        }
+        ScriptSpec.runTest(witnessText, amount, scriptSig, scriptPubKey, flags, None, expected)
+        count = count + 1
+      case unexpected => throw new RuntimeException(s"cannot parse $unexpected")
+    })
+    count
   }
 }
 
 @RunWith(classOf[JUnitRunner])
-class ScriptSpec extends FlatSpec {
-
-  implicit val format = DefaultFormats
-
-  "Script" should "pass reference client valid script tests" in {
-    val stream = classOf[ScriptSpec].getResourceAsStream("/data/script_valid.json")
+class ScriptSpec extends FunSuite {
+  test("reference client script tests") {
+    val stream = classOf[ScriptSpec].getResourceAsStream("/data/script_tests.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
-    // use tail to skip the first line of the .json file
-    json.extract[List[List[String]]].tail.foreach(_ match {
-      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, Some(comments), true)
-      case scriptSig :: scriptPubKey :: flags :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, None, true)
-      case _ => ()
-    })
-  }
-  it should "pass reference client invalid script tests" in {
-    val stream = classOf[ScriptSpec].getResourceAsStream("/data/script_invalid.json")
-    val json = JsonMethods.parse(new InputStreamReader(stream))
-    // use tail to skip the first line of the .json file
-    json.extract[List[List[String]]].tail.foreach(_ match {
-      case scriptSig :: scriptPubKey :: flags :: comments :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, Some(comments), false)
-      case scriptSig :: scriptPubKey :: flags :: Nil => ScriptSpec.runTest(scriptSig, scriptPubKey, flags, None, false)
-      case _ => ()
-    })
+    val count = ScriptSpec.runTest(json)
+    println(s"$count reference script tests passed")
   }
 }

@@ -27,7 +27,7 @@ class TransactionMalleabilitySpec extends FlatSpec {
         )),
       txOut = List(
         TxOut(
-          amount = 1000,
+          amount = 1000 satoshi,
           publicKeyScript = publicKeyScript)
       ),
       lockTime = 0)

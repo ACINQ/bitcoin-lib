@@ -12,37 +12,58 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.{Failure, Success, Try}
 
-@RunWith(classOf[JUnitRunner])
-class TransactionSpec extends FlatSpec with Matchers {
-
-  def process(stream: InputStream, valid: Boolean) : Unit = {
+object TransactionSpec {
+  def process(json: JValue, valid: Boolean): Unit = {
     implicit val format = DefaultFormats
-    val json = JsonMethods.parse(new InputStreamReader(stream))
-
-    json.extract[List[List[JValue]]].filter(_.size > 1).map(_ match {
+    var comment = ""
+    json.extract[List[List[JValue]]].map(_ match {
+      case JString(value) :: Nil => comment = value
       case JArray(m) :: JString(serializedTransaction) :: JString(verifyFlags) :: Nil => {
         val prevoutMap = collection.mutable.HashMap.empty[OutPoint, BinaryData]
+        val prevamountMap = collection.mutable.HashMap.empty[OutPoint, Satoshi]
         m.map(_ match {
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) => {
             val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
             prevoutMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> prevoutScript
           }
+          case JArray(List(JString(hash), JInt(index), JString(scriptPubKey), JInt(amount))) => {
+            val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
+            prevoutMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> prevoutScript
+            prevamountMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> Satoshi(amount.toLong)
+          }
         })
 
-        val tx = Transaction.read(serializedTransaction)
+        val tx = Transaction.read(serializedTransaction, Protocol.PROTOCOL_VERSION)
         Try {
           Transaction.validate(tx)
-          Transaction.correctlySpends(tx, prevoutMap.toMap, ScriptSpec.parseScriptFlags(verifyFlags))
+          for(i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
+            val prevOutputScript = prevoutMap(tx.txIn(i).outPoint)
+            val amount = prevamountMap.get(tx.txIn(i).outPoint).getOrElse(0 satoshi)
+            val ctx = new Script.Context(tx, i, amount)
+            val runner = new Script.Runner(ctx, ScriptSpec.parseScriptFlags(verifyFlags))
+            if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.witness(i))) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
+          }
         } match {
           case Success(_) if valid => ()
-          case Success(_) if !valid => throw new RuntimeException(s"$serializedTransaction should not be valid")
+          case Success(_) if !valid => throw new RuntimeException(s"$serializedTransaction should not be valid, [$comment]")
           case Failure(t) if !valid => ()
-          case Failure(t) if valid => throw new RuntimeException(s"$serializedTransaction should be valid", t)
+          case Failure(t) if valid => throw new RuntimeException(s"$serializedTransaction should be valid, [$comment]", t)
         }
       }
       case unexpected => throw new RuntimeException(s"unexpected: $unexpected")
     })
   }
+
+  def process(stream: InputStream, valid: Boolean) : Unit = {
+    implicit val format = DefaultFormats
+    val json = JsonMethods.parse(new InputStreamReader(stream))
+    process(json, valid)
+  }
+}
+
+@RunWith(classOf[JUnitRunner])
+class TransactionSpec extends FlatSpec with Matchers {
+  import TransactionSpec._
 
   "Bitcoins library" should "pass reference tx valid tests" in {
     val stream = classOf[ScriptSpec].getResourceAsStream("/data/tx_valid.json")
