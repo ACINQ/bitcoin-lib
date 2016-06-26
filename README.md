@@ -54,6 +54,10 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
 
 The latest snapshot (development) version is 0.9.6-SNAPSHOT, the latest released version is 0.9.5
 
+## Segwit support
+
+Bitcoin-lib 0.9.6-RC2, avalaible on Maven Central, fully supports segwit (see below for more information) and is on par with the segwit code that was just merged into Bitcoin Core.
+
 ## Usage
 
 Please have a look at unit tests, more samples will be added soon.
