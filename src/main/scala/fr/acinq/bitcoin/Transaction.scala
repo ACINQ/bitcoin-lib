@@ -26,7 +26,7 @@ object OutPoint extends BtcMessage[OutPoint] {
 /**
   * an out point is a reference to a specific output in a specific transaction that we want to claim
   *
-  * @param hash reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
+  * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
   * @param index index of the output in tx that we want to refer to
   */
 case class OutPoint(hash: BinaryData, index: Long) {
@@ -91,10 +91,10 @@ object TxIn extends BtcMessage[TxIn] {
 /**
   * Transaction input
   *
-  * @param outPoint Previous output transaction reference
+  * @param outPoint        Previous output transaction reference
   * @param signatureScript Computational Script for confirming transaction authorization
-  * @param sequence Transaction version as defined by the sender. Intended for "replacement" of transactions when
-  *                 information is updated before inclusion into a block. Unused for now.
+  * @param sequence        Transaction version as defined by the sender. Intended for "replacement" of transactions when
+  *                        information is updated before inclusion into a block. Unused for now.
   */
 case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long) {
   def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
@@ -121,7 +121,7 @@ object TxOut extends BtcMessage[TxOut] {
 /**
   * Transaction output
   *
-  * @param amount amount in Satoshis
+  * @param amount          amount in Satoshis
   * @param publicKeyScript Usually contains the public key as a Bitcoin script setting up conditions to claim this output.
   */
 case class TxOut(amount: Satoshi, publicKeyScript: BinaryData)
@@ -130,10 +130,10 @@ object ScriptWitness extends BtcMessage[ScriptWitness] {
   val empty = ScriptWitness(Seq.empty[BinaryData])
 
   override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit =
-    writeCollection[BinaryData](t.stack, (b:BinaryData, o:OutputStream, _: Long) => writeScript(b, o), out, protocolVersion)
+    writeCollection[BinaryData](t.stack, (b: BinaryData, o: OutputStream, _: Long) => writeScript(b, o), out, protocolVersion)
 
   override def read(in: InputStream, protocolVersion: Long): ScriptWitness =
-    ScriptWitness(readCollection[BinaryData](in, (i: InputStream, _:Long) => script(i), None, protocolVersion))
+    ScriptWitness(readCollection[BinaryData](in, (i: InputStream, _: Long) => script(i), None, protocolVersion))
 }
 
 /**
@@ -144,6 +144,7 @@ object ScriptWitness extends BtcMessage[ScriptWitness] {
   */
 case class ScriptWitness(stack: Seq[BinaryData]) {
   def isNull = stack.isEmpty
+
   def isNotNull = !isNull
 }
 
@@ -310,7 +311,7 @@ object Transaction extends BtcMessage[Transaction] {
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int): Seq[Byte] =
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType)
 
-    /**
+  /**
     * hash a tx for signing
     *
     * @param tx                   input transaction
@@ -378,12 +379,11 @@ object Transaction extends BtcMessage[Transaction] {
     * @param amount               amount of the output claimed by this tx input
     * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
     * @param privateKey           private key
-    * @param randomize            if false, the output signature will not be randomized (use for testing only !!)
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte], randomize: Boolean): Seq[Byte] = {
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] = {
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-    val (r, s) = Crypto.sign(hash, privateKey.take(32), randomize)
+    val (r, s) = Crypto.sign(hash, privateKey.take(32))
     val sig = Crypto.encodeSignature(r, s)
     sig :+ (sighashType.toByte)
   }
@@ -398,26 +398,10 @@ object Transaction extends BtcMessage[Transaction] {
     * @param amount               amount of the output claimed by this tx input
     * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
     * @param privateKey           private key
-    * @param randomize            if false, the output signature will not be randomized (use for testing only !!)
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte], randomize: Boolean): Seq[Byte] =
-    signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey, randomize)
-
-    /**
-    * sign a tx input
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type, which will be appended to the signature
-    * @param amount               amount of the output claimed by this tx input
-    * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
-    * @param privateKey           private key
-    * @return the encoded signature of this tx for this specific tx input
-    */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] =
-    signInput(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion, privateKey, true)
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] =
+    signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
 
   /**
     *
@@ -426,32 +410,26 @@ object Transaction extends BtcMessage[Transaction] {
     * @param previousOutputScript public key script of the output claimed by this tx input
     * @param sighashType          signature hash type, which will be appended to the signature
     * @param privateKey           private key
-    * @param randomize            if false, the output signature will not be randomized (use for testing only)
     * @return the encoded signature of this tx for this specific tx input
     */
   @deprecated
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: Seq[Byte], randomize: Boolean): Seq[Byte] =
-    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = 0, privateKey, randomize)
-
-  @deprecated
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: Seq[Byte]): Seq[Byte] =
-    signInput(tx, inputIndex, previousOutputScript, sighashType, privateKey, true)
+    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = 0, privateKey)
 
   /**
     * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
     *
-    * @param input     transaction to sign
-    * @param signData  list of data for signing: previous tx output script and associated private key
-    * @param randomize if false, signature will not be randomized. Use for debugging purposes only!
+    * @param input    transaction to sign
+    * @param signData list of data for signing: previous tx output script and associated private key
     * @return a new signed transaction
     */
-  def sign(input: Transaction, signData: Seq[SignData], randomize: Boolean = true): Transaction = {
+  def sign(input: Transaction, signData: Seq[SignData]): Transaction = {
 
     require(signData.length == input.txIn.length, "There should be signing data for every transaction")
 
     // sign each input
     val signedInputs = for (i <- 0 until input.txIn.length) yield {
-      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey, randomize)
+      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey)
 
       // this is the public key that is associated with the private key we used for signing
       val publicKey = Crypto.publicKeyFromPrivateKey(signData(i).privateKey)
@@ -463,7 +441,7 @@ object Transaction extends BtcMessage[Transaction] {
 
     input.copy(txIn = signedInputs)
   }
-  
+
   def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
     for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
       val prevOutput = previousOutputs(tx.txIn(i).outPoint)
@@ -499,19 +477,20 @@ object SignData {
   * data for signing pay2pk transaction
   *
   * @param prevPubKeyScript previous output public key script
-  * @param privateKey private key associated with the previous output public key
+  * @param privateKey       private key associated with the previous output public key
   */
 case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
 
 /**
   * Transaction
   *
-  * @param version Transaction data format version
-  * @param txIn Transaction inputs
-  * @param txOut Transaction outputs
+  * @param version  Transaction data format version
+  * @param txIn     Transaction inputs
+  * @param txOut    Transaction outputs
   * @param lockTime The block number or timestamp at which this transaction is locked
   */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long, witness: Seq[ScriptWitness]) {
+
   import Transaction._
 
   lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS))
@@ -520,7 +499,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   /**
     *
     * @param blockHeight current block height
-    * @param blockTime current block time
+    * @param blockTime   current block time
     * @return true if the transaction is final
     */
   def isFinal(blockHeight: Long, blockTime: Long): Boolean = lockTime match {
@@ -533,33 +512,33 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
 
   /**
     *
-    * @param i index of the tx input to update
+    * @param i         index of the tx input to update
     * @param sigScript new signature script
     * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
     */
-  def updateSigScript(i: Int, sigScript: BinaryData) : Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(signatureScript = sigScript)))
+  def updateSigScript(i: Int, sigScript: BinaryData): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(signatureScript = sigScript)))
 
   /**
     *
-    * @param i index of the tx input to update
+    * @param i         index of the tx input to update
     * @param sigScript new signature script
     * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
     */
-  def updateSigScript(i: Int, sigScript: Seq[ScriptElt]) : Transaction = updateSigScript(i, Script.write(sigScript))
+  def updateSigScript(i: Int, sigScript: Seq[ScriptElt]): Transaction = updateSigScript(i, Script.write(sigScript))
 
-  def updateWitness(i: Int, witness: ScriptWitness) : Transaction = this.copy(witness = this.witness.updated(i, witness))
+  def updateWitness(i: Int, witness: ScriptWitness): Transaction = this.copy(witness = this.witness.updated(i, witness))
 
   /**
     *
     * @param input input to add the tx
     * @return a new transaction which includes the newly added input
     */
-  def addInput(input: TxIn) : Transaction = this.copy(txIn = this.txIn :+ input)
+  def addInput(input: TxIn): Transaction = this.copy(txIn = this.txIn :+ input)
 
   /**
     *
     * @param output output to add to the tx
     * @return a new transaction which includes the newly added output
     */
-  def addOutput(output: TxOut) : Transaction = this.copy(txOut = this.txOut :+ output)
+  def addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut :+ output)
 }

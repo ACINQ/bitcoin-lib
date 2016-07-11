@@ -12,8 +12,6 @@ import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameter
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.bouncycastle.math.ec.ECPoint
 
-import Protocol._
-
 object Crypto {
   val params = SECNamedCurves.getByName("secp256k1")
   val curve = new ECDomainParameters(params.getCurve, params.getG, params.getN, params.getH)
@@ -48,27 +46,30 @@ object Crypto {
   def ripemd160 = hash(new RIPEMD160Digest) _
 
   /**
-   * 160 bits bitcoin hash, used mostly for address encoding
-   * hash160(input) = RIPEMD160(SHA256(input))
-   * @param input array of byte
-   * @return the 160 bits BTC hash of input
-   */
+    * 160 bits bitcoin hash, used mostly for address encoding
+    * hash160(input) = RIPEMD160(SHA256(input))
+    *
+    * @param input array of byte
+    * @return the 160 bits BTC hash of input
+    */
   def hash160(input: Seq[Byte]): Seq[Byte] = ripemd160(sha256(input))
 
   /**
-   * 256 bits bitcoin hash
-   * hash256(input) = SHA256(SHA256(input))
-   * @param input array of byte
-   * @return the 256 bits BTC hash of input
-   */
+    * 256 bits bitcoin hash
+    * hash256(input) = SHA256(SHA256(input))
+    *
+    * @param input array of byte
+    * @return the 256 bits BTC hash of input
+    */
   def hash256(input: Seq[Byte]) = sha256(sha256(input))
 
   /**
-   * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
-   * @param r first value
-   * @param s second value
-   * @return (r, s) in DER format
-   */
+    * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
+    *
+    * @param r first value
+    * @param s second value
+    * @return (r, s) in DER format
+    */
   def encodeSignature(r: BigInteger, s: BigInteger): Seq[Byte] = {
     // Usually 70-72 bytes
     val bos = new ByteArrayOutputStream(72)
@@ -142,10 +143,11 @@ object Crypto {
   }
 
   /**
-   * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
-   * @param blob sigbyte data
-   * @return the decoded (r, s) signature
-   */
+    * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
+    *
+    * @param blob sigbyte data
+    * @return the decoded (r, s) signature
+    */
   def decodeSignature(blob: Seq[Byte]): (BigInteger, BigInteger) = {
     val decoder = new ASN1InputStream(blob.toArray)
     val seq = decoder.readObject.asInstanceOf[DLSequence]
@@ -169,18 +171,18 @@ object Crypto {
   }
 
   /**
-   * @param data data
-   * @param signature signature
-   * @param publicKey public key
-   * @return true is signature is valid for this data with this public key
-   */
+    * @param data      data
+    * @param signature signature
+    * @param publicKey public key
+    * @return true is signature is valid for this data with this public key
+    */
   def verifySignature(data: Seq[Byte], signature: Seq[Byte], publicKey: Seq[Byte]): Boolean = verifySignature(data, decodeSignature(signature), publicKey)
 
   /**
-   *
-   * @param privateKey private key
-   * @return the corresponding public key
-   */
+    *
+    * @param privateKey private key
+    * @return the corresponding public key
+    */
   def publicKeyFromPrivateKey(privateKey: Seq[Byte]) = {
     // a private key is either 32 bytes or 33 bytes with a last byte of 0x01
     val compressed = privateKey.length match {
@@ -194,16 +196,15 @@ object Crypto {
   }
 
   /**
-   * Sign data with a private key
-   * @param data data to sign
-   * @param privateKey private key. If you are using bitcoin "compressed" private keys make sure to only use the first 32 bytes of
-   *                   the key (there is an extra "1" appended to the key)
-   * @param randomize if true, signing the same data with the same key multiple times will produce different results. Default is 'true'
-   *                  and you should specify 'false' for testing purposes only
-   * @return a (r, s) ECDSA signature pair
-   */
-  def sign(data: Seq[Byte], privateKey: BinaryData, randomize: Boolean = true): (BigInteger, BigInteger) = {
-    val signer = if (randomize) new ECDSASigner() else new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
+    * Sign data with a private key, using RCF6979 deterministic signatures
+    *
+    * @param data       data to sign
+    * @param privateKey private key. If you are using bitcoin "compressed" private keys make sure to only use the first 32 bytes of
+    *                   the key (there is an extra "1" appended to the key)
+    * @return a (r, s) ECDSA signature pair
+    */
+  def sign(data: Seq[Byte], privateKey: BinaryData): (BigInteger, BigInteger) = {
+    val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
     val privateKeyParameters = new ECPrivateKeyParameters(new BigInteger(1, privateKey), curve)
     signer.init(true, privateKeyParameters)
     val Array(r, s) = signer.generateSignature(data.toArray)

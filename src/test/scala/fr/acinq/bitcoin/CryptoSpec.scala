@@ -45,7 +45,7 @@ class CryptoSpec extends FlatSpec {
     val (_, privateKey) = Base58Check.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
     val publicKey = Crypto.publicKeyFromPrivateKey(privateKey)
     val data = "this is a test".getBytes("UTF-8")
-    val (r, s) = Crypto.sign(data, privateKey.take(32), randomize = false) // because "compressed" keys have a extra 0x01 at the end
+    val (r, s) = Crypto.sign(data, privateKey.take(32)) // because "compressed" keys have a extra 0x01 at the end
     val encoded = Crypto.encodeSignature(r, s)
     assert(Crypto.verifySignature(data, encoded, publicKey))
   }
