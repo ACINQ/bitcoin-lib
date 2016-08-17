@@ -258,6 +258,4 @@ object ScriptElt {
 
   // name -> code
   val name2code = code2elt.mapValues(_.asInstanceOf[Product].productPrefix.stripPrefix("OP_")).map(_.swap) + ("NOP2" -> 0xb1) + ("NOP3" -> 0xb2)
-
-  def getCode(op: ScriptElt): Int = Script.write(op :: Nil).head
 }

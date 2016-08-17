@@ -92,12 +92,14 @@ object TxIn extends BtcMessage[TxIn] {
   * Transaction input
   *
   * @param outPoint        Previous output transaction reference
-  * @param signatureScript Computational Script for confirming transaction authorization
+  * @param signatureScript Signature script which should match the public key script of the output that we want to spend
   * @param sequence        Transaction version as defined by the sender. Intended for "replacement" of transactions when
-  *                        information is updated before inclusion into a block. Unused for now.
+  *                        information is updated before inclusion into a block. Repurposed for OP_CSV (see BIPs 68 & 112)
+  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
   */
-case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long) {
+case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) {
   def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
+  def hasWitness: Boolean = witness.isNotNull
 }
 
 object TxOut extends BtcMessage[TxOut] {
@@ -122,7 +124,7 @@ object TxOut extends BtcMessage[TxOut] {
   * Transaction output
   *
   * @param amount          amount in Satoshis
-  * @param publicKeyScript Usually contains the public key as a Bitcoin script setting up conditions to claim this output.
+  * @param publicKeyScript public key script which sets the conditions for spending this output
   */
 case class TxOut(amount: Satoshi, publicKeyScript: BinaryData)
 
@@ -150,6 +152,8 @@ case class ScriptWitness(stack: Seq[BinaryData]) {
 
 object Transaction extends BtcMessage[Transaction] {
   val SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000L
+  // if lockTime >= LOCKTIME_THRESHOLD it is a unix timestamp otherwise it is a block height
+  val LOCKTIME_THRESHOLD = 500000000L
 
   /**
     *
@@ -157,22 +161,6 @@ object Transaction extends BtcMessage[Transaction] {
     * @return true if protocol version specifies that witness data is to be serialized
     */
   def serializeTxWitness(version: Long): Boolean = (version & SERIALIZE_TRANSACTION_NO_WITNESS) == 0
-
-  /**
-    *
-    * @param witness transaction witness data
-    * @return true if witness is not empty
-    */
-  def isNotNull(witness: Seq[ScriptWitness]) = witness.exists(_.isNotNull)
-
-  /**
-    *
-    * @param witness transaction witness data
-    * @return true if witness is empty
-    */
-  def isNull(witness: Seq[ScriptWitness]) = !isNotNull(witness)
-
-  def apply(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) = new Transaction(version, txIn, txOut, lockTime, Seq.fill(txIn.size)(ScriptWitness.empty))
 
   override def read(input: InputStream, protocolVersion: Long): Transaction = {
     val tx = Transaction(uint32(input), readCollection[TxIn](input, protocolVersion), Seq.empty[TxOut], 0)
@@ -188,9 +176,9 @@ object Transaction extends BtcMessage[Transaction] {
     val tx2 = flags match {
       case 0 => tx1.copy(lockTime = uint32(input))
       case 1 =>
-        val witness = new ArrayBuffer[ScriptWitness]()
-        for (i <- 0 until tx1.txIn.size) witness += ScriptWitness.read(input, protocolVersion)
-        tx1.copy(witness = witness.toSeq, lockTime = uint32(input))
+        val witnesses = new ArrayBuffer[ScriptWitness]()
+        for (i <- 0 until tx1.txIn.size) witnesses += ScriptWitness.read(input, protocolVersion)
+        tx1.updateWitnesses(witnesses).copy(lockTime = uint32(input))
       case _ => throw new RuntimeException(s"Unknown transaction optional data $flags")
     }
 
@@ -198,13 +186,13 @@ object Transaction extends BtcMessage[Transaction] {
   }
 
   override def write(tx: Transaction, out: OutputStream, protocolVersion: Long) = {
-    if (serializeTxWitness(protocolVersion) && isNotNull(tx.witness)) {
+    if (serializeTxWitness(protocolVersion) && tx.hasWitness) {
       writeUInt32(tx.version, out)
       writeUInt8(0x00, out)
       writeUInt8(0x01, out)
       writeCollection(tx.txIn, out, protocolVersion)
       writeCollection(tx.txOut, out, protocolVersion)
-      for (i <- 0 until tx.txIn.size) ScriptWitness.write(tx.witness(i), out, protocolVersion)
+      for (i <- 0 until tx.txIn.size) ScriptWitness.write(tx.txIn(i).witness, out, protocolVersion)
       writeUInt32(tx.lockTime, out)
     } else {
       writeUInt32(tx.version, out)
@@ -367,7 +355,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @return a hash which can be used to sign the referenced tx input
     */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int): Seq[Byte] =
-    hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
+    hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
 
   /**
     * sign a tx input
@@ -449,7 +437,7 @@ object Transaction extends BtcMessage[Transaction] {
       val amount = prevOutput.amount
       val ctx = new Script.Context(tx, i, amount)
       val runner = new Script.Runner(ctx, scriptFlags, callback)
-      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.witness(i))) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
+      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.txIn(i).witness)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
     }
   }
 
@@ -489,7 +477,7 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
   * @param txOut    Transaction outputs
   * @param lockTime The block number or timestamp at which this transaction is locked
   */
-case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long, witness: Seq[ScriptWitness]) {
+case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
 
   import Transaction._
 
@@ -504,8 +492,8 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
     */
   def isFinal(blockHeight: Long, blockTime: Long): Boolean = lockTime match {
     case 0 => true
-    case value if value < LockTimeThreshold && value < blockHeight => true
-    case value if value >= LockTimeThreshold && value < blockTime => true
+    case value if value < LOCKTIME_THRESHOLD && value < blockHeight => true
+    case value if value >= LOCKTIME_THRESHOLD && value < blockTime => true
     case _ if txIn.exists(!_.isFinal) => false
     case _ => true
   }
@@ -526,7 +514,16 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
     */
   def updateSigScript(i: Int, sigScript: Seq[ScriptElt]): Transaction = updateSigScript(i, Script.write(sigScript))
 
-  def updateWitness(i: Int, witness: ScriptWitness): Transaction = this.copy(witness = this.witness.updated(i, witness))
+  def updateWitness(i: Int, witness: ScriptWitness): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(witness = witness)))
+
+  def updateWitnesses(witnesses: Seq[ScriptWitness]) : Transaction = {
+    require(witnesses.length == txIn.length)
+    witnesses.zipWithIndex.foldLeft(this){
+      case (tx, (witness, index)) => tx.updateWitness(index, witness)
+    }
+  }
+
+  def hasWitness: Boolean = txIn.exists(_.hasWitness)
 
   /**
     *

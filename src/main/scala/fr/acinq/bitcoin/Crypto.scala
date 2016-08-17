@@ -12,6 +12,8 @@ import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameter
 import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.bouncycastle.math.ec.ECPoint
 
+import scala.annotation.tailrec
+
 object Crypto {
   val params = SECNamedCurves.getByName("secp256k1")
   val curve = new ECDomainParameters(params.getCurve, params.getG, params.getN, params.getH)
@@ -203,7 +205,7 @@ object Crypto {
     *                   the key (there is an extra "1" appended to the key)
     * @return a (r, s) ECDSA signature pair
     */
-  def sign(data: Seq[Byte], privateKey: BinaryData): (BigInteger, BigInteger) = {
+  def sign(data: BinaryData, privateKey: BinaryData): (BigInteger, BigInteger) = {
     val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
     val privateKeyParameters = new ECPrivateKeyParameters(new BigInteger(1, privateKey), curve)
     signer.init(true, privateKeyParameters)

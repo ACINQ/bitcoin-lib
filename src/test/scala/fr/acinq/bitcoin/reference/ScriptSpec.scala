@@ -84,7 +84,7 @@ object ScriptSpec {
     val witness = ScriptWitness(witnessText.map(BinaryData(_)))
     val scriptPubKey = parseFromText(scriptPubKeyText)
     val scriptSig = parseFromText(scriptSigText)
-    val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).copy(witness = Seq(witness))
+    val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).updateWitness(0, witness)
     val ctx = Script.Context(tx, 0, amount)
     val runner = new Script.Runner(ctx, parseScriptFlags(flags))
 

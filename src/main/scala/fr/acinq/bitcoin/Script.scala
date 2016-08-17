@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin
 
+import Crypto._
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 
 import scala.annotation.tailrec
@@ -116,8 +117,6 @@ object Script {
   import Protocol._
 
   type Stack = List[Seq[Byte]]
-
-  val LocktimeThreshold = 500000000L
 
   private val True = Seq(1: Byte)
 
@@ -295,8 +294,8 @@ object Script {
     // unless the type of nLockTime being tested is the same as
     // the nLockTime in the transaction.
     if (!(
-      (tx.lockTime < LocktimeThreshold && lockTime < LocktimeThreshold) ||
-        (tx.lockTime >= LocktimeThreshold && lockTime >= LocktimeThreshold)
+      (tx.lockTime < Transaction.LOCKTIME_THRESHOLD && lockTime < Transaction.LOCKTIME_THRESHOLD) ||
+        (tx.lockTime >= Transaction.LOCKTIME_THRESHOLD && lockTime >= Transaction.LOCKTIME_THRESHOLD)
       ))
       return false
 
@@ -962,4 +961,46 @@ object Script {
     val op_n = ScriptElt.code2elt(pubkeys.size + 0x50)
     Script.write(op_m :: pubkeys.toList.map(OP_PUSHDATA(_)) ::: op_n :: OP_CHECKMULTISIG :: Nil)
   }
+
+  /**
+    *
+    * @param pubKey public key
+    * @return a pay-to-public-key-hash script
+    */
+  def pay2pkh(pubKey: BinaryData): Seq[ScriptElt] = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hash160(pubKey)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-script script
+    */
+  def pay2sh(script: Seq[ScriptElt]): Seq[ScriptElt] = pay2sh(Script.write(script))
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-script script
+    */
+  def pay2sh(script: BinaryData): Seq[ScriptElt] = OP_HASH160 :: OP_PUSHDATA(hash160(script)) :: OP_EQUAL :: Nil
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-witness-script script
+    */
+  def pay2wsh(script: Seq[ScriptElt]): Seq[ScriptElt] = pay2wsh(Script.write(script))
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-witness-script script
+    */
+  def pay2wsh(script: BinaryData): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(sha256(script)) :: Nil
+
+  /**
+    *
+    * @param pubKey public key
+    * @return a pay-to-witness-public-key-hash script
+    */
+  def pay2wpkh(pubKey: BinaryData): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(hash160(pubKey)) :: Nil
 }
