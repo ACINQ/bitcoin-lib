@@ -6,6 +6,8 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+import scala.util.Random
+
 @RunWith(classOf[JUnitRunner])
 class DeterministicWalletSpec extends FlatSpec {
   import fr.acinq.bitcoin.DeterministicWallet._
@@ -108,5 +110,17 @@ class DeterministicWalletSpec extends FlatSpec {
     val IR = I.takeRight(32)
     val guess = new BigInteger(1, m42.secretkey).subtract(new BigInteger(1, IL)).mod(Crypto.curve.getN)
     assert(guess === k)
+  }
+  it should "be able to derive private keys" in {
+    val random = new Random()
+    val seed = new Array[Byte](32)
+    for (i <- 0 until 50) {
+      random.nextBytes(seed)
+      val master = DeterministicWallet.generate(seed)
+      for (j <- 0 until 50) {
+        val index = random.nextLong()
+        val key = DeterministicWallet.derivePrivateKey(master, index)
+      }
+    }
   }
 }

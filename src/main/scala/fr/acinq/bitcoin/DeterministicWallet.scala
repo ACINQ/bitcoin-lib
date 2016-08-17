@@ -126,7 +126,12 @@ object DeterministicWallet {
     val IR = I.takeRight(32)
     val key = new BigInteger(1, IL).add(new BigInteger(1, parent.secretkey)).mod(Crypto.curve.getN) // Crypto.curve should not be used like this...
     val buffer = key.toByteArray.dropWhile(_ == 0) // BigInteger.toByteArray may add a leading 0x00
-    ExtendedPrivateKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
+    val buffer1 = buffer.length match {
+      case 32 => buffer
+      case length if length < 32 => Array.fill(32 - length)(0.toByte) ++ buffer
+      case _ => throw new RuntimeException("cannot derive private key")
+    }
+    ExtendedPrivateKey(buffer1, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 
   /**
