@@ -47,16 +47,16 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.5</version>
+    <version>0.9.6</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.6-SNAPSHOT, the latest released version is 0.9.5
+The latest snapshot (development) version is 0.9.7-SNAPSHOT, the latest released version is 0.9.6
 
 ## Segwit support
 
-Bitcoin-lib 0.9.6-RC2, avalaible on Maven Central, fully supports segwit (see below for more information) and is on par with the segwit code that was just merged into Bitcoin Core.
+Bitcoin-lib 0.9.6, avalaible on Maven Central, fully supports segwit (see below for more information) and is on par with the segwit code that was just merged into Bitcoin Core.
 
 ## Usage
 
@@ -230,7 +230,7 @@ val pubKeyScript = OP_0 :: OP_PUSHDATA(pkh) :: Nil
 
 To spend them, you provide a witness that is just a push of a signature and the actual public key:
 ```scala
-val witness = ScriptWitness(Seq(sig, pub1))
+val witness = ScriptWitness(sig :: pubKey :: Nil))
 ```
 
 This sample demonstrates how to serialize, create and verify a P2WPK transaction
@@ -248,11 +248,11 @@ This sample demonstrates how to serialize, create and verify a P2WPK transaction
     // now let's create a simple tx that spends tx1 and send 0.39 BTC to P2WPK output
     val tx2 = {
       val tmp = Transaction(version = 1,
-        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.39 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte], witness = ScriptWitness.empty) :: Nil,
+        txOut = TxOut(0.39 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
-      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)), randomize = false)
+      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)))
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx2.txid == BinaryData("3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e"))
@@ -260,21 +260,21 @@ This sample demonstrates how to serialize, create and verify a P2WPK transaction
 
     // and now we create a segwit tx that spends the P2WPK output
     val tx3 = {
-      val tmp = Transaction(version = 1,
-        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.38 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+      val tmp: Transaction = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte], witness = ScriptWitness.empty) :: Nil,
+        txOut = TxOut(0.38 btc, Script.pay2wpkh(pub1)) :: Nil, // we reuse the same output script but if could be anything else
         lockTime = 0
       )
       // mind this: the pubkey script used for signing is not the prevout pubscript (which is just a push
-      // of the pubkey hash), but the actual script that is evaluated by the script engine
-      val pubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
-      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount.toLong, 1, priv1, randomize = false)
+      // of the pubkey hash), but the actual script that is evaluated by the script engine, in this case a PAY2PKH script
+      val pubKeyScript = Script.pay2pkh(pub1)
+      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, 1, priv1)
       val witness = ScriptWitness(Seq(sig, pub1))
-      tmp.copy(witness = Seq(witness))
+      tmp.updateWitness(0, witness)
     }
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx3.txid == BinaryData("a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8"))
+    // this tx was published on segnet as a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8
 ```
 #### P2WSH transactions
 
@@ -289,7 +289,7 @@ val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
 val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, redeemScript))
 ```
 
-This sample demonstrates how to serialize, create and verify a P2WPK transaction
+This sample demonstrates how to serialize, create and verify a P2WPSH transaction
 
 ```scala
     val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
@@ -312,31 +312,69 @@ This sample demonstrates how to serialize, create and verify a P2WPK transaction
       val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
       val tmp = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.49 btc, OP_0 :: OP_PUSHDATA(Crypto.sha256(redeemScript)) :: Nil) :: Nil,
+        txOut = TxOut(0.49 btc, Script.pay2wsh(redeemScript)) :: Nil,
         lockTime = 0
       )
-      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)), randomize = false)
+      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)))
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    assert(tx2.txid == BinaryData("9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355"))
     // this tx was published on segnet as 9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355
 
     // and now we create a segwit tx that spends the P2WSH output
     val tx3 = {
-      val tmp = Transaction(version = 1,
+      val tmp: Transaction = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.48 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        txOut = TxOut(0.48 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
       val pubKeyScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
-      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount.toLong, 1)
-      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
-      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
+      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, 1)
+      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2.take(32))) :+ SIGHASH_ALL.toByte
+      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3.take(32))) :+ SIGHASH_ALL.toByte
       val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, pubKeyScript))
-      tmp.copy(witness = Seq(witness))
+      tmp.updateWitness(0, witness)
     }
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    assert(tx3.txid == BinaryData("943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb"))
     // this tx was published on segnet as 943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb
+```
+
+#### Segwit transactions embedded in standard P2SH transactions
+
+```scala
+    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
+    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
+
+    // p2wpkh script
+    val script = Script.write(Script.pay2wpkh(pub1))
+
+    // which we embeed into a standard p2sh script
+    val p2shaddress = Base58Check.encode(Base58.Prefix.ScriptAddressSegnet, Crypto.hash160(script))
+    assert(p2shaddress === "MDbNMghDbaaizHz8pSgMqu9qJXvKwouqkM")
+
+    // this tx send 0.5 btc to our p2shaddress
+    val tx = Transaction.read("010000000175dd435bf25e5d77567272f7d6eefcf37b7156b78bb233490140d6fa7545cfca010000006a47304402206e601a482b301141cb3a1712c18729fa1f1731fce5c4205ac9d344af38bb24bf022003fe70edcbd1a5b3957b3c939e583739eadb8de8d3d2cc2ad2903b19c991cb80012102ba2558223d7cd5df2d8decc4506a62ccaa96159f685360335c280952b25e7adefeffffff02692184df000000001976a9148b3ee15d631122010d31e1774aa318ca9ca8b67088ac80f0fa020000000017a9143e73638f202bb880a28e8df1946adc3058227d11878c730000", pversion)
+
+    // let's spend it:
+
+    val tx1 = {
+      val tmp: Transaction = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx.hash, 1), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
+        txOut = TxOut(0.49 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        lockTime = 0
+      )
+      val pubKeyScript = Script.pay2pkh(pub1)
+      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, 1)
+      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1.take(32))) :+ SIGHASH_ALL.toByte
+      val witness = ScriptWitness(Seq(sig, pub1))
+      tmp.updateSigScript(0, OP_PUSHDATA(script) :: Nil).updateWitness(0, witness)
+    }
+
+    Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    assert(tx1.txid === BinaryData("98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
+    // this tx was published on segnet as 98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5
 ```
 
 ### Wallet features
