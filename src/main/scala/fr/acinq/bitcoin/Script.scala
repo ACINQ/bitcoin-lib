@@ -77,6 +77,15 @@ object ScriptFlags {
   //
   val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM = (1 << 12)
 
+
+  // Segwit script only: Require the argument of OP_IF/NOTIF to be exactly 0x01 or empty vector
+  //
+  val SCRIPT_VERIFY_MINIMALIF = (1 << 13)
+
+  // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
+  //
+  val SCRIPT_VERIFY_NULLFAIL = (1 << 14)
+
   /**
     * Mandatory script verification flags that all new blocks must comply with for
     * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -100,6 +109,8 @@ object ScriptFlags {
     SCRIPT_VERIFY_NULLDUMMY |
     SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
     SCRIPT_VERIFY_CLEANSTACK |
+    SCRIPT_VERIFY_MINIMALIF |
+    SCRIPT_VERIFY_NULLFAIL |
     SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY |
     SCRIPT_VERIFY_LOW_S |
@@ -413,8 +424,8 @@ object Script {
         if (sigBytes1.isEmpty) false
         else {
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
-          //val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags)
-          Crypto.verifySignature(hash, sigBytes, pubKey)
+          val result = Crypto.verifySignature(hash, sigBytes, pubKey)
+          result
         }
       }
     }
@@ -498,11 +509,17 @@ object Script {
         // check whether we are in a non-executed IF branch
         case OP_IF :: tail if conditions.exists(_ == false) => run(tail, stack, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
         case OP_IF :: tail => stack match {
+          case True :: stacktail if signatureVersion == 1 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
+          case False :: stacktail if signatureVersion == 1 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
+          case _ :: stacktail if signatureVersion == 1 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => throw new RuntimeException("OP_IF argument must be minimal")
           case head :: stacktail if castToBoolean(head) => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case head :: stacktail => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
         }
         case OP_NOTIF :: tail if conditions.exists(_ == false) => run(tail, stack, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
         case OP_NOTIF :: tail => stack match {
+          case False :: stacktail if signatureVersion == 1 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
+          case True :: stacktail if signatureVersion == 1 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
+          case _ :: stacktail if signatureVersion == 1 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => throw new RuntimeException("OP_NOTIF argument must be minimal")
           case head :: stacktail if castToBoolean(head) => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
           case head :: stacktail => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
         }
@@ -600,8 +617,11 @@ object Script {
           case pubKey :: sigBytes :: stacktail => {
             // remove signature from script
             val scriptCode1 = if (signatureVersion == 0) removeSignature(scriptCode, sigBytes) else scriptCode
-            val result = checkSignature(pubKey, sigBytes, Script.write(scriptCode1), signatureVersion)
-            run(tail, (if (result) True else False) :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
+            val success = checkSignature(pubKey, sigBytes, Script.write(scriptCode1), signatureVersion)
+            if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
+              require(sigBytes.isEmpty, "Signature must be zero for failed CHECKSIG operation")
+            }
+            run(tail, (if (success) True else False) :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
           }
           case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
         }
@@ -627,8 +647,10 @@ object Script {
           val stack4 = stack3.drop(n + 1)
           val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
           val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode1), signatureVersion)
-          val result = if (success) True else False
-          run(tail, result :: stack4, state.copy(opCount = nextOpCount), signatureVersion)
+          if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
+            sigs.foreach(sig => require(sig.isEmpty, "Signature must be zero for failed CHECKMULTISIG operation"))
+          }
+          run(tail, (if (success) True else False) :: stack4, state.copy(opCount = nextOpCount), signatureVersion)
         }
         case OP_CHECKMULTISIGVERIFY :: tail => run(OP_CHECKMULTISIG :: OP_VERIFY :: tail, stack, state.copy(opCount = opCount - 1), signatureVersion)
         case OP_CODESEPARATOR :: tail => run(tail, stack, state.copy(opCount = opCount + 1, scriptCode = tail), signatureVersion)
