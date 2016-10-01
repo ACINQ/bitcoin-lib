@@ -27,6 +27,11 @@ package object bitcoin {
     val One: BinaryData = "0100000000000000000000000000000000000000000000000000000000000000"
   }
 
+  object SigVersion {
+    val SIGVERSION_BASE = 0
+    val SIGVERSION_WITNESS_V0 = 1
+  }
+
   sealed trait BtcAmount
 
   case class Satoshi(amount: Long) extends BtcAmount {

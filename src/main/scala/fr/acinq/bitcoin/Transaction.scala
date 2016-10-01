@@ -311,7 +311,7 @@ object Transaction extends BtcMessage[Transaction] {
     */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int): Seq[Byte] = {
     signatureVersion match {
-      case 1 =>
+      case SigVersion.SIGVERSION_WITNESS_V0 =>
         val hashPrevOut: BinaryData = if (!isAnyoneCanPay(sighashType)) {
           Crypto.hash256(tx.txIn.map(_.outPoint).map(OutPoint.write(_, Protocol.PROTOCOL_VERSION)).flatten)
         } else Hash.Zeroes
@@ -402,7 +402,7 @@ object Transaction extends BtcMessage[Transaction] {
     */
   @deprecated
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: Seq[Byte]): Seq[Byte] =
-    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = 0, privateKey)
+    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
 
   /**
     * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
