@@ -86,6 +86,10 @@ object ScriptFlags {
   //
   val SCRIPT_VERIFY_NULLFAIL = (1 << 14)
 
+  // Public keys in segregated witness scripts must be compressed
+  //
+  val SCRIPT_VERIFY_WITNESS_PUBKEYTYPE = (1 << 15)
+
   /**
     * Mandatory script verification flags that all new blocks must comply with for
     * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -416,7 +420,7 @@ object Script {
     def checkSignature(pubKey: Seq[Byte], sigBytes: Seq[Byte], scriptCode: Seq[Byte], signatureVersion: Int): Boolean = {
       if (sigBytes.isEmpty) false
       else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) throw new RuntimeException("invalid signature")
-      else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag)) throw new RuntimeException("invalid public key")
+      else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion)) throw new RuntimeException("invalid public key")
       else if (!Crypto.isPubKeyValid(pubKey)) false
       else {
         val sigHashFlags = sigBytes.last & 0xff // sig hash is the last byte

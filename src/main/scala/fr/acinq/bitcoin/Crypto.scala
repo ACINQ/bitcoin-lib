@@ -121,8 +121,11 @@ object Crypto {
     else true
   }
 
-  def checkPubKeyEncoding(key: Seq[Byte], flags: Int): Boolean = {
-    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) isPubKeyCompressedOrUncompressed(key) else true
+  def checkPubKeyEncoding(key: Seq[Byte], flags: Int, sigVersion: Int): Boolean = {
+    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) require(isPubKeyCompressedOrUncompressed(key), "invalid public key")
+    // Only compressed keys are accepted in segwit
+    if ((flags & ScriptFlags.SCRIPT_VERIFY_WITNESS_PUBKEYTYPE) != 0 && sigVersion == SigVersion.SIGVERSION_WITNESS_V0) require(isPubKeyCompressed(key), "public key must be compressed in segwit")
+    true
   }
 
   def isPubKeyValid(key: Seq[Byte]): Boolean = key.length match {
@@ -137,6 +140,15 @@ object Crypto {
     case _ => false
   }
 
+  def isPubKeyCompressed(key: Seq[Byte]): Boolean = key.length match {
+    case 33 if key(0) == 2 || key(0) == 3 => true
+    case _ => false
+  }
+
+  def isPrivateKeyCompressed(key: Seq[Byte]): Boolean = key.length match {
+    case 33 if key.last == 1 => true
+    case _ => false
+  }
 
   def isDefinedHashtypeSignature(sig: Seq[Byte]): Boolean = if (sig.isEmpty) false
   else {

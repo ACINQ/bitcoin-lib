@@ -370,6 +370,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @return the encoded signature of this tx for this specific tx input
     */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] = {
+    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(Crypto.isPrivateKeyCompressed(privateKey), "private key must be compressed in segwit")
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
     val (r, s) = Crypto.sign(hash, privateKey.take(32))
     val sig = Crypto.encodeSignature(r, s)

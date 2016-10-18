@@ -63,7 +63,8 @@ object ScriptSpec {
     "NULLFAIL" -> SCRIPT_VERIFY_NULLFAIL,
     "CHECKLOCKTIMEVERIFY" -> SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY,
     "CHECKSEQUENCEVERIFY" -> SCRIPT_VERIFY_CHECKSEQUENCEVERIFY,
-    "WITNESS" -> SCRIPT_VERIFY_WITNESS
+    "WITNESS" -> SCRIPT_VERIFY_WITNESS,
+    "WITNESS_PUBKEYTYPE" -> SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
   )
 
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
