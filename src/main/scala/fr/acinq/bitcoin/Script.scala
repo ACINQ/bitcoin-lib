@@ -649,7 +649,13 @@ object Script {
           val sigs = stack3.take(n)
           if ((scriptFlag & ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack3(n).size == 0, "multisig dummy is not empty")
           val stack4 = stack3.drop(n + 1)
-          val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+
+          // Drop the signature in pre-segwit scripts but not segwit scripts
+          val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
+            removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+          } else {
+            scriptCode
+          }
           val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode1), signatureVersion)
           if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
             sigs.foreach(sig => require(sig.isEmpty, "Signature must be zero for failed CHECKMULTISIG operation"))
