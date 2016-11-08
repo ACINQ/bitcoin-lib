@@ -2,7 +2,6 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin
 import org.json4s.DefaultFormats
-import org.json4s.jackson.Serialization
 
 /**
  * implements the "standard" JSON representation of BTC transactions
@@ -53,6 +52,4 @@ object Json {
     }
     Tx(txid.toString, transaction.version, transaction.lockTime, ins, outs)
   }
-
-  def toJson(input: Transaction, testnet: Boolean) = Serialization.writePretty(convert(input, testnet))
 }
