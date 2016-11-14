@@ -47,16 +47,16 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.6</version>
+    <version>0.9.7</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.7-SNAPSHOT, the latest released version is 0.9.6
+The latest snapshot (development) version is 0.9.8-SNAPSHOT, the latest released version is 0.9.7
 
 ## Segwit support
 
-Bitcoin-lib 0.9.6, avalaible on Maven Central, fully supports segwit (see below for more information) and is on par with the segwit code that was just merged into Bitcoin Core.
+Bitcoin-lib 0.9.7, avalaible on Maven Central, fully supports segwit (see below for more information) and is on par with the segwit code in Bitcoin Core 0.13.1.
 
 ## Usage
 
