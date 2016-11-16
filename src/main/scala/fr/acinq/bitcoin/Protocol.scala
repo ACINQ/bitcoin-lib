@@ -188,6 +188,8 @@ object Protocol {
     blob
   }
 
+  def writeBytes(input: Array[Byte], out: OutputStream): Unit = out.write(input)
+
   def varstring(input: InputStream): String = {
     val length = varint(input)
     new String(bytes(input, length), "UTF-8")
@@ -195,7 +197,7 @@ object Protocol {
 
   def writeVarstring(input: String, out: OutputStream) = {
     writeVarint(input.length, out)
-    out.write(input.getBytes("UTF-8"))
+    writeBytes(input.getBytes("UTF-8"), out)
   }
 
   def hash(input: InputStream): Array[Byte] = bytes(input, 32) // a hash is always 256 bits
@@ -209,7 +211,7 @@ object Protocol {
 
   def writeScript(input: Array[Byte], out: OutputStream): Unit = {
     writeVarint(input.length.toLong, out)
-    out.write(input)
+    writeBytes(input, out)
   }
 
   implicit val txInSer = TxIn
@@ -321,8 +323,8 @@ object BlockHeader extends BtcMessage[BlockHeader] {
 
   override def write(input: BlockHeader, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.version, out)
-    out.write(input.hashPreviousBlock)
-    out.write(input.hashMerkleRoot)
+    writeBytes(input.hashPreviousBlock, out)
+    writeBytes(input.hashMerkleRoot, out)
     writeUInt32(input.time, out)
     writeUInt32(input.bits, out)
     writeUInt32(input.nonce, out)
@@ -458,11 +460,11 @@ object Message extends BtcMessage[Message] {
     writeUInt32(input.magic, out)
     val buffer = new Array[Byte](12)
     input.command.getBytes("ISO-8859-1").copyToArray(buffer)
-    out.write(buffer)
+    writeBytes(buffer, out)
     writeUInt32(input.payload.length, out)
     val checksum = Crypto.hash256(input.payload).take(4).toArray
-    out.write(checksum)
-    out.write(input.payload)
+    writeBytes(checksum, out)
+    writeBytes(input.payload, out)
   }
 }
 
@@ -492,10 +494,10 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
     writeUInt32(input.time, out)
     writeUInt64(input.services, out)
     input.address match {
-      case _: Inet4Address => out.write(fromHexString("00000000000000000000ffff"))
+      case _: Inet4Address => writeBytes(fromHexString("00000000000000000000ffff"), out)
       case _: Inet6Address => ()
     }
-    out.write(input.address.getAddress)
+    writeBytes(input.address.getAddress, out)
     writeUInt16BigEndian(input.port, out)
   }
 }
@@ -515,10 +517,10 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
   override def write(input: NetworkAddress, out: OutputStream, protocolVersion: Long) = {
     writeUInt64(input.services, out)
     input.address match {
-      case _: Inet4Address => out.write(fromHexString("00000000000000000000ffff"))
+      case _: Inet4Address => writeBytes(fromHexString("00000000000000000000ffff"), out)
       case _: Inet6Address => ()
     }
-    out.write(input.address.getAddress)
+    writeBytes(input.address.getAddress, out)
     writeUInt16BigEndian(input.port, out) // wtf ?? why BE there ?
   }
 }
@@ -534,8 +536,9 @@ object Version extends BtcMessage[Version] {
     val addr_from = NetworkAddress.read(in)
     val nonce = uint64(in)
     val length = varint(in)
-    val buffer = new Array[Byte](length.toInt)
-    in.read(buffer)
+    /*val buffer = new Array[Byte](length.toInt)
+    in.read(buffer)*/
+    val buffer = bytes(in, length)
     val user_agent = new String(buffer, "ISO-8859-1")
     val start_height = uint32(in)
     val relay = if (uint8(in) == 0) false else true
@@ -550,7 +553,7 @@ object Version extends BtcMessage[Version] {
     NetworkAddress.write(input.addr_from, out)
     writeUInt64(input.nonce, out)
     writeVarint(input.user_agent.length, out)
-    out.write(input.user_agent.getBytes("ISO-8859-1"))
+    writeBytes(input.user_agent.getBytes("ISO-8859-1"), out)
     writeUInt32(input.start_height, out)
     writeUInt8(if (input.relay) 1 else 0, out)
   }
@@ -588,7 +591,7 @@ object InventoryVector extends BtcMessage[InventoryVector] {
 
   override def write(t: InventoryVector, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.`type`, out)
-    out.write(t.hash)
+    writeBytes(t.hash, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): InventoryVector = InventoryVector(uint32(in), hash(in))
@@ -610,7 +613,7 @@ object Getheaders extends BtcMessage[Getheaders] {
   override def write(t: Getheaders, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.version, out)
     writeCollection(t.locatorHashes, (h:BinaryData, o:OutputStream, _: Long) => o.write(h), out, protocolVersion)
-    out.write(t.stopHash)
+    writeBytes(t.stopHash, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): Getheaders = {
@@ -647,7 +650,7 @@ object Getblocks extends BtcMessage[Getblocks] {
   override def write(t: Getblocks, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.version, out)
     writeCollection(t.locatorHashes, (h: BinaryData, o:OutputStream, _: Long) => o.write(h), out, protocolVersion)
-    out.write(t.stopHash)
+    writeBytes(t.stopHash, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): Getblocks = {
