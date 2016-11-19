@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin
 
+import Crypto._
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 
 import scala.annotation.tailrec
@@ -76,6 +77,19 @@ object ScriptFlags {
   //
   val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM = (1 << 12)
 
+
+  // Segwit script only: Require the argument of OP_IF/NOTIF to be exactly 0x01 or empty vector
+  //
+  val SCRIPT_VERIFY_MINIMALIF = (1 << 13)
+
+  // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
+  //
+  val SCRIPT_VERIFY_NULLFAIL = (1 << 14)
+
+  // Public keys in segregated witness scripts must be compressed
+  //
+  val SCRIPT_VERIFY_WITNESS_PUBKEYTYPE = (1 << 15)
+
   /**
     * Mandatory script verification flags that all new blocks must comply with for
     * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -99,6 +113,8 @@ object ScriptFlags {
     SCRIPT_VERIFY_NULLDUMMY |
     SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
     SCRIPT_VERIFY_CLEANSTACK |
+    SCRIPT_VERIFY_MINIMALIF |
+    SCRIPT_VERIFY_NULLFAIL |
     SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY |
     SCRIPT_VERIFY_LOW_S |
@@ -116,8 +132,6 @@ object Script {
   import Protocol._
 
   type Stack = List[Seq[Byte]]
-
-  val LocktimeThreshold = 500000000L
 
   private val True = Seq(1: Byte)
 
@@ -295,8 +309,8 @@ object Script {
     // unless the type of nLockTime being tested is the same as
     // the nLockTime in the transaction.
     if (!(
-      (tx.lockTime < LocktimeThreshold && lockTime < LocktimeThreshold) ||
-        (tx.lockTime >= LocktimeThreshold && lockTime >= LocktimeThreshold)
+      (tx.lockTime < Transaction.LOCKTIME_THRESHOLD && lockTime < Transaction.LOCKTIME_THRESHOLD) ||
+        (tx.lockTime >= Transaction.LOCKTIME_THRESHOLD && lockTime >= Transaction.LOCKTIME_THRESHOLD)
       ))
       return false
 
@@ -406,7 +420,7 @@ object Script {
     def checkSignature(pubKey: Seq[Byte], sigBytes: Seq[Byte], scriptCode: Seq[Byte], signatureVersion: Int): Boolean = {
       if (sigBytes.isEmpty) false
       else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) throw new RuntimeException("invalid signature")
-      else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag)) throw new RuntimeException("invalid public key")
+      else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion)) throw new RuntimeException("invalid public key")
       else if (!Crypto.isPubKeyValid(pubKey)) false
       else {
         val sigHashFlags = sigBytes.last & 0xff // sig hash is the last byte
@@ -414,8 +428,8 @@ object Script {
         if (sigBytes1.isEmpty) false
         else {
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
-          //val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags)
-          Crypto.verifySignature(hash, sigBytes, pubKey)
+          val result = Crypto.verifySignature(hash, sigBytes, pubKey)
+          result
         }
       }
     }
@@ -499,11 +513,17 @@ object Script {
         // check whether we are in a non-executed IF branch
         case OP_IF :: tail if conditions.exists(_ == false) => run(tail, stack, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
         case OP_IF :: tail => stack match {
+          case True :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
+          case False :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
+          case _ :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => throw new RuntimeException("OP_IF argument must be minimal")
           case head :: stacktail if castToBoolean(head) => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case head :: stacktail => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
         }
         case OP_NOTIF :: tail if conditions.exists(_ == false) => run(tail, stack, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
         case OP_NOTIF :: tail => stack match {
+          case False :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
+          case True :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
+          case _ :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0  => throw new RuntimeException("OP_NOTIF argument must be minimal")
           case head :: stacktail if castToBoolean(head) => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
           case head :: stacktail => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
         }
@@ -600,9 +620,12 @@ object Script {
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
             // remove signature from script
-            val scriptCode1 = if (signatureVersion == 0) removeSignature(scriptCode, sigBytes) else scriptCode
-            val result = checkSignature(pubKey, sigBytes, Script.write(scriptCode1), signatureVersion)
-            run(tail, (if (result) True else False) :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
+            val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) removeSignature(scriptCode, sigBytes) else scriptCode
+            val success = checkSignature(pubKey, sigBytes, Script.write(scriptCode1), signatureVersion)
+            if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
+              require(sigBytes.isEmpty, "Signature must be zero for failed CHECKSIG operation")
+            }
+            run(tail, (if (success) True else False) :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
           }
           case _ => throw new RuntimeException("Cannot perform OP_CHECKSIG on a stack with less than 2 elements")
         }
@@ -626,10 +649,18 @@ object Script {
           val sigs = stack3.take(n)
           if ((scriptFlag & ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack3(n).size == 0, "multisig dummy is not empty")
           val stack4 = stack3.drop(n + 1)
-          val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+
+          // Drop the signature in pre-segwit scripts but not segwit scripts
+          val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
+            removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+          } else {
+            scriptCode
+          }
           val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode1), signatureVersion)
-          val result = if (success) True else False
-          run(tail, result :: stack4, state.copy(opCount = nextOpCount), signatureVersion)
+          if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
+            sigs.foreach(sig => require(sig.isEmpty, "Signature must be zero for failed CHECKMULTISIG operation"))
+          }
+          run(tail, (if (success) True else False) :: stack4, state.copy(opCount = nextOpCount), signatureVersion)
         }
         case OP_CHECKMULTISIGVERIFY :: tail => run(OP_CHECKMULTISIG :: OP_VERIFY :: tail, stack, state.copy(opCount = opCount - 1), signatureVersion)
         case OP_CODESEPARATOR :: tail => run(tail, stack, state.copy(opCount = opCount + 1, scriptCode = tail), signatureVersion)
@@ -962,4 +993,46 @@ object Script {
     val op_n = ScriptElt.code2elt(pubkeys.size + 0x50)
     Script.write(op_m :: pubkeys.toList.map(OP_PUSHDATA(_)) ::: op_n :: OP_CHECKMULTISIG :: Nil)
   }
+
+  /**
+    *
+    * @param pubKey public key
+    * @return a pay-to-public-key-hash script
+    */
+  def pay2pkh(pubKey: BinaryData): Seq[ScriptElt] = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hash160(pubKey)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-script script
+    */
+  def pay2sh(script: Seq[ScriptElt]): Seq[ScriptElt] = pay2sh(Script.write(script))
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-script script
+    */
+  def pay2sh(script: BinaryData): Seq[ScriptElt] = OP_HASH160 :: OP_PUSHDATA(hash160(script)) :: OP_EQUAL :: Nil
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-witness-script script
+    */
+  def pay2wsh(script: Seq[ScriptElt]): Seq[ScriptElt] = pay2wsh(Script.write(script))
+
+  /**
+    *
+    * @param script bitcoin script
+    * @return a pay-to-witness-script script
+    */
+  def pay2wsh(script: BinaryData): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(sha256(script)) :: Nil
+
+  /**
+    *
+    * @param pubKey public key
+    * @return a pay-to-witness-public-key-hash script
+    */
+  def pay2wpkh(pubKey: BinaryData): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(hash160(pubKey)) :: Nil
 }

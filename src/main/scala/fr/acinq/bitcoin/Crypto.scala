@@ -12,7 +12,7 @@ import org.spongycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameter
 import org.spongycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.spongycastle.math.ec.ECPoint
 
-import Protocol._
+import scala.annotation.tailrec
 
 object Crypto {
   val params = SECNamedCurves.getByName("secp256k1")
@@ -121,8 +121,11 @@ object Crypto {
     else true
   }
 
-  def checkPubKeyEncoding(key: Seq[Byte], flags: Int): Boolean = {
-    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) isPubKeyCompressedOrUncompressed(key) else true
+  def checkPubKeyEncoding(key: Seq[Byte], flags: Int, sigVersion: Int): Boolean = {
+    if ((flags & ScriptFlags.SCRIPT_VERIFY_STRICTENC) != 0) require(isPubKeyCompressedOrUncompressed(key), "invalid public key")
+    // Only compressed keys are accepted in segwit
+    if ((flags & ScriptFlags.SCRIPT_VERIFY_WITNESS_PUBKEYTYPE) != 0 && sigVersion == SigVersion.SIGVERSION_WITNESS_V0) require(isPubKeyCompressed(key), "public key must be compressed in segwit")
+    true
   }
 
   def isPubKeyValid(key: Seq[Byte]): Boolean = key.length match {
@@ -137,10 +140,19 @@ object Crypto {
     case _ => false
   }
 
+  def isPubKeyCompressed(key: Seq[Byte]): Boolean = key.length match {
+    case 33 if key(0) == 2 || key(0) == 3 => true
+    case _ => false
+  }
+
+  def isPrivateKeyCompressed(key: Seq[Byte]): Boolean = key.length match {
+    case 33 if key.last == 1 => true
+    case _ => false
+  }
 
   def isDefinedHashtypeSignature(sig: Seq[Byte]): Boolean = if (sig.isEmpty) false
   else {
-    val hashType = sig.last & (~(SIGHASH_ANYONECANPAY))
+    val hashType = (sig.last & 0xff) & (~(SIGHASH_ANYONECANPAY))
     if (hashType < SIGHASH_ALL || hashType > SIGHASH_SINGLE) false else true
   }
 
@@ -198,17 +210,15 @@ object Crypto {
   }
 
   /**
-    * Sign data with a private key
+    * Sign data with a private key, using RCF6979 deterministic signatures
     *
     * @param data       data to sign
     * @param privateKey private key. If you are using bitcoin "compressed" private keys make sure to only use the first 32 bytes of
     *                   the key (there is an extra "1" appended to the key)
-    * @param randomize  if true, signing the same data with the same key multiple times will produce different results. Default is 'true'
-    *                   and you should specify 'false' for testing purposes only
     * @return a (r, s) ECDSA signature pair
     */
-  def sign(data: Seq[Byte], privateKey: BinaryData, randomize: Boolean = true): (BigInteger, BigInteger) = {
-    val signer = if (randomize) new ECDSASigner() else new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
+  def sign(data: BinaryData, privateKey: BinaryData): (BigInteger, BigInteger) = {
+    val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
     val privateKeyParameters = new ECPrivateKeyParameters(new BigInteger(1, privateKey), curve)
     signer.init(true, privateKeyParameters)
     val Array(r, s) = signer.generateSignature(data.toArray)

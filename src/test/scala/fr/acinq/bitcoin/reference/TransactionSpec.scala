@@ -41,7 +41,7 @@ object TransactionSpec {
             val amount = prevamountMap.get(tx.txIn(i).outPoint).getOrElse(0 satoshi)
             val ctx = new Script.Context(tx, i, amount)
             val runner = new Script.Runner(ctx, ScriptSpec.parseScriptFlags(verifyFlags))
-            if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.witness(i))) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
+            if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.txIn(i).witness)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
           }
         } match {
           case Success(_) if valid => ()

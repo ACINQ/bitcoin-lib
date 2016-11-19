@@ -59,9 +59,12 @@ object ScriptSpec {
     "DISCOURAGE_UPGRADABLE_NOPS" -> SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS,
     "DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM" -> SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM,
     "CLEANSTACK" -> SCRIPT_VERIFY_CLEANSTACK,
+    "MINIMALIF" -> SCRIPT_VERIFY_MINIMALIF,
+    "NULLFAIL" -> SCRIPT_VERIFY_NULLFAIL,
     "CHECKLOCKTIMEVERIFY" -> SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY,
     "CHECKSEQUENCEVERIFY" -> SCRIPT_VERIFY_CHECKSEQUENCEVERIFY,
-    "WITNESS" -> SCRIPT_VERIFY_WITNESS
+    "WITNESS" -> SCRIPT_VERIFY_WITNESS,
+    "WITNESS_PUBKEYTYPE" -> SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
   )
 
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
@@ -84,7 +87,7 @@ object ScriptSpec {
     val witness = ScriptWitness(witnessText.map(BinaryData(_)))
     val scriptPubKey = parseFromText(scriptPubKeyText)
     val scriptSig = parseFromText(scriptSigText)
-    val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).copy(witness = Seq(witness))
+    val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).updateWitness(0, witness)
     val ctx = Script.Context(tx, 0, amount)
     val runner = new Script.Runner(ctx, parseScriptFlags(flags))
 

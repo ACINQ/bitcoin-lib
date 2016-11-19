@@ -13,10 +13,10 @@ class SegwitSpec extends FunSuite {
     val bin: BinaryData = "01000000000102fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f00000000494830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac000247304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee0121025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee635711000000"
     val tx = Transaction.read(bin, Protocol.PROTOCOL_VERSION)
 
-    assert(tx.witness == Seq(ScriptWitness.empty, ScriptWitness(
+    assert(tx.txIn.map(_.witness) == Seq(ScriptWitness.empty, ScriptWitness(
       Seq(
-      BinaryData("304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee01"),
-      BinaryData("025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee6357")
+        BinaryData("304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee01"),
+        BinaryData("025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee6357")
       )
     )))
     assert(BinaryData(Transaction.write(tx, Protocol.PROTOCOL_VERSION)) == bin)
@@ -34,7 +34,7 @@ class SegwitSpec extends FunSuite {
 
     val sigScript = BinaryData("4830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01")
     val tx1 = tx.updateSigScript(0, sigScript)
-    val tx2 = tx1.copy(witness = ScriptWitness.empty :: ScriptWitness((sig :+ SIGHASH_ALL.toByte) :: pub :: Nil) :: Nil)
+    val tx2 = tx1.updateWitness(1, ScriptWitness((sig :+ SIGHASH_ALL.toByte) :: pub :: Nil))
     val bin: BinaryData = Transaction.write(tx2, Protocol.PROTOCOL_VERSION)
     assert(bin === BinaryData("01000000000102fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f00000000494830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac000247304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee0121025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee635711000000"))
   }
@@ -43,16 +43,17 @@ class SegwitSpec extends FunSuite {
     val tx = Transaction.read("01000000000102fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f00000000494830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac000247304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee0121025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee635711000000", Protocol.PROTOCOL_VERSION)
     val priv: BinaryData = "619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb901"
     val pub: BinaryData = Crypto.publicKeyFromPrivateKey(priv)
-    val pubKeyScript = Script.write(OP_0 :: OP_PUSHDATA(Crypto.hash160(pub)) :: Nil)
+    val pubKeyScript = Script.write(Script.pay2wpkh(pub))
     val runner = new Script.Runner(new Script.Context(tx, 1, 600000000 satoshi), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(runner.verifyScripts(tx.txIn(1).signatureScript, pubKeyScript, tx.witness(1)))
+    assert(runner.verifyScripts(tx.txIn(1).signatureScript, pubKeyScript, tx.txIn(1).witness))
   }
 
   test("segwit fixes tx malleability") {
     val tx1 = Transaction.read("010000000001011e0e457f710df0284a75773b5a8785bfde6f81ab6f5cbb81bbffdbd13c93cf3a0000000000ffffffff0180d54302000000001600140f66351d05269952302a607b4d6fb69517387a9702483045022100d1fe26c7e00b37b833c3973e7394d82d09934670e7d3995f6d8584dd7ef113930220700b4ce9195ddc086b0eaceb0cf7f7f1c89c8f6a5b1c11c7c8c02f4b3d0612ab012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac01900000000", pversion)
-    assert(Transaction.isNotNull(tx1.witness))
+    assert(tx1.hasWitness)
     assert(tx1.txIn.find(!_.signatureScript.isEmpty).isEmpty)
-    val tx2 = tx1.copy(witness = Seq(ScriptWitness.empty))
+    val tx2 = tx1.updateWitnesses(Seq(ScriptWitness.empty))
+    assert(tx2 != tx1)
     assert(tx2.txid == tx1.txid)
   }
 
@@ -75,11 +76,11 @@ class SegwitSpec extends FunSuite {
     // now let's create a simple tx that spends tx1 and send 0.39 BTC to P2WPK output
     val tx2 = {
       val tmp = Transaction(version = 1,
-        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.39 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte], witness = ScriptWitness.empty) :: Nil,
+        txOut = TxOut(0.39 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
-      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)), randomize = false)
+      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)))
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx2.txid == BinaryData("3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e"))
@@ -87,15 +88,15 @@ class SegwitSpec extends FunSuite {
 
     // and now we create a segwit tx that spends the P2WPK output
     val tx3 = {
-      val tmp = Transaction(version = 1,
-        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.38 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+      val tmp: Transaction = Transaction(version = 1,
+        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte], witness = ScriptWitness.empty) :: Nil,
+        txOut = TxOut(0.38 btc, Script.pay2wpkh(pub1)) :: Nil, // we reuse the same output script but if could be anything else
         lockTime = 0
       )
       // mind this: the pubkey script used for signing is not the prevout pubscript (which is just a push
-      // of the pubkey hash), but the actual script that is evaluated by the script engine
-      val pubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
-      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, 1, priv1, randomize = false)
+      // of the pubkey hash), but the actual script that is evaluated by the script engine, in this case a PAY2PKH script
+      val pubKeyScript = Script.pay2pkh(pub1)
+      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
       val witness = ScriptWitness(Seq(sig, pub1))
       tmp.updateWitness(0, witness)
     }
@@ -126,10 +127,10 @@ class SegwitSpec extends FunSuite {
       val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
       val tmp = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.49 btc, OP_0 :: OP_PUSHDATA(Crypto.sha256(redeemScript)) :: Nil) :: Nil,
+        txOut = TxOut(0.49 btc, Script.pay2wsh(redeemScript)) :: Nil,
         lockTime = 0
       )
-      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)), randomize = false)
+      Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)))
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx2.txid == BinaryData("9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355"))
@@ -137,15 +138,15 @@ class SegwitSpec extends FunSuite {
 
     // and now we create a segwit tx that spends the P2WSH output
     val tx3 = {
-      val tmp = Transaction(version = 1,
+      val tmp: Transaction = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
-        txOut = TxOut(0.48 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
+        txOut = TxOut(0.48 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
       val pubKeyScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
-      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, 1)
-      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
-      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
+      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0)
+      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2.take(32))) :+ SIGHASH_ALL.toByte
+      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3.take(32))) :+ SIGHASH_ALL.toByte
       val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, pubKeyScript))
       tmp.updateWitness(0, witness)
     }
@@ -160,7 +161,7 @@ class SegwitSpec extends FunSuite {
     val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
 
     // p2wpkh script
-    val script = Script.write(OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil)
+    val script = Script.write(Script.pay2wpkh(pub1))
 
     // which we embeed into a standard p2sh script
     val p2shaddress = Base58Check.encode(Base58.Prefix.ScriptAddressSegnet, Crypto.hash160(script))
@@ -173,14 +174,14 @@ class SegwitSpec extends FunSuite {
     // let's spend it:
 
     val tx1 = {
-      val tmp = Transaction(version = 1,
+      val tmp: Transaction = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx.hash, 1), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte]) :: Nil,
         txOut = TxOut(0.49 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: Nil) :: Nil,
         lockTime = 0
       )
-      val pubKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(pub1)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
-      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, 1)
-      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1.take(32), randomize = false)) :+ SIGHASH_ALL.toByte
+      val pubKeyScript = Script.pay2pkh(pub1)
+      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, SigVersion.SIGVERSION_WITNESS_V0)
+      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1.take(32))) :+ SIGHASH_ALL.toByte
       val witness = ScriptWitness(Seq(sig, pub1))
       tmp.updateSigScript(0, OP_PUSHDATA(script) :: Nil).updateWitness(0, witness)
     }
