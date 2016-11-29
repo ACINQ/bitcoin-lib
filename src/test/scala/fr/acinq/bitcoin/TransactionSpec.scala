@@ -11,9 +11,12 @@ import Protocol._
 @RunWith(classOf[JUnitRunner])
 class TransactionSpec extends FlatSpec with Matchers {
   "Bitcoins library" should "create and sign transaction" in {
-    val srcTx = fromHexString("dcd82df7b26f0eacd226b8fbd366672c854284ba8080f79e1307138c7f1a1f6d".sliding(2, 2).toList.reverse.mkString("")) // for some reason it has to be reversed
-    val amount = 9000000 // amount in satoshi
-    val vout = 0 // output index
+    val srcTx = fromHexString("dcd82df7b26f0eacd226b8fbd366672c854284ba8080f79e1307138c7f1a1f6d".sliding(2, 2).toList.reverse.mkString(""))
+    // for some reason it has to be reversed
+    val amount = 9000000
+    // amount in satoshi
+    val vout = 0
+    // output index
     val destAdress = fromHexString("76a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac")
     val out = new ByteArrayOutputStream()
     writeUInt32(1, out) //version
@@ -26,17 +29,20 @@ class TransactionSpec extends FlatSpec with Matchers {
     writeUInt64(amount, out)
     writeScript(destAdress, out) //output script
     writeUInt32(0, out)
-    writeUInt32(1, out) // hash code type
+    writeUInt32(1, out)
+    // hash code type
     val serialized = out.toByteArray
     val hashed = Crypto.hash256(serialized)
     val pkey_encoded = Base58.decode("92f9274aR3s6zd1vuAgxquv4KP5S5thJadF3k54NHuTV4fXL1vW")
     val pkey = pkey_encoded.slice(1, pkey_encoded.size - 4)
     val (r, s) = Crypto.sign(hashed, pkey)
-    val sig = Crypto.encodeSignature(r, s) // DER encoded
+    val sig = Crypto.encodeSignature(r, s)
+    // DER encoded
     val sigOut = new ByteArrayOutputStream()
     writeUInt8(sig.length + 1, sigOut) // +1 because of the hash code
     sigOut.write(sig.toArray)
-    writeUInt8(1, sigOut) // hash code type
+    writeUInt8(1, sigOut)
+    // hash code type
     val pub = Crypto.publicKeyFromPrivateKey(pkey)
     writeUInt8(pub.length, sigOut)
     sigOut.write(pub)
@@ -207,8 +213,10 @@ class TransactionSpec extends FlatSpec with Matchers {
       SignData(previousTx(2).txOut(0).publicKeyScript, Base58Check.decode("921vnTeSQCN7GMHdiHyaoZ1JSugTtzvg8rqyXH9HmFtBgrNDxCT")._2)
     )
 
-    val dest1 = "n2Jrcf7cJH7wMJdhKZGVi2jaSnV2BwYE9m" //priv: 926iWgQDq5dN84BJ4q2fu4wjSSaVWFxwanE8EegzMh3vGCUBJ94
-    val dest2 = "mk6kmMF5EEXksBkZxi7FniwwRgWuZuwDpo" //priv: 91r7coHBdzfgfm2p3ToJ3Bu6kcqL3BvSo5m4ENzMZzsimRKH8aq
+    val dest1 = "n2Jrcf7cJH7wMJdhKZGVi2jaSnV2BwYE9m"
+    //priv: 926iWgQDq5dN84BJ4q2fu4wjSSaVWFxwanE8EegzMh3vGCUBJ94
+    val dest2 = "mk6kmMF5EEXksBkZxi7FniwwRgWuZuwDpo"
+    //priv: 91r7coHBdzfgfm2p3ToJ3Bu6kcqL3BvSo5m4ENzMZzsimRKH8aq
     // 0.03 and 0.07 BTC in satoshi, meaning the fee will be (0.01+0.002+0.09)-(0.03+0.07) = 0.002
     val amount1 = 3000000 satoshi
     val amount2 = 7000000 satoshi
@@ -239,5 +247,13 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // redeem tx
     Transaction.correctlySpends(signedTx, previousTx, ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
+  }
+
+  it should "compute tx size and weight" in {
+    val tx = Transaction.read("02000000000101d5babb96fc16d69455555edad0147525dba4581a4698fa5ffa270038663622d00100000000ffffffff04f6540000000000002200205751128e230201252054ab0fe8bfb897bcea7558dcb3cb43b435f11eea307b96f6540000000000001976a91470c0b535309db2aff3feabf5a54ad54ed28860e888acf65400000000000022002014aa3f91b837d2e3907a369b154368bc3a56cb6d2e7ca9f8163bfab480683ccef6540000000000002200206b39ae68b56cf3a1abb4be38fb55aaa6f5607f200642f52941b07c32572e49070400483045022100bb9d60b3d659329d346611fc107cf6aff5d29fb41209f55469978c1766f4571c02205a7466982e4ededb6adaccb44c8e68839b3bb9a7a042d6b3f1fef608cf8ab00601483045022100fe2c561731015d5d20083d57ec6d1b640359191dc239b8867ac064b930c3795d02201f54e0025ea1f074abb9c7d9eaed791d11f8fbd1387235a56e6500d6130e9b66014752210313151c5c6bb22d2d989cba0f12a51545d6179bae0ede36dcea598e06b0a279db2103c28b94b58f539ea687a941f8256c14b9b856d00a33bd526851ab021b69c87b6552ae00000000")
+
+    assert(tx.baseSize() == 214)
+    assert(tx.totalSize() == 436)
+    assert(tx.weight() == 1078)
   }
 }
