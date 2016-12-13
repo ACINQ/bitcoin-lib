@@ -421,7 +421,7 @@ object Script {
       if (sigBytes.isEmpty) false
       else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) throw new RuntimeException("invalid signature")
       else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion)) throw new RuntimeException("invalid public key")
-      else if (!Crypto.isPubKeyValid(pubKey)) false
+      else if (!Crypto.isPubKeyValid(pubKey)) false // see how this is different from above ?
       else {
         val sigHashFlags = sigBytes.last & 0xff
         // sig hash is the last byte
@@ -429,7 +429,7 @@ object Script {
         if (sigBytes1.isEmpty) false
         else {
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
-          val result = Crypto.verifySignature(hash, sigBytes, pubKey)
+          val result = Crypto.verifySignature(hash, sigBytes, Point(pubKey))
           result
         }
       }
@@ -987,14 +987,14 @@ object Script {
     *                as required signatures)
     * @return a multisig redeem script
     */
-  def createMultiSigMofN(m: Int, pubkeys: Seq[BinaryData]): Array[Byte] = {
+  def createMultiSigMofN(m: Int, pubkeys: Seq[PublicKey]): Seq[ScriptElt] = {
     require(m > 0 && m <= 16, s"number of required signatures is $m, should be between 1 and 16")
     require(pubkeys.size > 0 && pubkeys.size <= 16, s"number of public keys is ${pubkeys.size}, should be between 1 and 16")
     require(m <= pubkeys.size, "The required number of signatures shouldn't be greater than the number of public keys")
     val op_m = ScriptElt.code2elt(m + 0x50)
     // 1 -> OP_1, 2 -> OP_2, ... 16 -> OP_16
     val op_n = ScriptElt.code2elt(pubkeys.size + 0x50)
-    Script.write(op_m :: pubkeys.toList.map(OP_PUSHDATA(_)) ::: op_n :: OP_CHECKMULTISIG :: Nil)
+    op_m :: pubkeys.toList.map(OP_PUSHDATA(_)) ::: op_n :: OP_CHECKMULTISIG :: Nil
   }
 
   /**
@@ -1002,7 +1002,7 @@ object Script {
     * @param pubKey public key
     * @return a pay-to-public-key-hash script
     */
-  def pay2pkh(pubKey: BinaryData): Seq[ScriptElt] = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hash160(pubKey)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
+  def pay2pkh(pubKey: PublicKey): Seq[ScriptElt] = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubKey.hash) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
 
   /**
     *
@@ -1037,5 +1037,5 @@ object Script {
     * @param pubKey public key
     * @return a pay-to-witness-public-key-hash script
     */
-  def pay2wpkh(pubKey: BinaryData): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(hash160(pubKey)) :: Nil
+  def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(pubKey.hash) :: Nil
 }

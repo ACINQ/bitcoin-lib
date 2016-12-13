@@ -38,7 +38,7 @@ class ProtocolSpec extends FlatSpec {
   }
   it should "serialize/deserialize blocks" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/block1.dat")
-    val bytes = ByteStreams.toByteArray(stream).toSeq
+    val bytes: BinaryData = ByteStreams.toByteArray(stream)
     val block = Block.read(bytes)
     val check = Block.write(block)
     assert(check == bytes)
@@ -115,10 +115,10 @@ class ProtocolSpec extends FlatSpec {
     assert(message.command === "addr")
     val addr = Addr.read(message.payload)
     assert(addr.addresses.length === 1)
-    assert(addr.addresses(0).address.getAddress === Array(10:Byte, 0:Byte, 0:Byte, 1:Byte))
+    assert(addr.addresses(0).address.getAddress === Array(10: Byte, 0: Byte, 0: Byte, 1: Byte))
     assert(addr.addresses(0).port === 8333)
 
-    val addr1 = Addr(List(NetworkAddressWithTimestamp(time = 1292899810L, services = 1L, address = InetAddress.getByAddress(Array(10:Byte, 0:Byte, 0:Byte, 1:Byte)), port = 8333)))
+    val addr1 = Addr(List(NetworkAddressWithTimestamp(time = 1292899810L, services = 1L, address = InetAddress.getByAddress(Array(10: Byte, 0: Byte, 0: Byte, 1: Byte)), port = 8333)))
     val message1 = Message(magic = 0xd9b4bef9, command = "addr", payload = Addr.write(addr1))
     assert(toHexString(Message.write(message1)) === "f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d")
   }

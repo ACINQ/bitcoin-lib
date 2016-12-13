@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
@@ -107,16 +108,16 @@ class SegwitSpec extends FunSuite {
   }
 
   test("create p2wsh tx") {
-    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
-    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
-    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1))
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pub1 = priv1.toPoint
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, pub1.hash)
     assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
 
-    val (Base58.Prefix.SecretKeySegnet, priv2) = Base58Check.decode("QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ")
-    val pub2: BinaryData = Crypto.publicKeyFromPrivateKey(priv2)
+    val priv2 = PrivateKey.fromBase58("QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ", Base58.Prefix.SecretKeySegnet)
+    val pub2 = priv2.toPoint
 
-    val (Base58.Prefix.SecretKeySegnet, priv3) = Base58Check.decode("QX3AN7b3WCAFaiCvAS2UD7HJZBsFU6r5shjfogJu55411hAF3BVx")
-    val pub3: BinaryData = Crypto.publicKeyFromPrivateKey(priv3)
+    val priv3 = PrivateKey.fromBase58("QX3AN7b3WCAFaiCvAS2UD7HJZBsFU6r5shjfogJu55411hAF3BVx", Base58.Prefix.SecretKeySegnet)
+    val pub3 = priv3.toPoint
 
     // this is a standard tx that sends 0.5 BTC to D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap
     val tx1 = Transaction.read("010000000240b4f27534e9d5529e67e52619c7addc88eff64c8e7afc9b41afe9a01c6e2aea010000006b48304502210091aed7fe956c4b2471778bfef5a323a96fee21ec6d73a9b7f363beaad135c5f302207f63b0ffc08fd905cdb87b109416c2d6d8ec56ca25dd52529c931aa1154277f30121037cb5789f1ca6c640b6d423ef71390e0b002da81db8fad4466bf6c2fdfb79a24cfeffffff6e21b8c625d9955e48de0a6bbcd57b03624620a93536ddacabc19d024c330f04010000006a47304402203fb779df3ae2bf8404e6d89f83af3adee0d0a0c4ec5a01a1e88b3aa4313df6490220608177ca82cf4f7da9820a8e8bf4266ccece9eb004e73926e414296d0635d7c1012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac019feffffff0280f0fa02000000001976a9140f66351d05269952302a607b4d6fb69517387a9788ace06d9800000000001976a91457572594090c298721e8dddcec3ac1ec593c6dcc88ac205a0000", pversion)
@@ -143,10 +144,10 @@ class SegwitSpec extends FunSuite {
         txOut = TxOut(0.48 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
-      val pubKeyScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
+      val pubKeyScript = Script.write(Script.createMultiSigMofN(2, Seq(pub2, pub3)))
       val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0)
-      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2.take(32))) :+ SIGHASH_ALL.toByte
-      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3.take(32))) :+ SIGHASH_ALL.toByte
+      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2)) :+ SIGHASH_ALL.toByte
+      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3)) :+ SIGHASH_ALL.toByte
       val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, pubKeyScript))
       tmp.updateWitness(0, witness)
     }
@@ -157,8 +158,8 @@ class SegwitSpec extends FunSuite {
   }
 
   test("create p2pkh embedded in p2sh") {
-    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
-    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pub1: BinaryData = priv1.toPoint
 
     // p2wpkh script
     val script = Script.write(Script.pay2wpkh(pub1))
@@ -181,7 +182,7 @@ class SegwitSpec extends FunSuite {
       )
       val pubKeyScript = Script.pay2pkh(pub1)
       val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, SigVersion.SIGVERSION_WITNESS_V0)
-      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1.take(32))) :+ SIGHASH_ALL.toByte
+      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1)) :+ SIGHASH_ALL.toByte
       val witness = ScriptWitness(Seq(sig, pub1))
       tmp.updateSigScript(0, OP_PUSHDATA(script) :: Nil).updateWitness(0, witness)
     }

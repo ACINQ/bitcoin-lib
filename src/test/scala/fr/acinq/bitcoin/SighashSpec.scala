@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.scalatest.{FlatSpec, FunSuite}
 
 /**
@@ -8,11 +9,11 @@ import org.scalatest.{FlatSpec, FunSuite}
 class SighashSpec extends FunSuite {
   test("SIGHASH_ANYONECANPAY lets you add inputs") {
     val privateKeys = List(
-      BinaryData(Base58Check.decode("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs")._2),
-      BinaryData(Base58Check.decode("cV5oyXUgySSMcUvKNdKtuYg4t4NTaxkwYrrocgsJZuYac2ogEdZX")._2)
+      PrivateKey.fromBase58("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs", Base58.Prefix.SecretKeyTestnet),
+      PrivateKey.fromBase58("cV5oyXUgySSMcUvKNdKtuYg4t4NTaxkwYrrocgsJZuYac2ogEdZX", Base58.Prefix.SecretKeyTestnet)
     )
 
-    val publicKeys = privateKeys.map(k => Crypto.publicKeyFromPrivateKey(k): BinaryData)
+    val publicKeys = privateKeys.map(_.toPoint)
 
     val previousTx = Seq(
       Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2pkh(publicKeys(0))) :: Nil, lockTime = 0),
@@ -47,13 +48,12 @@ class SighashSpec extends FunSuite {
   }
 
   test("SIGHASH_ANYONECANPAY lets you add inputs (SEGWIT version") {
-
     val privateKeys = List(
-      BinaryData(Base58Check.decode("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs")._2),
-      BinaryData(Base58Check.decode("cV5oyXUgySSMcUvKNdKtuYg4t4NTaxkwYrrocgsJZuYac2ogEdZX")._2)
+      PrivateKey.fromBase58("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs", Base58.Prefix.SecretKeyTestnet),
+      PrivateKey.fromBase58("cV5oyXUgySSMcUvKNdKtuYg4t4NTaxkwYrrocgsJZuYac2ogEdZX", Base58.Prefix.SecretKeyTestnet)
     )
 
-    val publicKeys = privateKeys.map(k => Crypto.publicKeyFromPrivateKey(k): BinaryData)
+    val publicKeys = privateKeys.map(_.toPoint)
 
     val previousTx = Seq(
       Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2wpkh(publicKeys(0))) :: Nil, lockTime = 0),
@@ -67,7 +67,7 @@ class SighashSpec extends FunSuite {
     val tx1 = {
       val tmp = tx.addInput(TxIn(OutPoint(previousTx(0), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
       val sig: BinaryData = Transaction.signInput(tmp, 0, Script.pay2pkh(publicKeys(0)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(0).txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys(0))
-      tmp.updateWitness(0, ScriptWitness(sig :: publicKeys(0) :: Nil))
+      tmp.updateWitness(0, ScriptWitness(sig :: publicKeys(0).toBin :: Nil))
     }
     Transaction.correctlySpends(tx1, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
@@ -75,7 +75,7 @@ class SighashSpec extends FunSuite {
     val tx2 = {
       val tmp = tx1.addInput(TxIn(OutPoint(previousTx(1), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
       val sig: BinaryData = Transaction.signInput(tmp, 1, Script.pay2pkh(publicKeys(1)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(1).txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys(1))
-      tmp.updateWitness(1, ScriptWitness(sig :: publicKeys(1) :: Nil))
+      tmp.updateWitness(1, ScriptWitness(sig :: publicKeys(1).toBin :: Nil))
     }
     Transaction.correctlySpends(tx2, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 

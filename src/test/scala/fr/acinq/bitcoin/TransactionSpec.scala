@@ -7,6 +7,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
 import Protocol._
+import fr.acinq.bitcoin.Crypto._
 
 @RunWith(classOf[JUnitRunner])
 class TransactionSpec extends FlatSpec with Matchers {
@@ -34,7 +35,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val serialized = out.toByteArray
     val hashed = Crypto.hash256(serialized)
     val pkey_encoded = Base58.decode("92f9274aR3s6zd1vuAgxquv4KP5S5thJadF3k54NHuTV4fXL1vW")
-    val pkey = pkey_encoded.slice(1, pkey_encoded.size - 4)
+    val pkey = Scalar(pkey_encoded.slice(1, pkey_encoded.size - 4))
     val (r, s) = Crypto.sign(hashed, pkey)
     val sig = Crypto.encodeSignature(r, s)
     // DER encoded
@@ -43,9 +44,9 @@ class TransactionSpec extends FlatSpec with Matchers {
     sigOut.write(sig.toArray)
     writeUInt8(1, sigOut)
     // hash code type
-    val pub = Crypto.publicKeyFromPrivateKey(pkey)
+    val pub = pkey.toPoint
     writeUInt8(pub.length, sigOut)
-    sigOut.write(pub)
+    sigOut.write(pub.toBin)
     val sigScript = sigOut.toByteArray
 
     val signedOut = new ByteArrayOutputStream()
@@ -69,7 +70,7 @@ class TransactionSpec extends FlatSpec with Matchers {
   it should "create and verify pay2pk transactions with 1 input/1 output" in {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val amount = 10000 satoshi
-    val (_, privateKey) = Base58Check.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
+    val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
 
     val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
     // create a transaction where the sig script is the pubkey script of the tx we want to redeem
@@ -100,14 +101,14 @@ class TransactionSpec extends FlatSpec with Matchers {
     val hashed = Crypto.hash256(serializedTx1AndHashType)
 
     // step #4: sign transaction hash
-    val (r, s) = Crypto.sign(hashed, privateKey.take(32))
+    val (r, s) = Crypto.sign(hashed, privateKey)
     val sig = Crypto.encodeSignature(r, s) // DER encoded
 
     // this is the public key that is associated to the private key we used for signing
-    val publicKey = Crypto.publicKeyFromPrivateKey(privateKey)
+    val publicKey = privateKey.toPoint
     // we check that is really is the public key that is encoded in the address the previous tx was paid to
     val providedHash = Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2
-    val computedHash = Crypto.hash160(publicKey)
+    val computedHash = publicKey.hash
     assert(providedHash == computedHash)
 
     // step #5: now we replace the sigscript with sig + public key, and we get what would be sent to the btc network
@@ -120,7 +121,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     ))
 
     // check signature
-    assert(Crypto.verifySignature(hashed, sig, publicKey))
+    assert(Crypto.verifySignature(hashed, sig, publicKey.toBin))
 
     // check script
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)

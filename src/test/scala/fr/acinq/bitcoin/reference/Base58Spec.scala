@@ -46,7 +46,7 @@ class Base58Spec extends FlatSpec {
           isCompressed match {
             case true =>
               assert(data.length == 33)
-              assert(data(32) == 1)
+              assert(data.last == 1)
               assert(toHexString(data.take(32)) == hex)
             case false =>
               assert(data.length == 32)
@@ -56,7 +56,7 @@ class Base58Spec extends FlatSpec {
           val JString(addrType) = obj \ "addrType"
           assert(toHexString(data) == hex)
           (addrType, isTestnet) match {
-            case ("pubkey", false) => assert(version ==  Prefix.PubkeyAddress)
+            case ("pubkey", false) => assert(version == Prefix.PubkeyAddress)
             case ("pubkey", true) => assert(version == Prefix.PubkeyAddressTestnet)
             case ("script", false) => assert(version == Prefix.ScriptAddress)
             case ("script", true) => assert(version == Prefix.ScriptAddressTestnet)

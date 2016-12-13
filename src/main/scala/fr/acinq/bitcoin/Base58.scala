@@ -35,10 +35,10 @@ object Base58 {
   val map = alphabet.zipWithIndex.toMap
 
   /**
-   *
-   * @param input binary data
-   * @return the base-58 representation of input
-   */
+    *
+    * @param input binary data
+    * @return the base-58 representation of input
+    */
   def encode(input: Seq[Byte]): String = {
     if (input.isEmpty) ""
     else {
@@ -53,6 +53,7 @@ object Base58 {
           builder.append(alphabet.charAt(remainder.intValue))
           encode1(x)
       }
+
       encode1(big)
       input.takeWhile(_ == 0).map(_ => builder.append(alphabet.charAt(0)))
       builder.toString().reverse
@@ -60,73 +61,74 @@ object Base58 {
   }
 
   /**
-   *
-   * @param input base-58 encoded data
-   * @return the decoded data
-   */
-  def decode(input: String) : BinaryData = {
-    val zeroes = input.takeWhile(_ == '1').map(_ => 0:Byte).toArray
-    val trim  = input.dropWhile(_ == '1').toList
+    *
+    * @param input base-58 encoded data
+    * @return the decoded data
+    */
+  def decode(input: String): BinaryData = {
+    val zeroes = input.takeWhile(_ == '1').map(_ => 0: Byte).toArray
+    val trim = input.dropWhile(_ == '1').toList
     val decoded = trim.foldLeft(BigInteger.ZERO)((a, b) => a.multiply(BigInteger.valueOf(58L)).add(BigInteger.valueOf(map(b))))
     if (trim.isEmpty) zeroes else zeroes ++ decoded.toByteArray.dropWhile(_ == 0) // BigInteger.toByteArray may add a leading 0x00
   }
 }
 
 /**
- * https://en.bitcoin.it/wiki/Base58Check_encoding
- * Base58Check is a format based on Base58 and used a lot in bitcoin, for encoding addresses and private keys for
- * example. It includes a prefix (usually a single byte) and a checksum so you know what has been encoded, and that it has
- * been transmitted correctly.
- * For example, to create an address for a public key you could write:
- * {{{
- *   val pub: BinaryData = "0202a406624211f2abbdc68da3df929f938c3399dd79fac1b51b0e4ad1d26a47aa"
- *   val address = Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pub))
- * }}}
- * And to decode a private key you could write:
- * {{{
- *   // check that is it a mainnet private key
- *   val (Base58.Prefix.SecretKey, priv) = Base58Check.decode("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn")
- * }}}
- *
- */
+  * https://en.bitcoin.it/wiki/Base58Check_encoding
+  * Base58Check is a format based on Base58 and used a lot in bitcoin, for encoding addresses and private keys for
+  * example. It includes a prefix (usually a single byte) and a checksum so you know what has been encoded, and that it has
+  * been transmitted correctly.
+  * For example, to create an address for a public key you could write:
+  * {{{
+  *   val pub: BinaryData = "0202a406624211f2abbdc68da3df929f938c3399dd79fac1b51b0e4ad1d26a47aa"
+  *   val address = Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pub))
+  * }}}
+  * And to decode a private key you could write:
+  * {{{
+  *   // check that is it a mainnet private key
+  *   val (Base58.Prefix.SecretKey, priv) = Base58Check.decode("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn")
+  * }}}
+  *
+  */
 object Base58Check {
   def checksum(data: Seq[Byte]) = Crypto.hash256(data).take(4)
 
   /**
-   * Encode data in Base58Check format.
-   * For example, to create an address from a public key you could use:
-   *
-   * @param prefix version prefix (one byte)
-   * @param data date to be encoded
-   * @return a Base58 string
-   */
-  def encode(prefix: Byte, data: Seq[Byte]) : String = {
+    * Encode data in Base58Check format.
+    * For example, to create an address from a public key you could use:
+    *
+    * @param prefix version prefix (one byte)
+    * @param data   date to be encoded
+    * @return a Base58 string
+    */
+  def encode(prefix: Byte, data: Seq[Byte]): String = {
     val prefixAndData = prefix +: data
     Base58.encode(prefixAndData ++ checksum(prefixAndData))
   }
 
   /**
-   *
-   * @param prefix version prefix (several bytes, as used with BIP32 ExtendedKeys for example)
-   * @param data data to be encoded
-   * @return a Base58 String
-   */
-  def encode(prefix: Seq[Byte], data: Seq[Byte]) : String = {
+    *
+    * @param prefix version prefix (several bytes, as used with BIP32 ExtendedKeys for example)
+    * @param data   data to be encoded
+    * @return a Base58 String
+    */
+  def encode(prefix: Seq[Byte], data: Seq[Byte]): String = {
     val prefixAndData = prefix ++ data
     Base58.encode(prefixAndData ++ checksum(prefixAndData))
   }
 
   /**
-   * Decodes Base58 data that has been encoded with a single byte prefix
-   * @param encoded encoded data
-   * @return a (prefix, data) tuple
-   * @throws RuntimeException if the checksum that is part of the encoded data cannot be verified
-   */
-  def decode(encoded: String) : (Byte, Seq[Byte]) = {
+    * Decodes Base58 data that has been encoded with a single byte prefix
+    *
+    * @param encoded encoded data
+    * @return a (prefix, data) tuple
+    * @throws RuntimeException if the checksum that is part of the encoded data cannot be verified
+    */
+  def decode(encoded: String): (Byte, BinaryData) = {
     val raw = Base58.decode(encoded)
     val versionAndHash = raw.dropRight(4)
     val checksum = raw.takeRight(4)
-    require(checksum ==  Base58Check.checksum(versionAndHash), s"invalid Base58Check data $encoded")
+    require(checksum == Base58Check.checksum(versionAndHash), s"invalid Base58Check data $encoded")
     (versionAndHash(0), versionAndHash.tail)
   }
 }

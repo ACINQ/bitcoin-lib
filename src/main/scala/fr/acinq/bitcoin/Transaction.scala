@@ -4,6 +4,7 @@ import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 
 import fr.acinq.bitcoin.Script.Runner
 import Protocol._
+import fr.acinq.bitcoin.Crypto.PrivateKey
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -379,10 +380,10 @@ object Transaction extends BtcMessage[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] = {
-    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(Crypto.isPrivateKeyCompressed(privateKey), "private key must be compressed in segwit")
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): BinaryData = {
+    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(privateKey.compressed, "private key must be compressed in segwit")
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-    val (r, s) = Crypto.sign(hash, privateKey.take(32))
+    val (r, s) = Crypto.sign(hash, privateKey)
     val sig = Crypto.encodeSignature(r, s)
     sig :+ (sighashType.toByte)
   }
@@ -399,7 +400,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] =
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): BinaryData =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
 
   /**
@@ -412,7 +413,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @return the encoded signature of this tx for this specific tx input
     */
   @deprecated
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: Seq[Byte]): Seq[Byte] =
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: PrivateKey): BinaryData =
   signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
 
   /**
