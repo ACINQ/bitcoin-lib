@@ -61,7 +61,7 @@ object Crypto {
     * @param compressed if true, points generated from this scalar will be compressed
     */
   case class Scalar(value: BigInteger, compressed: Boolean = true) {
-    def add(scalar: Scalar): Scalar = Scalar(value.add(scalar.value))
+    def add(scalar: Scalar): Scalar = Scalar(value.add(scalar.value)).mod(Crypto.curve.getN)
 
     def multiply(scalar: Scalar): Scalar = Scalar(value.multiply(scalar.value).mod(Crypto.curve.getN))
 
