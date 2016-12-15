@@ -66,6 +66,12 @@ object Protocol {
 
   def writeUInt16(input: Int, out: OutputStream): Unit = writeUInt16(input.toLong, out)
 
+  def writeUInt16(input: Int): Array[Byte] = {
+    val out = new ByteArrayOutputStream(2)
+    writeUInt16(input, out)
+    out.toByteArray
+  }
+
   def writeUInt16BigEndian(input: Long, out: OutputStream): Unit = {
     writeUInt8((input >> 8) & 0xff, out)
     writeUInt8((input) & 0xff, out)
@@ -98,11 +104,7 @@ object Protocol {
 
   def writeUInt32(input: Int, out: OutputStream): Unit = writeUInt32(input.toLong, out)
 
-  def writeUInt32(input: Int): Array[Byte] = {
-    val out = new ByteArrayOutputStream()
-    writeUInt32(input, out)
-    out.toByteArray
-  }
+  def writeUInt32(input: Int): Array[Byte] = writeUInt32(input.toLong)
 
   def writeUInt32(input: Long): Array[Byte] = {
     val out = new ByteArrayOutputStream(4)
