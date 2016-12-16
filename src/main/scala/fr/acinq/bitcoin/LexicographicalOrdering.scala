@@ -9,7 +9,7 @@ import scala.annotation.tailrec
 object LexicographicalOrdering {
   @tailrec
   def isLessThan(a: Seq[Byte], b: Seq[Byte]): Boolean = {
-    if (a.isEmpty && b.isEmpty) true
+    if (a.isEmpty && b.isEmpty) false
     else if (a.isEmpty) true
     else if (b.isEmpty) false
     else if (a.head == b.head) isLessThan(a.tail, b.tail)
