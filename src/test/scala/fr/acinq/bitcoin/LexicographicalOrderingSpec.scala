@@ -48,4 +48,9 @@ class LexicographicalOrderingSpec extends FunSuite {
       TxOut(2400000000L satoshi, BinaryData("41044a656f065871a353f216ca26cef8dde2f03e8c16202d2e8ad769f02032cb86a5eb5e56842e92e19141d60a01928f8dd2c875a390f67c1f6c94cfc617c0ea45afac"))
     ))
   }
+
+  test("shorter is lesser") {
+    assert(LexicographicalOrdering.isLessThan(BinaryData("aaaa"), BinaryData("aaaa00")))
+    assert(!LexicographicalOrdering.isLessThan(BinaryData("aaaa00"), BinaryData("aaaa")))
+  }
 }

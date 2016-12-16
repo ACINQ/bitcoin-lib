@@ -4,8 +4,8 @@ import java.io._
 import java.math.BigInteger
 
 /**
- * see https://en.bitcoin.it/wiki/Protocol_specification
- */
+  * see https://en.bitcoin.it/wiki/Protocol_specification
+  */
 package object bitcoin {
   val Coin = 100000000L
   val Cent = 1000000L
@@ -15,8 +15,8 @@ package object bitcoin {
   val LockTimeThreshold = 500000000L
 
   /**
-   * signature hash flags
-   */
+    * signature hash flags
+    */
   val SIGHASH_ALL = 1
   val SIGHASH_NONE = 2
   val SIGHASH_SINGLE = 3
@@ -66,8 +66,14 @@ package object bitcoin {
     require(amount.abs <= 21e6, "amount must not be greater than 21 millions")
   }
 
+  case class MilliSatoshi(amount: Long) extends BtcAmount
+
   implicit final class SatoshiLong(private val n: Long) extends AnyVal {
     def satoshi = Satoshi(n)
+  }
+
+  implicit final class MilliSatoshiLong(private val n: Long) extends AnyVal {
+    def millisatoshi = MilliSatoshi(n)
   }
 
   implicit final class BtcDouble(private val n: Double) extends AnyVal {
@@ -90,25 +96,37 @@ package object bitcoin {
 
   implicit def millibtc2btc(input: MilliBtc): Btc = Btc(input.amount / 1000L)
 
+  implicit def satoshi2millisatoshi(input: Satoshi): MilliSatoshi = MilliSatoshi(input.amount * 1000L)
+
+  implicit def millisatoshi2satoshi(input: MilliSatoshi): Satoshi = Satoshi(input.amount / 1000L)
+
+  implicit def btc2millisatoshi(input: Btc): MilliSatoshi = satoshi2millisatoshi(btc2satoshi(input))
+
+  implicit def millisatoshi2btc(input: MilliSatoshi): Btc = satoshi2btc(millisatoshi2satoshi(input))
+
+  implicit def millibtc2millisatoshi(input: MilliBtc): MilliSatoshi = satoshi2millisatoshi(millibtc2satoshi(input))
+
+  implicit def millisatoshi2millibtc(input: MilliSatoshi): MilliBtc = satoshi2millibtc(millisatoshi2satoshi(input))
+
   def toHexString(blob: Seq[Byte]) = blob.map("%02x".format(_)).mkString
 
   def fromHexString(hex: String): Array[Byte] = hex.stripPrefix("0x").sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)
 
-  implicit def string2binaryData(input: String) : BinaryData = BinaryData(fromHexString(input))
+  implicit def string2binaryData(input: String): BinaryData = BinaryData(fromHexString(input))
 
-  implicit def seq2binaryData(input: Seq[Byte]) : BinaryData = BinaryData(input)
+  implicit def seq2binaryData(input: Seq[Byte]): BinaryData = BinaryData(input)
 
-  implicit def array2binaryData(input: Array[Byte]) : BinaryData = BinaryData(input)
+  implicit def array2binaryData(input: Array[Byte]): BinaryData = BinaryData(input)
 
-  implicit def binaryData2array(input: BinaryData) : Array[Byte] = input.data.toArray
+  implicit def binaryData2array(input: BinaryData): Array[Byte] = input.data.toArray
 
-  implicit def binaryData2Seq(input: BinaryData) : Seq[Byte] = input.data
+  implicit def binaryData2Seq(input: BinaryData): Seq[Byte] = input.data
 
   /**
-   *
-   * @param input compact size encoded integer as used to encode proof-of-work difficulty target
-   * @return a (result, isNegative, overflow) tuple were result is the decoded integer
-   */
+    *
+    * @param input compact size encoded integer as used to encode proof-of-work difficulty target
+    * @return a (result, isNegative, overflow) tuple were result is the decoded integer
+    */
   def decodeCompact(input: Long): (BigInteger, Boolean, Boolean) = {
     val nSize = (input >> 24).toInt
     val (nWord, result) = if (nSize <= 3) {
