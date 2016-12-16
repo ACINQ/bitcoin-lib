@@ -109,7 +109,7 @@ class DeterministicWalletSpec extends FlatSpec {
     val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes.data ++ writeUInt32BigEndian(42L))
     val IL = I.take(32)
     val IR = I.takeRight(32)
-    val guess = new BigInteger(1, m42.secretkeybytes).subtract(new BigInteger(1, IL)).mod(Crypto.curve.getN)
+    val guess = new BigInteger(1, m42.secretkeybytes).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)
     assert(guess === k)
   }
   it should "be able to derive private keys" in {

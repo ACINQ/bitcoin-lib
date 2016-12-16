@@ -171,7 +171,7 @@ object Script {
     case head :: tail => out.write(elt2code(head)); write(tail, out)
   }
 
-  def write(script: Seq[ScriptElt]): Array[Byte] = {
+  def write(script: Seq[ScriptElt]): BinaryData = {
     val out = new ByteArrayOutputStream()
     write(script, out)
     out.toByteArray
@@ -204,7 +204,7 @@ object Script {
     case _ => 1
   }
 
-  def encodeNumber(value: Long): Seq[Byte] = {
+  def encodeNumber(value: Long): BinaryData = {
     if (value == 0) Array.empty[Byte]
     else {
       val result = ArrayBuffer.empty[Byte]

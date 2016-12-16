@@ -145,7 +145,7 @@ object DeterministicWallet {
     val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes.data ++ writeUInt32BigEndian(index))
     val IL = I.take(32)
     val IR = I.takeRight(32)
-    val p = new BigInteger(1, IL)
+    val p = new BigInteger(1, IL.toArray)
     if (p.compareTo(Crypto.curve.getN) == 1) {
       throw new RuntimeException("cannot generated child public key")
     }

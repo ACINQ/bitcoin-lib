@@ -41,7 +41,7 @@ object Protocol {
 
   def writeUInt8(input: Int, out: OutputStream): Unit = writeUInt8(input.toLong, out)
 
-  def writeUInt8(input: Int): Array[Byte] = {
+  def writeUInt8(input: Int): BinaryData = {
     val out = new ByteArrayOutputStream()
     writeUInt8(input, out)
     out.toByteArray
@@ -66,7 +66,7 @@ object Protocol {
 
   def writeUInt16(input: Int, out: OutputStream): Unit = writeUInt16(input.toLong, out)
 
-  def writeUInt16(input: Int): Array[Byte] = {
+  def writeUInt16(input: Int): BinaryData = {
     val out = new ByteArrayOutputStream(2)
     writeUInt16(input, out)
     out.toByteArray
@@ -77,13 +77,13 @@ object Protocol {
     writeUInt8((input) & 0xff, out)
   }
 
-  def writeUInt16BigEndian(input: Long): Array[Byte] = {
+  def writeUInt16BigEndian(input: Long): BinaryData = {
     val out = new ByteArrayOutputStream(2)
     writeUInt16BigEndian(input, out)
     out.toByteArray
   }
 
-  def writeUInt16BigEndian(input: Int): Array[Byte] = writeUInt16BigEndian(input.toLong)
+  def writeUInt16BigEndian(input: Int): BinaryData = writeUInt16BigEndian(input.toLong)
 
   def uint32(a: Int, b: Int, c: Int, d: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8) | ((c & 0xffl) << 16) | ((d & 0xffl) << 24)
 
@@ -106,7 +106,7 @@ object Protocol {
 
   def writeUInt32(input: Int): Array[Byte] = writeUInt32(input.toLong)
 
-  def writeUInt32(input: Long): Array[Byte] = {
+  def writeUInt32(input: Long): BinaryData = {
     val out = new ByteArrayOutputStream(4)
     writeUInt32(input, out)
     out.toByteArray
@@ -119,13 +119,13 @@ object Protocol {
     writeUInt8((input) & 0xff, out)
   }
 
-  def writeUInt32BigEndian(input: Long): Array[Byte] = {
+  def writeUInt32BigEndian(input: Long): BinaryData = {
     val out = new ByteArrayOutputStream(4)
     writeUInt32BigEndian(input, out)
     out.toByteArray
   }
 
-  def writeUInt32BigEndian(input: Int): Array[Byte] = writeUInt32BigEndian(input.toLong)
+  def writeUInt32BigEndian(input: Int): BinaryData = writeUInt32BigEndian(input.toLong)
 
   def uint64(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int, h: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8) | ((c & 0xffl) << 16) | ((d & 0xffl) << 24) | ((e & 0xffl) << 32) | ((f & 0xffl) << 40) | ((g & 0xffl) << 48) | ((h & 0xffl) << 56)
 
@@ -144,7 +144,7 @@ object Protocol {
     writeUInt8((input >>> 56) & 0xff, out)
   }
 
-  def writeUInt64(input: Long): Array[Byte] = {
+  def writeUInt64(input: Long): BinaryData = {
     val out = new ByteArrayOutputStream(8)
     writeUInt64(input, out)
     out.toByteArray
@@ -179,9 +179,9 @@ object Protocol {
     }
   }
 
-  def bytes(input: InputStream, size: Long): Array[Byte] = bytes(input, size.toInt)
+  def bytes(input: InputStream, size: Long): BinaryData = bytes(input, size.toInt)
 
-  def bytes(input: InputStream, size: Int): Array[Byte] = {
+  def bytes(input: InputStream, size: Int): BinaryData = {
     val blob = new Array[Byte](size)
     if (size > 0) {
       val count = input.read(blob)
@@ -202,7 +202,7 @@ object Protocol {
     writeBytes(input.getBytes("UTF-8"), out)
   }
 
-  def hash(input: InputStream): Array[Byte] = bytes(input, 32) // a hash is always 256 bits
+  def hash(input: InputStream): BinaryData = bytes(input, 32) // a hash is always 256 bits
 
   def script(input: InputStream): BinaryData = {
     val length = varint(input) // read size
@@ -538,8 +538,6 @@ object Version extends BtcMessage[Version] {
     val addr_from = NetworkAddress.read(in)
     val nonce = uint64(in)
     val length = varint(in)
-    /*val buffer = new Array[Byte](length.toInt)
-    in.read(buffer)*/
     val buffer = bytes(in, length)
     val user_agent = new String(buffer, "ISO-8859-1")
     val start_height = uint32(in)

@@ -120,7 +120,7 @@ object Crypto {
 
   implicit def bin2point(data: BinaryData): Point = Point(data)
 
-  def hmac512(key: Seq[Byte], data: Seq[Byte]): Array[Byte] = {
+  def hmac512(key: Seq[Byte], data: Seq[Byte]): BinaryData = {
     val mac = new HMac(new SHA512Digest())
     mac.init(new KeyParameter(key.toArray))
     mac.update(data.toArray, 0, data.length)
