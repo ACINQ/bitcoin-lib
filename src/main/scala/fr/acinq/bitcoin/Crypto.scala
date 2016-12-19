@@ -57,14 +57,20 @@ object Crypto {
 
   /**
     *
-    * @param value
+    * @param value      value to initialize this scalar with
     * @param compressed if true, points generated from this scalar will be compressed
     */
   case class Scalar(value: BigInteger, compressed: Boolean = true) {
     def add(scalar: Scalar): Scalar = Scalar(value.add(scalar.value)).mod(Crypto.curve.getN)
 
+    def substract(scalar: Scalar): Scalar = Scalar(value.subtract(scalar.value)).mod(Crypto.curve.getN)
+
     def multiply(scalar: Scalar): Scalar = Scalar(value.multiply(scalar.value).mod(Crypto.curve.getN))
 
+    /**
+      *
+      * @return a binary representation of this value: 32 bytes if not compressed, 33 bytes with a last byte of '1' if compressed
+      */
     def toBin: BinaryData = {
       val bin = fixSize(value.toByteArray.dropWhile(_ == 0))
       if (compressed) bin :+ 1.toByte else bin
@@ -92,13 +98,28 @@ object Crypto {
 
   implicit def scalar2bin(scalar: Scalar): BinaryData = scalar.toBin
 
+  /**
+    * Curve point
+    *
+    * @param value    ecPoint to initialize this point with
+    * @param encoding if true, this point will be encoded in compressed format
+    */
   case class Point(value: ECPoint, encoding: PublicKey.Encoding = PublicKey.Compressed) {
     def add(point: Point): Point = Point(value.add(point.value))
 
     def multiply(scalar: Scalar): Point = Point(value.multiply(scalar.value))
 
+    /**
+      *
+      * @return a binary representation of this point in DER format
+      */
     def toBin: BinaryData = value.getEncoded(if (encoding == PublicKey.Uncompressed) false else true)
 
+    /**
+      *
+      * @return the hash160 of the binary representation of this point. This can be used to generated addresses (the address
+      *         of a public key is he base58 encoding of its hash)
+      */
     def hash: BinaryData = Crypto.hash160(toBin)
   }
 

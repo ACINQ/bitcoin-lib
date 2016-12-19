@@ -51,6 +51,7 @@ class LexicographicalOrderingSpec extends FunSuite {
 
   test("shorter is lesser") {
     assert(!LexicographicalOrdering.isLessThan(BinaryData.empty, BinaryData.empty))
+    assert(!LexicographicalOrdering.isLessThan(BinaryData("aaaa"), BinaryData("aaaa")))
     assert(LexicographicalOrdering.isLessThan(BinaryData.empty, BinaryData("aa")))
     assert(LexicographicalOrdering.isLessThan(BinaryData("aaaa"), BinaryData("aaaa00")))
     assert(!LexicographicalOrdering.isLessThan(BinaryData("aaaa00"), BinaryData("aaaa")))
