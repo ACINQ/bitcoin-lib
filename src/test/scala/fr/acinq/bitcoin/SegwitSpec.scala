@@ -65,9 +65,9 @@ class SegwitSpec extends FunSuite {
   }
 
   test("create p2wpkh tx") {
-    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
-    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
-    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1))
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pub1 = priv1.toPoint
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.toBin))
 
     assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
 
@@ -77,7 +77,7 @@ class SegwitSpec extends FunSuite {
     // now let's create a simple tx that spends tx1 and send 0.39 BTC to P2WPK output
     val tx2 = {
       val tmp = Transaction(version = 1,
-        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte], witness = ScriptWitness.empty) :: Nil,
+        txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = Nil, witness = ScriptWitness.empty) :: Nil,
         txOut = TxOut(0.39 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
@@ -90,7 +90,7 @@ class SegwitSpec extends FunSuite {
     // and now we create a segwit tx that spends the P2WPK output
     val tx3 = {
       val tmp: Transaction = Transaction(version = 1,
-        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Seq.empty[Byte], witness = ScriptWitness.empty) :: Nil,
+        txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = Nil, witness = ScriptWitness.empty) :: Nil,
         txOut = TxOut(0.38 btc, Script.pay2wpkh(pub1)) :: Nil, // we reuse the same output script but if could be anything else
         lockTime = 0
       )
@@ -110,7 +110,8 @@ class SegwitSpec extends FunSuite {
   test("create p2wsh tx") {
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
     val pub1 = priv1.toPoint
-    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, pub1.hash)
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.toBin))
+
     assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
 
     val priv2 = PrivateKey.fromBase58("QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ", Base58.Prefix.SecretKeySegnet)
@@ -145,9 +146,8 @@ class SegwitSpec extends FunSuite {
         lockTime = 0
       )
       val pubKeyScript = Script.write(Script.createMultiSigMofN(2, Seq(pub2, pub3)))
-      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0)
-      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2)) :+ SIGHASH_ALL.toByte
-      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3)) :+ SIGHASH_ALL.toByte
+      val sig2 = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv2)
+      val sig3 = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv3)
       val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, pubKeyScript))
       tmp.updateWitness(0, witness)
     }
@@ -168,7 +168,6 @@ class SegwitSpec extends FunSuite {
     val p2shaddress = Base58Check.encode(Base58.Prefix.ScriptAddressSegnet, Crypto.hash160(script))
     assert(p2shaddress === "MDbNMghDbaaizHz8pSgMqu9qJXvKwouqkM")
 
-
     // this tx send 0.5 btc to our p2shaddress
     val tx = Transaction.read("010000000175dd435bf25e5d77567272f7d6eefcf37b7156b78bb233490140d6fa7545cfca010000006a47304402206e601a482b301141cb3a1712c18729fa1f1731fce5c4205ac9d344af38bb24bf022003fe70edcbd1a5b3957b3c939e583739eadb8de8d3d2cc2ad2903b19c991cb80012102ba2558223d7cd5df2d8decc4506a62ccaa96159f685360335c280952b25e7adefeffffff02692184df000000001976a9148b3ee15d631122010d31e1774aa318ca9ca8b67088ac80f0fa020000000017a9143e73638f202bb880a28e8df1946adc3058227d11878c730000", pversion)
 
@@ -181,8 +180,7 @@ class SegwitSpec extends FunSuite {
         lockTime = 0
       )
       val pubKeyScript = Script.pay2pkh(pub1)
-      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, SigVersion.SIGVERSION_WITNESS_V0)
-      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1)) :+ SIGHASH_ALL.toByte
+      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
       val witness = ScriptWitness(Seq(sig, pub1))
       tmp.updateSigScript(0, OP_PUSHDATA(script) :: Nil).updateWitness(0, witness)
     }

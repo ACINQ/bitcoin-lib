@@ -29,6 +29,7 @@ object Crypto {
 
   object PrivateKey {
     def fromBase58(value: String, prefix: Byte): PrivateKey = {
+      require(Set(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix), "invalid base 58 prefix for a private key")
       val (`prefix`, data) = Base58Check.decode(value)
       Scalar(data)
     }
@@ -44,10 +45,6 @@ object Crypto {
 
     case object Hybrid extends Encoding
 
-    def fromBase58(value: String, prefix: Byte): PublicKey = {
-      val (`prefix`, data) = Base58Check.decode(value)
-      Point(data)
-    }
   }
 
   private def fixSize(data: BinaryData): BinaryData = data.length match {
@@ -88,6 +85,8 @@ object Crypto {
       case 32 => new Scalar(new BigInteger(1, data), compressed = false)
       case 33 if data.last == 1 => new Scalar(new BigInteger(1, data.take(32).toArray), compressed = true)
     }
+
+    def apply(data: BinaryData, compressed: Boolean): Scalar = new Scalar(new BigInteger(1, data.take(32).toArray), compressed)
   }
 
   implicit def scalar2biginteger(scalar: Scalar): BigInteger = scalar.value
@@ -120,7 +119,9 @@ object Crypto {
       * @return the hash160 of the binary representation of this point. This can be used to generated addresses (the address
       *         of a public key is he base58 encoding of its hash)
       */
-    def hash: BinaryData = Crypto.hash160(toBin)
+    def hash160: BinaryData = Crypto.hash160(toBin)
+
+    def hash = hash160
   }
 
   object Point {
