@@ -47,16 +47,16 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.7</version>
+    <version>0.9.8</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.8-SNAPSHOT, the latest released version is 0.9.7
+The latest snapshot (development) version is 0.9.9-SNAPSHOT, the latest released version is 0.9.8
 
 ## Segwit support
 
-Bitcoin-lib 0.9.7, avalaible on Maven Central, fully supports segwit (see below for more information) and is on par with the segwit code in Bitcoin Core 0.13.1.
+Bitcoin-lib, starting with version 0.9.7, fully supports segwit (see below for more information) and is on par with the segwit code in Bitcoin Core 0.13.1.
 
 ## Usage
 
@@ -79,26 +79,30 @@ mvn scala:console
 scala> import fr.acinq.bitcoin._
 import fr.acinq.bitcoin._
 
-scala> val priv:BinaryData = "1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd"
-priv: fr.acinq.bitcoin.BinaryData = 1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd
+scala> import fr.acinq.bitcoin.Crypto._
+import fr.acinq.bitcoin.Crypto._
 
-scala> val pubUncompressed:BinaryData = Crypto.publicKeyFromPrivateKey(priv)
-pubUncompressed: fr.acinq.bitcoin.BinaryData = 04f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a07cf33da18bd734c600b96a72bbc4749d5141c90ec8ac328ae52ddfe2e505bdb
+scala> val priv: PrivateKey = BinaryData("1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd")
+priv: fr.acinq.bitcoin.Crypto.PrivateKey = Scalar(13840170145645816737842251482747434280357113762558403558088249138233286766301,false)
 
-scala> val pubCompressed:BinaryData = Crypto.publicKeyFromPrivateKey(priv :+ 1.toByte)
-pubCompressed: fr.acinq.bitcoin.BinaryData = 03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a
+scala> val pubUncompressed = priv.toPoint
+pubUncompressed: fr.acinq.bitcoin.Crypto.Point = Point((5679e2144ad22ac79f6c0e2d52fe1578d5bb3d12db3ba9c23d2733a03960a4b8,54754177a3cb6d7baa9285a462047c4ae5e31e9f824b2097da84cdf3d450116d,9f6586672462dd1bac01f4e1e7db69a7818bf480def5cd6c3a398f7958cfc3d9,0),Uncompressed)
 
-scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pubUncompressed))
+scala> val pubCompressed = priv.copy(compressed = true).toPoint
+pubCompressed: fr.acinq.bitcoin.Crypto.Point = Point((5679e2144ad22ac79f6c0e2d52fe1578d5bb3d12db3ba9c23d2733a03960a4b8,54754177a3cb6d7baa9285a462047c4ae5e31e9f824b2097da84cdf3d450116d,9f6586672462dd1bac01f4e1e7db69a7818bf480def5cd6c3a398f7958cfc3d9,0),Compressed)
+
+scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pubUncompressed.toBin))
 res0: String = 1424C2F4bC9JidNjjTUZCbUxv6Sa1Mt62x
 
-scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pubCompressed))
+scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, Crypto.hash160(pubCompressed.toBin))
 res1: String = 1J7mdg5rbQyUHENYdx39WVWK7fsLpEoXZy
 
-scala> Base58Check.encode(Base58.Prefix.SecretKey, priv)
+scala> Base58Check.encode(Base58.Prefix.SecretKey, priv.toBin)
 res2: String = 5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn
 
-scala> Base58Check.encode(Base58.Prefix.SecretKey, priv :+ 1.toByte)
+scala> Base58Check.encode(Base58.Prefix.SecretKey, priv.copy(compressed = true).toBin)
 res3: String = KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ
+
 
 ```
 
@@ -110,12 +114,12 @@ The Transaction class can be used to create, serialize, deserialize, sign and va
 
 A P2PKH transactions sends bitcoins to a public key hash, using a standard P2PKH script:
 ``` scala
-val pkh = Crypto.hash160(pubKey)
+val pkh = Crypto.hash160(pubKey.toBin)
 val pubKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pkh) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
 ```
 To spend it, just provide a signature and the public key:
 ```scala
-val sigScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil
+val sigScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey.toBin) :: Nil
 ```
 This sample demonstrates how to serialize, create and verify simple P2PKH transactions.
 
@@ -123,24 +127,37 @@ This sample demonstrates how to serialize, create and verify simple P2PKH transa
   // simple pay to PK tx
 
   // we have a tx that was sent to a public key that we own
-  val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
-  val (Base58.Prefix.SecretKeyTestnet, privateKey) = Base58Check.decode("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp")
+    val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
+    val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
+    val amount = 10000 satoshi
 
-  // we want to send money from the previous tx output to mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3
-  val destinationAddress = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
+    val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
+    val publicKey = privateKey.toPoint
 
-  // step  #1: creation a new transaction that reuses the previous transaction's output pubkey script
-  val unsignedTx = Transaction(
-    version = 1L,
-    txIn =  TxIn(OutPoint(previousTx.hash, 0), signatureScript = Array.emptyByteArray, sequence = 0xFFFFFFFFL) :: Nil,
-    txOut = TxOut(amount = 10000, OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(destinationAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
-    lockTime = 0L)
+    val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
 
-  // step #2: sign it
-  val signedTx = Transaction.sign(unsignedTx, SignData(previousTx.txOut(0).publicKeyScript, privateKey) :: Nil)
+    // create a transaction where the sig script is the pubkey script of the tx we want to redeem
+    // the pubkey script is just a wrapper around the pub key hash
+    // what it means is that we will sign a block of data that contains txid + from + to + amount
 
-  // check that it actually spends the previous tx
-  Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    // step  #1: creation a new transaction that reuses the previous transaction's output pubkey script
+    val tx1 = Transaction(
+      version = 1L,
+      txIn = List(
+        TxIn(OutPoint(previousTx, 0), signatureScript = Nil, sequence = 0xFFFFFFFFL)
+      ),
+      txOut = List(
+        TxOut(amount = amount, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubkeyHash) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
+      ),
+      lockTime = 0L
+    )
+
+    // step #2: sign the tx
+    val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, privateKey)
+    val tx2 = tx1.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey.toBin) :: Nil)
+
+    // redeem the tx
+    Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
 ```
 
 #### P2SH transactions
@@ -161,62 +178,59 @@ val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(re
 This sample demonstrates how to serialize, create and verify a multisig P2SH transaction
 
 ```scala
+    val key1: PrivateKey = BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01")
+    val pub1 = key1.toPoint
+    val key2: PrivateKey = BinaryData("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01")
+    val pub2 = key2.toPoint
+    val key3: PrivateKey = BinaryData("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01")
+    val pub3 = key3.toPoint
 
-  val pub1: BinaryData = "0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A"
-  val key1: BinaryData = "C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA"
-  val pub2: BinaryData = "032C58BC9615A6FF24E9132CEF33F1EF373D97DC6DA7933755BC8BB86DBEE9F55C"
-  val key2: BinaryData = "5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C"
-  val pub3: BinaryData = "02C4D72D99CA5AD12C17C9CFE043DC4E777075E8835AF96F46D8E3CCD929FE1926"
-  val key3: BinaryData = "29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C"
+    // we want to spend the first output of this tx
+    val previousTx = Transaction.read("01000000014100d6a4d20ff14dfffd772aa3610881d66332ed160fc1094a338490513b0cf800000000fc0047304402201182201b586c6bfe6fd0346382900834149674d3cbb4081c304965440b1c0af20220023b62a997f4385e9279dc1078590556c6c6a85c3ec20fda407e95eb270e4de90147304402200c75f91f8bd741a8e71d11ff6a3e931838e32ceead34ccccfe3f73f01a81e45f02201795881473644b5f5ee6a8d8a90fe16e60eacace40e88900c375af2e0c51e26d014c69522103bd95bfc136869e2e5e3b0491e45c32634b0201a03903e210b01be248e04df8702103e04f714a4010ca5bb1423ef97012cb1008fb0dfd2f02acbcd3650771c46e4a8f2102913bd21425454688bdc2df2f0e518c5f3109b1c1be56e6e783a41c394c95dc0953aeffffffff0140420f00000000001976a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac00000000")
+    val privateKey = PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet)
+    val publicKey = privateKey.toPoint
 
-  // we want to spend the first output of this tx
-  val previousTx = Transaction.read("01000000014100d6a4d20ff14dfffd772aa3610881d66332ed160fc1094a338490513b0cf800000000fc0047304402201182201b586c6bfe6fd0346382900834149674d3cbb4081c304965440b1c0af20220023b62a997f4385e9279dc1078590556c6c6a85c3ec20fda407e95eb270e4de90147304402200c75f91f8bd741a8e71d11ff6a3e931838e32ceead34ccccfe3f73f01a81e45f02201795881473644b5f5ee6a8d8a90fe16e60eacace40e88900c375af2e0c51e26d014c69522103bd95bfc136869e2e5e3b0491e45c32634b0201a03903e210b01be248e04df8702103e04f714a4010ca5bb1423ef97012cb1008fb0dfd2f02acbcd3650771c46e4a8f2102913bd21425454688bdc2df2f0e518c5f3109b1c1be56e6e783a41c394c95dc0953aeffffffff0140420f00000000001976a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac00000000")
-  val (Base58.Prefix.SecretKeyTestnet, privateKey) = Base58Check.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")
-  val publicKey = Crypto.publicKeyFromPrivateKey(privateKey)
+    // create and serialize a "2 out of 3" multisig script
+    val redeemScript = Script.write(Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3)))
 
-  // create a "2 out of 3" multisig script
-  val redeemScript = Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3 ))
+    // the multisig adress is just that hash of this script
+    val multisigAddress = Crypto.hash160(redeemScript)
 
-  // the multisig adress is just that hash of this script
-  val multisigAddress = Crypto.hash160(redeemScript)
+    // we want to send money to our multisig adress by redeeming the first output
+    // of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
+    // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
 
-  // we want to send money to our multisig adress by redeeming the first output
-  // of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
-  // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
+    // create a tx with empty input signature scripts
+    val tx = Transaction(
+      version = 1L,
+      txIn = TxIn(OutPoint(previousTx.hash, 0), signatureScript = Nil, sequence = 0xFFFFFFFFL) :: Nil,
+      txOut = TxOut(
+        amount = 900000 satoshi, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
+        publicKeyScript = OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil) :: Nil,
+      lockTime = 0L)
 
-  // create a tx with empty input signature scripts
-  val tx = Transaction(version = 1L,
-    txIn = TxIn(OutPoint(previousTx.hash, 0), signatureScript = Array.emptyByteArray, sequence = 0xFFFFFFFFL) :: Nil,
-    txOut = TxOut(
-      amount = 900000, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
-      publicKeyScript = OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil) :: Nil,
-    lockTime = 0L)
+    // and sign it
+    val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, privateKey)
+    val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.toPoint.toBin) :: Nil)
+    Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
-  // and sign it
-  val signData = SignData(
-    fromHexString("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
-    Base58Check.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
+    // how to spend our tx ? let's try to sent its output to our public key
+    val spendingTx = Transaction(version = 1L,
+      txIn = TxIn(OutPoint(signedTx.hash, 0), signatureScript = Array.emptyByteArray, sequence = 0xFFFFFFFFL) :: Nil,
+      txOut = TxOut(
+        amount = 900000 satoshi,
+        publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(publicKey.toBin)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+      lockTime = 0L)
 
-  val signedTx = Transaction.sign(tx, Seq(SignData(previousTx.txOut(0).publicKeyScript, privateKey)))
-  Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    // we need at least 2 signatures
+    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key1)
+    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key2)
 
+    // update our tx with the correct sig script
+    val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
+    val signedSpendingTx = spendingTx.updateSigScript(0, Script.write(sigScript))
+    Transaction.correctlySpends(signedSpendingTx, signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
-  // how to spend our tx ? let's try to sent its output to our public key
-  val spendingTx = Transaction(version = 1L,
-    txIn = TxIn(OutPoint(signedTx.hash, 0), signatureScript = Array.emptyByteArray, sequence = 0xFFFFFFFFL) :: Nil,
-    txOut = TxOut(
-      amount = 900000,
-      publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(publicKey)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
-    lockTime = 0L)
-
-  // we need at least 2 signatures
-  val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key1)
-  val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key2)
-
-  // update our tx with the correct sig script
-  val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
-  val signedSpendingTx = spendingTx.updateSigScript(0, Script.write(sigScript))
-  Transaction.correctlySpends(signedSpendingTx, signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 ```
 
 #### P2WPK transactions
@@ -292,16 +306,17 @@ val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, redeemScript))
 This sample demonstrates how to serialize, create and verify a P2WPSH transaction
 
 ```scala
-    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
-    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
-    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1))
+        val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pub1 = priv1.toPoint
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.toBin))
+
     assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
 
-    val (Base58.Prefix.SecretKeySegnet, priv2) = Base58Check.decode("QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ")
-    val pub2: BinaryData = Crypto.publicKeyFromPrivateKey(priv2)
+    val priv2 = PrivateKey.fromBase58("QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ", Base58.Prefix.SecretKeySegnet)
+    val pub2 = priv2.toPoint
 
-    val (Base58.Prefix.SecretKeySegnet, priv3) = Base58Check.decode("QX3AN7b3WCAFaiCvAS2UD7HJZBsFU6r5shjfogJu55411hAF3BVx")
-    val pub3: BinaryData = Crypto.publicKeyFromPrivateKey(priv3)
+    val priv3 = PrivateKey.fromBase58("QX3AN7b3WCAFaiCvAS2UD7HJZBsFU6r5shjfogJu55411hAF3BVx", Base58.Prefix.SecretKeySegnet)
+    val pub3 = priv3.toPoint
 
     // this is a standard tx that sends 0.5 BTC to D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap
     val tx1 = Transaction.read("010000000240b4f27534e9d5529e67e52619c7addc88eff64c8e7afc9b41afe9a01c6e2aea010000006b48304502210091aed7fe956c4b2471778bfef5a323a96fee21ec6d73a9b7f363beaad135c5f302207f63b0ffc08fd905cdb87b109416c2d6d8ec56ca25dd52529c931aa1154277f30121037cb5789f1ca6c640b6d423ef71390e0b002da81db8fad4466bf6c2fdfb79a24cfeffffff6e21b8c625d9955e48de0a6bbcd57b03624620a93536ddacabc19d024c330f04010000006a47304402203fb779df3ae2bf8404e6d89f83af3adee0d0a0c4ec5a01a1e88b3aa4313df6490220608177ca82cf4f7da9820a8e8bf4266ccece9eb004e73926e414296d0635d7c1012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac019feffffff0280f0fa02000000001976a9140f66351d05269952302a607b4d6fb69517387a9788ace06d9800000000001976a91457572594090c298721e8dddcec3ac1ec593c6dcc88ac205a0000", pversion)
@@ -328,10 +343,9 @@ This sample demonstrates how to serialize, create and verify a P2WPSH transactio
         txOut = TxOut(0.48 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
-      val pubKeyScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
-      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, 1)
-      val sig2 = Crypto.encodeSignature(Crypto.sign(hash, priv2.take(32))) :+ SIGHASH_ALL.toByte
-      val sig3 = Crypto.encodeSignature(Crypto.sign(hash, priv3.take(32))) :+ SIGHASH_ALL.toByte
+      val pubKeyScript = Script.write(Script.createMultiSigMofN(2, Seq(pub2, pub3)))
+      val sig2 = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv2)
+      val sig3 = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv3)
       val witness = ScriptWitness(Seq(BinaryData.empty, sig2, sig3, pubKeyScript))
       tmp.updateWitness(0, witness)
     }
@@ -344,8 +358,8 @@ This sample demonstrates how to serialize, create and verify a P2WPSH transactio
 #### Segwit transactions embedded in standard P2SH transactions
 
 ```scala
-    val (Base58.Prefix.SecretKeySegnet, priv1) = Base58Check.decode("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT")
-    val pub1: BinaryData = Crypto.publicKeyFromPrivateKey(priv1)
+        val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pub1: BinaryData = priv1.toPoint
 
     // p2wpkh script
     val script = Script.write(Script.pay2wpkh(pub1))
@@ -366,8 +380,7 @@ This sample demonstrates how to serialize, create and verify a P2WPSH transactio
         lockTime = 0
       )
       val pubKeyScript = Script.pay2pkh(pub1)
-      val hash = Transaction.hashForSigning(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, 1)
-      val sig = Crypto.encodeSignature(Crypto.sign(hash, priv1.take(32))) :+ SIGHASH_ALL.toByte
+      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SIGHASH_ALL, tx.txOut(1).amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
       val witness = ScriptWitness(Seq(sig, pub1))
       tmp.updateSigScript(0, OP_PUSHDATA(script) :: Nil).updateWitness(0, witness)
     }

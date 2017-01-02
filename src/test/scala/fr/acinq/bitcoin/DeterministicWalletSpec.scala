@@ -10,6 +10,7 @@ import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class DeterministicWalletSpec extends FlatSpec {
+
   import fr.acinq.bitcoin.DeterministicWallet._
   import Protocol._
 
@@ -95,7 +96,7 @@ class DeterministicWalletSpec extends FlatSpec {
   it should "be possible to go up the private key chain if you have the master pub key and a child private key!!" in {
     val m = generate(fromHexString("000102030405060708090a0b0c0d0e0f"))
     assert(encode(m, testnet = false) === "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi")
-    val k = new BigInteger(1, m.secretkey.data.toArray) // k is our master private key
+    val k = new BigInteger(1, m.secretkeybytes.data.toArray) // k is our master private key
 
     val m_pub = publicKey(m)
     assert(encode(m_pub, testnet = false) === "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8")
@@ -105,10 +106,10 @@ class DeterministicWalletSpec extends FlatSpec {
 
     // now we have: the master public key, and a child private key, and we want to climb the tree back up
     // to the parent private key
-    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickey.data ++ writeUInt32BigEndian(42L))
+    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes.data ++ writeUInt32BigEndian(42L))
     val IL = I.take(32)
     val IR = I.takeRight(32)
-    val guess = new BigInteger(1, m42.secretkey).subtract(new BigInteger(1, IL)).mod(Crypto.curve.getN)
+    val guess = new BigInteger(1, m42.secretkeybytes).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)
     assert(guess === k)
   }
   it should "be able to derive private keys" in {

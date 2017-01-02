@@ -4,6 +4,7 @@ import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 
 import fr.acinq.bitcoin.Script.Runner
 import Protocol._
+import fr.acinq.bitcoin.Crypto.PrivateKey
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -99,6 +100,7 @@ object TxIn extends BtcMessage[TxIn] {
   */
 case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) {
   def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
+
   def hasWitness: Boolean = witness.isNotNull
 }
 
@@ -219,6 +221,12 @@ object Transaction extends BtcMessage[Transaction] {
     }
   }
 
+  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion | SERIALIZE_TRANSACTION_NO_WITNESS).length
+
+  def totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).length
+
+  def weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
+
   def isCoinbase(input: Transaction) = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn(0).outPoint)
 
   /**
@@ -234,8 +242,11 @@ object Transaction extends BtcMessage[Transaction] {
     val filteredScript = Script.write(Script.parse(previousOutputScript).filterNot(_ == OP_CODESEPARATOR))
 
     def removeSignatureScript(txin: TxIn): TxIn = txin.copy(signatureScript = Array.empty[Byte])
+
     def removeAllSignatureScripts(tx: Transaction): Transaction = tx.copy(txIn = tx.txIn.map(removeSignatureScript))
+
     def updateSignatureScript(tx: Transaction, index: Int, script: Array[Byte]): Transaction = tx.copy(txIn = tx.txIn.updated(index, tx.txIn(index).copy(signatureScript = script)))
+
     def resetSequence(txins: Seq[TxIn], inputIndex: Int): Seq[TxIn] = for (i <- 0 until txins.size) yield {
       if (i == inputIndex) txins(i)
       else txins(i).copy(sequence = 0)
@@ -369,10 +380,10 @@ object Transaction extends BtcMessage[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] = {
-    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(Crypto.isPrivateKeyCompressed(privateKey), "private key must be compressed in segwit")
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): BinaryData = {
+    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(privateKey.compressed, "private key must be compressed in segwit")
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-    val (r, s) = Crypto.sign(hash, privateKey.take(32))
+    val (r, s) = Crypto.sign(hash, privateKey)
     val sig = Crypto.encodeSignature(r, s)
     sig :+ (sighashType.toByte)
   }
@@ -389,7 +400,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] =
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): BinaryData =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
 
   /**
@@ -402,8 +413,8 @@ object Transaction extends BtcMessage[Transaction] {
     * @return the encoded signature of this tx for this specific tx input
     */
   @deprecated
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: Seq[Byte]): Seq[Byte] =
-    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: PrivateKey): BinaryData =
+  signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
 
   /**
     * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
@@ -517,9 +528,9 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
 
   def updateWitness(i: Int, witness: ScriptWitness): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(witness = witness)))
 
-  def updateWitnesses(witnesses: Seq[ScriptWitness]) : Transaction = {
+  def updateWitnesses(witnesses: Seq[ScriptWitness]): Transaction = {
     require(witnesses.length == txIn.length)
-    witnesses.zipWithIndex.foldLeft(this){
+    witnesses.zipWithIndex.foldLeft(this) {
       case (tx, (witness, index)) => tx.updateWitness(index, witness)
     }
   }
@@ -539,4 +550,11 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
     * @return a new transaction which includes the newly added output
     */
   def addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut :+ output)
+
+  def baseSize(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.baseSize(this, protocolVersion)
+
+  def totalSize(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.totalSize(this, protocolVersion)
+
+  def weight(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.weight(this, protocolVersion)
+
 }
