@@ -15,7 +15,7 @@ object OutPoint extends BtcMessage[OutPoint] {
 
   override def write(input: OutPoint, out: OutputStream, protocolVersion: Long) = {
     out.write(input.hash)
-    writeUInt32(input.index, out)
+    writeUInt32(input.index.toInt, out)
   }
 
   def isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == Hash.Zeroes
@@ -74,7 +74,7 @@ object TxIn extends BtcMessage[TxIn] {
   override def write(input: TxIn, out: OutputStream, protocolVersion: Long) = {
     OutPoint.write(input.outPoint, out)
     writeScript(input.signatureScript, out)
-    writeUInt32(input.sequence, out)
+    writeUInt32(input.sequence.toInt, out)
   }
 
   override def validate(input: TxIn): Unit = {
@@ -189,18 +189,18 @@ object Transaction extends BtcMessage[Transaction] {
 
   override def write(tx: Transaction, out: OutputStream, protocolVersion: Long) = {
     if (serializeTxWitness(protocolVersion) && tx.hasWitness) {
-      writeUInt32(tx.version, out)
+      writeUInt32(tx.version.toInt, out)
       writeUInt8(0x00, out)
       writeUInt8(0x01, out)
       writeCollection(tx.txIn, out, protocolVersion)
       writeCollection(tx.txOut, out, protocolVersion)
       for (i <- 0 until tx.txIn.size) ScriptWitness.write(tx.txIn(i).witness, out, protocolVersion)
-      writeUInt32(tx.lockTime, out)
+      writeUInt32(tx.lockTime.toInt, out)
     } else {
-      writeUInt32(tx.version, out)
+      writeUInt32(tx.version.toInt, out)
       writeCollection(tx.txIn, out, protocolVersion)
       writeCollection(tx.txOut, out, protocolVersion)
-      writeUInt32(tx.lockTime, out)
+      writeUInt32(tx.lockTime.toInt, out)
     }
   }
 
@@ -328,7 +328,7 @@ object Transaction extends BtcMessage[Transaction] {
         } else Hash.Zeroes
 
         val hashSequence: BinaryData = if (!isAnyoneCanPay(sighashType) && !isHashSingle(sighashType) && !isHashNone(sighashType)) {
-          Crypto.hash256(tx.txIn.map(_.sequence).map(Protocol.writeUInt32).flatten)
+          Crypto.hash256(tx.txIn.map(_.sequence).map(s => Protocol.writeUInt32(s.toInt)).flatten)
         } else Hash.Zeroes
 
         val hashOutputs: BinaryData = if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
@@ -338,15 +338,15 @@ object Transaction extends BtcMessage[Transaction] {
         } else Hash.Zeroes
 
         val out = new ByteArrayOutputStream()
-        Protocol.writeUInt32(tx.version, out)
+        Protocol.writeUInt32(tx.version.toInt, out)
         out.write(hashPrevOut)
         out.write(hashSequence)
         out.write(OutPoint.write(tx.txIn(inputIndex).outPoint, Protocol.PROTOCOL_VERSION))
         Protocol.writeScript(previousOutputScript, out)
         Protocol.writeUInt64(amount.toLong, out)
-        Protocol.writeUInt32(tx.txIn(inputIndex).sequence, out)
+        Protocol.writeUInt32(tx.txIn(inputIndex).sequence.toInt, out)
         out.write(hashOutputs)
-        Protocol.writeUInt32(tx.lockTime, out)
+        Protocol.writeUInt32(tx.lockTime.toInt, out)
         Protocol.writeUInt32(sighashType, out)
         val preimage: BinaryData = out.toByteArray
         Crypto.hash256(preimage)
