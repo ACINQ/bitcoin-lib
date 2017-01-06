@@ -6,8 +6,6 @@ import java.net.{Inet4Address, Inet6Address, InetAddress}
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util
 
-import com.typesafe.config.ConfigFactory
-
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -31,7 +29,7 @@ object Protocol {
     * basic serialization functions
     */
 
-  val PROTOCOL_VERSION = ConfigFactory.load().getLong("bitcoin-lib.protocol-version")
+  val PROTOCOL_VERSION = 70015
 
   def uint8(input: InputStream): Int = input.read()
 
