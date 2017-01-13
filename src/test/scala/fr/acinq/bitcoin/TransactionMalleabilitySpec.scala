@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -11,7 +12,8 @@ class TransactionMalleabilitySpec extends FlatSpec {
     val prevTx = Transaction.read("01000000014a1140be18e3affa32a9561a3a4a75b9ed8b965a368a6f39fc57aee97c0eb4df010000006a4730440220363ce2ad434d16d8ca4f35866432fec887526bed328ec705af3a36cef1625fce0220579c0a7c57fe8a3691c833b78de7a3886a5e66422866e5d66cfcede2b8aaaac50121024034a310a6001ea45f7c9708c2f878c8ce42d715ceeaa2cd315af9d97baf85faffffffff02d0f9a800000000001976a91450ca5b3fb8268714ef48b0d46813df337dc5d5db88ac80969800000000001976a914d59dbfeedb94e9e66bd8b91af6caad082971b1b588ac00000000")
 
     // private key that matches the public key the btc we sent to in the tx we want to redeem
-    val (_, privateKey) = Base58Check.decode("cSjAjBx5zSuA16zhG2owyNCzkXLc7qJTz9M8aR6uK9S9QqS9P6gF")
+    val privateKey = PrivateKey.fromBase58("cSjAjBx5zSuA16zhG2owyNCzkXLc7qJTz9M8aR6uK9S9QqS9P6gF", Base58.Prefix.SecretKeyTestnet)
+    //    val (_, privateKey) = Base58Check.decode("cSjAjBx5zSuA16zhG2owyNCzkXLc7qJTz9M8aR6uK9S9QqS9P6gF")
 
     // public key we want to sent btc to
     val publicKey = BinaryData("03f1c059112166776c70367cc1a83851c6224e45f6fe3944442f7961072212f954")
@@ -36,7 +38,7 @@ class TransactionMalleabilitySpec extends FlatSpec {
     // step #2: sign the unsigned tx
     // signature script: push signature and public key
     val sig = Transaction.signInput(unsignedTx, 0, prevTx.txOut(1).publicKeyScript, SIGHASH_ALL, privateKey)
-    val signatureScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(Crypto.publicKeyFromPrivateKey(privateKey)) :: Nil
+    val signatureScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey) :: Nil
 
     val tx1 = Transaction(version = 1,
       txIn = List(

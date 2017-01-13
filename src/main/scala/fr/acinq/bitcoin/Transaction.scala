@@ -432,7 +432,7 @@ object Transaction extends BtcMessage[Transaction] {
       val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey)
 
       // this is the public key that is associated with the private key we used for signing
-      val publicKey = Crypto.publicKeyFromPrivateKey(signData(i).privateKey)
+      val publicKey = signData(i).privateKey.publicKey
 
       // signature script: push signature and public key
       val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
@@ -470,7 +470,7 @@ object Transaction extends BtcMessage[Transaction] {
 }
 
 object SignData {
-  def apply(prevPubKeyScript: Seq[ScriptElt], privateKey: BinaryData): SignData = new SignData(Script.write(prevPubKeyScript), privateKey)
+  def apply(prevPubKeyScript: Seq[ScriptElt], privateKey: PrivateKey): SignData = new SignData(Script.write(prevPubKeyScript), privateKey)
 }
 
 /**
@@ -479,7 +479,7 @@ object SignData {
   * @param prevPubKeyScript previous output public key script
   * @param privateKey       private key associated with the previous output public key
   */
-case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
+case class SignData(prevPubKeyScript: BinaryData, privateKey: PrivateKey)
 
 /**
   * Transaction
