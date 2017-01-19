@@ -73,6 +73,8 @@ object Crypto {
       case 33 if data.last == 1 => new PrivateKey(Scalar(data.take(32)), compressed = true)
     }
 
+    def apply(data: BinaryData, compressed: Boolean): PrivateKey = new PrivateKey(Scalar(data.take(32)), compressed)
+
     def fromBase58(value: String, prefix: Byte): PrivateKey = {
       require(Set(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix), "invalid base 58 prefix for a private key")
       val (`prefix`, data) = Base58Check.decode(value)
@@ -85,7 +87,7 @@ object Crypto {
     * @param value      value of this private key (a number)
     * @param compressed flags which specifies if the associated public key will be compressed or uncompressed.
     */
-  case class PrivateKey(value: Scalar, compressed: Boolean) {
+  case class PrivateKey(value: Scalar, compressed: Boolean = true) {
     /**
       *
       * @return the public key for this private key
@@ -119,6 +121,8 @@ object Crypto {
       * @return a binary representation of this point in DER format
       */
     def toBin(compressed: Boolean): BinaryData = value.getEncoded(compressed)
+
+    override def toString = toBin(true).toString
   }
 
   object Point {
@@ -142,7 +146,7 @@ object Crypto {
     * @param value      value of this public key (a point)
     * @param compressed flags which specifies if the associated public key will be compressed or uncompressed.
     */
-  case class PublicKey(value: Point, compressed: Boolean) {
+  case class PublicKey(value: Point, compressed: Boolean = true) {
     def toBin: BinaryData = value.toBin(compressed)
 
     /**
@@ -328,7 +332,7 @@ object Crypto {
     * @param privateKey private key
     * @return the corresponding public key
     */
-  def publicKeyFromPrivateKey(privateKey: Seq[Byte]) = Scalar(privateKey).toPoint
+  def publicKeyFromPrivateKey(privateKey: BinaryData) = PrivateKey(privateKey).publicKey
 
   /**
     * Sign data with a private key, using RCF6979 deterministic signatures

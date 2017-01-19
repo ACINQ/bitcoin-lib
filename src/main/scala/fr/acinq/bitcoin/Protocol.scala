@@ -37,8 +37,12 @@ object Protocol {
 
   def uint16(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Int = {
     val bin = new Array[Byte](2)
-    val buffer = ByteBuffer.wrap(bin).order(order)
     input.read(bin)
+    uint16(bin, order)
+  }
+
+  def uint16(input: BinaryData, order: ByteOrder): Int = {
+    val buffer = ByteBuffer.wrap(input).order(order)
     buffer.getShort & 0xFFFF
   }
 
@@ -53,8 +57,12 @@ object Protocol {
 
   def uint32(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Long = {
     val bin = new Array[Byte](4)
-    val buffer = ByteBuffer.wrap(bin).order(order)
     input.read(bin)
+    uint32(bin, order)
+  }
+
+  def uint32(input: BinaryData, order: ByteOrder): Long = {
+    val buffer = ByteBuffer.wrap(input).order(order)
     buffer.getInt() & 0xFFFFFFFFL
   }
 
@@ -71,8 +79,12 @@ object Protocol {
 
   def uint64(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Long = {
     val bin = new Array[Byte](8)
-    val buffer = ByteBuffer.wrap(bin).order(order)
     input.read(bin)
+    uint64(bin, order)
+  }
+
+  def uint64(input: BinaryData, order: ByteOrder): Long = {
+    val buffer = ByteBuffer.wrap(input).order(order)
     buffer.getLong()
   }
 
