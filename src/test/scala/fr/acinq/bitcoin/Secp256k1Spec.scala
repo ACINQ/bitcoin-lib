@@ -2,18 +2,22 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.{PrivateKey, Scalar}
 import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
+import org.junit.runner.RunWith
 import org.scalatest.FunSuite
+import org.scalatest.junit.JUnitRunner
 
 import scala.util.Random
 
 /**
   * run this test with -Djava.library.path=$PATH_LIBSECP256K1_DIR where $PATH_LIBSECP256K1_DIR is a directory that
-  * contains libsecp256k1.so
+  * contains libsecp256k1.so. For example:
+  * mvn test  -DargLine="-Djava.library.path=$PATH_LIBSECP256K1_DIR"
   * To create libsecp256k1.so:
   * clone libsecp256k1
   * $./autogen.sh && ./configure --enable-experimental --enable-module_ecdh --enable-jni && make clean && make && make check
   * libsecp256k1.so should be in the .libs/ directory
   */
+@RunWith(classOf[JUnitRunner])
 class Secp256k1Spec extends FunSuite {
   test("deterministic signatures") {
     assume(Secp256k1Context.isEnabled)

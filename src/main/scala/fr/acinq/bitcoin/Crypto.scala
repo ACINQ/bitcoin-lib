@@ -28,6 +28,7 @@ object Crypto {
 
   /**
     * A scalar is a 256 bit number
+    *
     * @param value value to initialize this scalar with
     */
   case class Scalar(value: BigInteger) {
@@ -166,8 +167,9 @@ object Crypto {
 
   /**
     * Computes ecdh using secp256k1's variant: sha256(priv * pub serialized in compressed format)
+    *
     * @param priv private value
-    * @param pub public value
+    * @param pub  public value
     * @return ecdh(priv, pub) as computed by libsecp256k1
     */
   def ecdh(priv: Scalar, pub: Point): BinaryData = {
