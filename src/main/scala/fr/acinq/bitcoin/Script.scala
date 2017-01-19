@@ -999,10 +999,20 @@ object Script {
 
   /**
     *
+    * @param pubKeyHash public key hash
+    * @return a pay-to-public-key-hash script
+    */
+  def pay2pkh(pubKeyHash: BinaryData): Seq[ScriptElt] = {
+    require(pubKeyHash.length == 20, "pubkey hash length must be 20 bytes")
+    OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubKeyHash) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
+  }
+
+  /**
+    *
     * @param pubKey public key
     * @return a pay-to-public-key-hash script
     */
-  def pay2pkh(pubKey: PublicKey): Seq[ScriptElt] = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubKey.hash160) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
+  def pay2pkh(pubKey: PublicKey): Seq[ScriptElt] = pay2pkh(pubKey.hash160)
 
   /**
     *
@@ -1034,8 +1044,18 @@ object Script {
 
   /**
     *
+    * @param pubKeyHash public key hash
+    * @return a pay-to-witness-public-key-hash script
+    */
+  def pay2wpkh(pubKeyHash: BinaryData): Seq[ScriptElt] = {
+    require(pubKeyHash.length == 20, "pubkey hash length must be 20 bytes")
+    OP_0 :: OP_PUSHDATA(pubKeyHash) :: Nil
+  }
+
+  /**
+    *
     * @param pubKey public key
     * @return a pay-to-witness-public-key-hash script
     */
-  def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(pubKey.hash160) :: Nil
+  def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = pay2wpkh(pubKey.hash160)
 }
