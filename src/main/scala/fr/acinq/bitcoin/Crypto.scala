@@ -27,7 +27,7 @@ object Crypto {
   }
 
   /**
-    *
+    * A scalar is a 256 bit number
     * @param value value to initialize this scalar with
     */
   case class Scalar(value: BigInteger) {
@@ -144,7 +144,8 @@ object Crypto {
   /**
     *
     * @param value      value of this public key (a point)
-    * @param compressed flags which specifies if the associated public key will be compressed or uncompressed.
+    * @param compressed flags which specifies if the public key is compressed or uncompressed. Compressed public keys are
+    *                   encoded on 33 bytes (first byte = sign of Y, then X on 32 bytes)
     */
   case class PublicKey(value: Point, compressed: Boolean = true) {
     def toBin: BinaryData = value.toBin(compressed)
@@ -162,6 +163,16 @@ object Crypto {
   implicit def publickey2point(pub: PublicKey): Point = pub.value
 
   implicit def publickey2bin(pub: PublicKey): BinaryData = pub.toBin
+
+  /**
+    * Computes ecdh using secp256k1's variant: sha256(priv * pub serialized in compressed format)
+    * @param priv private value
+    * @param pub public value
+    * @return ecdh(priv, pub) as computed by libsecp256k1
+    */
+  def ecdh(priv: Scalar, pub: Point): BinaryData = {
+    Crypto.sha256(pub.multiply(priv).getEncoded(true))
+  }
 
   def hmac512(key: Seq[Byte], data: Seq[Byte]): BinaryData = {
     val mac = new HMac(new SHA512Digest())
