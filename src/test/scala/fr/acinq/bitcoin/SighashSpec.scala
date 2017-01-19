@@ -13,7 +13,7 @@ class SighashSpec extends FunSuite {
       PrivateKey.fromBase58("cV5oyXUgySSMcUvKNdKtuYg4t4NTaxkwYrrocgsJZuYac2ogEdZX", Base58.Prefix.SecretKeyTestnet)
     )
 
-    val publicKeys = privateKeys.map(_.toPoint)
+    val publicKeys = privateKeys.map(_.publicKey)
 
     val previousTx = Seq(
       Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2pkh(publicKeys(0))) :: Nil, lockTime = 0),
@@ -53,7 +53,7 @@ class SighashSpec extends FunSuite {
       PrivateKey.fromBase58("cV5oyXUgySSMcUvKNdKtuYg4t4NTaxkwYrrocgsJZuYac2ogEdZX", Base58.Prefix.SecretKeyTestnet)
     )
 
-    val publicKeys = privateKeys.map(_.toPoint)
+    val publicKeys = privateKeys.map(_.publicKey)
 
     val previousTx = Seq(
       Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2wpkh(publicKeys(0))) :: Nil, lockTime = 0),

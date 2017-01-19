@@ -6,18 +6,18 @@ import org.scalatest.{FlatSpec, Matchers}
 import Protocol._
 import Base58.Prefix
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.Crypto.Scalar
+import fr.acinq.bitcoin.Crypto.{PrivateKey, Scalar}
 
 @RunWith(classOf[JUnitRunner])
 class MultisigSpec extends FlatSpec with Matchers {
-  val key1 = Scalar(BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
-  val pub1 = key1.toPoint
+  val key1 = PrivateKey(BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
+  val pub1 = key1.publicKey
 
-  val key2 = Scalar(BinaryData("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01"))
-  val pub2 = key2.toPoint
+  val key2 = PrivateKey(BinaryData("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01"))
+  val pub2 = key2.publicKey
 
-  val key3 = Scalar(BinaryData("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01"))
-  val pub3 = key3.toPoint
+  val key3 = PrivateKey(BinaryData("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01"))
+  val pub3 = key3.publicKey
 
   val redeemScript: BinaryData = Script.write(Script.createMultiSigMofN(2, List(pub1, pub2, pub3)))
   val multisigAddress = Crypto.hash160(redeemScript)
@@ -46,8 +46,8 @@ class MultisigSpec extends FlatSpec with Matchers {
     val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
 
     val signData = SignData(
-      fromHexString("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
-      Base58Check.decode("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM")._2)
+      BinaryData("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
+      PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet))
 
     val signedTx = Transaction.sign(tx, List(signData))
 

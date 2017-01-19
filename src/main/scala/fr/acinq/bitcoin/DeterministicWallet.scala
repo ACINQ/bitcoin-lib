@@ -38,16 +38,16 @@ object DeterministicWallet {
     require(secretkeybytes.length == 32)
     require(chaincode.length == 32)
 
-    def privateKey: PrivateKey = Scalar(secretkeybytes :+ 1.toByte)
+    def privateKey: PrivateKey = PrivateKey(Scalar(secretkeybytes), compressed = true)
 
-    def publicKey: PublicKey = privateKey.toPoint
+    def publicKey: PublicKey = privateKey.publicKey
   }
 
   case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
     require(publickeybytes.length == 33)
     require(chaincode.length == 32)
 
-    def publicKey: PublicKey = Point(publickeybytes)
+    def publicKey: PublicKey = PublicKey(publickeybytes)
   }
 
   def encode(input: ExtendedPrivateKey, testnet: Boolean): String = {
@@ -95,7 +95,7 @@ object DeterministicWallet {
     * @return the public key for this private key
     */
   def publicKey(input: ExtendedPrivateKey): ExtendedPublicKey = {
-    ExtendedPublicKey(input.publicKey, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
+    ExtendedPublicKey(input.publicKey.toBin, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
   }
 
   /**

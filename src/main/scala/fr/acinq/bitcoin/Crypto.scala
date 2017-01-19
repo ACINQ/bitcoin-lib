@@ -21,32 +21,6 @@ object Crypto {
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
 
-  // a private key is just a number
-  type PrivateKey = Scalar
-
-  // a public key is a point on the secp256k1 curve
-  type PublicKey = Point
-
-  object PrivateKey {
-    def fromBase58(value: String, prefix: Byte): PrivateKey = {
-      require(Set(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix), "invalid base 58 prefix for a private key")
-      val (`prefix`, data) = Base58Check.decode(value)
-      Scalar(data)
-    }
-  }
-
-  object PublicKey {
-
-    sealed trait Encoding
-
-    case object Uncompressed extends Encoding
-
-    case object Compressed extends Encoding
-
-    case object Hybrid extends Encoding
-
-  }
-
   private def fixSize(data: BinaryData): BinaryData = data.length match {
     case 32 => data
     case length if length < 32 => Array.fill(32 - length)(0.toByte) ++ data
@@ -54,10 +28,9 @@ object Crypto {
 
   /**
     *
-    * @param value      value to initialize this scalar with
-    * @param compressed if true, points generated from this scalar will be compressed
+    * @param value value to initialize this scalar with
     */
-  case class Scalar(value: BigInteger, compressed: Boolean = true) {
+  case class Scalar(value: BigInteger) {
     def add(scalar: Scalar): Scalar = Scalar(value.add(scalar.value)).mod(Crypto.curve.getN)
 
     def substract(scalar: Scalar): Scalar = Scalar(value.subtract(scalar.value)).mod(Crypto.curve.getN)
@@ -66,27 +39,24 @@ object Crypto {
 
     /**
       *
-      * @return a binary representation of this value: 32 bytes if not compressed, 33 bytes with a last byte of '1' if compressed
+      * @return a 32 bytes binary representation of this value
       */
-    def toBin: BinaryData = {
-      val bin = fixSize(value.toByteArray.dropWhile(_ == 0))
-      if (compressed) bin :+ 1.toByte else bin
-    }
+    def toBin: BinaryData = fixSize(value.toByteArray.dropWhile(_ == 0))
 
     /**
       *
       * @return this * G where G is the curve generator
       */
-    def toPoint: Point = Point(params.getG().multiply(value), if (compressed) PublicKey.Compressed else PublicKey.Uncompressed)
+    def toPoint: Point = Point(params.getG().multiply(value))
+
+    override def toString = this.toBin.toString
   }
 
   object Scalar {
-    def apply(data: BinaryData): Scalar = data.length match {
-      case 32 => new Scalar(new BigInteger(1, data), compressed = false)
-      case 33 if data.last == 1 => new Scalar(new BigInteger(1, data.take(32).toArray), compressed = true)
+    def apply(data: BinaryData): Scalar = {
+      require(data.length == 32, "scalar must be initialized with a 32 bytes value")
+      new Scalar(new BigInteger(1, data))
     }
-
-    def apply(data: BinaryData, compressed: Boolean): Scalar = new Scalar(new BigInteger(1, data.take(32).toArray), compressed)
   }
 
   implicit def scalar2biginteger(scalar: Scalar): BigInteger = scalar.value
@@ -97,13 +67,51 @@ object Crypto {
 
   implicit def scalar2bin(scalar: Scalar): BinaryData = scalar.toBin
 
+  object PrivateKey {
+    def apply(data: BinaryData): PrivateKey = data.length match {
+      case 32 => new PrivateKey(Scalar(data), compressed = false)
+      case 33 if data.last == 1 => new PrivateKey(Scalar(data.take(32)), compressed = true)
+    }
+
+    def apply(data: BinaryData, compressed: Boolean): PrivateKey = new PrivateKey(Scalar(data.take(32)), compressed)
+
+    def fromBase58(value: String, prefix: Byte): PrivateKey = {
+      require(Set(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix), "invalid base 58 prefix for a private key")
+      val (`prefix`, data) = Base58Check.decode(value)
+      PrivateKey(data)
+    }
+  }
+
+  /**
+    *
+    * @param value      value of this private key (a number)
+    * @param compressed flags which specifies if the associated public key will be compressed or uncompressed.
+    */
+  case class PrivateKey(value: Scalar, compressed: Boolean = true) {
+    /**
+      *
+      * @return the public key for this private key
+      */
+    def publicKey: PublicKey = PublicKey(value.toPoint, compressed)
+
+    /**
+      *
+      * @return the binary representation of this private key. It is either 32 bytes, or 33 bytes with final 0x1 if the
+      *         key is compressed
+      */
+    def toBin: BinaryData = if (compressed) value.toBin :+ 1.toByte else value.toBin
+
+    override def toString = toBin.toString
+  }
+
+  implicit def privatekey2scalar(priv: PrivateKey): Scalar = priv.value
+
   /**
     * Curve point
     *
-    * @param value    ecPoint to initialize this point with
-    * @param encoding if true, this point will be encoded in compressed format
+    * @param value ecPoint to initialize this point with
     */
-  case class Point(value: ECPoint, encoding: PublicKey.Encoding = PublicKey.Compressed) {
+  case class Point(value: ECPoint) {
     def add(point: Point): Point = Point(value.add(point.value))
 
     def multiply(scalar: Scalar): Point = Point(value.multiply(scalar.value))
@@ -112,7 +120,34 @@ object Crypto {
       *
       * @return a binary representation of this point in DER format
       */
-    def toBin: BinaryData = value.getEncoded(if (encoding == PublicKey.Uncompressed) false else true)
+    def toBin(compressed: Boolean): BinaryData = value.getEncoded(compressed)
+
+    override def toString = toBin(true).toString
+  }
+
+  object Point {
+    def apply(data: BinaryData): Point = Point(curve.getCurve.decodePoint(data))
+  }
+
+  implicit def point2ecpoint(point: Point): ECPoint = point.value
+
+  implicit def ecpoint2point(value: ECPoint): Point = Point(value)
+
+  object PublicKey {
+    def apply(data: BinaryData): PublicKey = data.length match {
+      case 65 if data.head == 4 => new PublicKey(Point(data), false)
+      case 65 if data.head == 6 || data.head == 7 => new PublicKey(Point(data), false)
+      case 33 if data.head == 2 || data.head == 3 => new PublicKey(Point(data), true)
+    }
+  }
+
+  /**
+    *
+    * @param value      value of this public key (a point)
+    * @param compressed flags which specifies if the associated public key will be compressed or uncompressed.
+    */
+  case class PublicKey(value: Point, compressed: Boolean = true) {
+    def toBin: BinaryData = value.toBin(compressed)
 
     /**
       *
@@ -121,26 +156,12 @@ object Crypto {
       */
     def hash160: BinaryData = Crypto.hash160(toBin)
 
-    def hash = hash160
+    override def toString = toBin.toString
   }
 
-  object Point {
-    def apply(data: BinaryData): Point = {
-      data.length match {
-        case 65 if data.head == 4 => Point(curve.getCurve.decodePoint(data), PublicKey.Uncompressed)
-        case 65 if data.head == 6 || data.head == 7 => Point(curve.getCurve.decodePoint(data), PublicKey.Hybrid)
-        case 33 if data.head == 2 || data.head == 3 => Point(curve.getCurve.decodePoint(data), PublicKey.Compressed)
-      }
-    }
-  }
+  implicit def publickey2point(pub: PublicKey): Point = pub.value
 
-  implicit def point2ecpoint(point: Point): ECPoint = point.value
-
-  implicit def ecpoint2point(value: ECPoint): Point = Point(value)
-
-  implicit def point2bin(point: Point): BinaryData = point.toBin
-
-  implicit def bin2point(data: BinaryData): Point = Point(data)
+  implicit def publickey2bin(pub: PublicKey): BinaryData = pub.toBin
 
   def hmac512(key: Seq[Byte], data: Seq[Byte]): BinaryData = {
     val mac = new HMac(new SHA512Digest())
@@ -311,7 +332,7 @@ object Crypto {
     * @param privateKey private key
     * @return the corresponding public key
     */
-  def publicKeyFromPrivateKey(privateKey: Seq[Byte]) = Scalar(privateKey).toPoint
+  def publicKeyFromPrivateKey(privateKey: BinaryData) = PrivateKey(privateKey).publicKey
 
   /**
     * Sign data with a private key, using RCF6979 deterministic signatures
@@ -323,7 +344,7 @@ object Crypto {
     */
   def sign(data: BinaryData, privateKey: PrivateKey): (BigInteger, BigInteger) = {
     val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
-    val privateKeyParameters = new ECPrivateKeyParameters(privateKey, curve)
+    val privateKeyParameters = new ECPrivateKeyParameters(privateKey.value, curve)
     signer.init(true, privateKeyParameters)
     val Array(r, s) = signer.generateSignature(data.toArray)
 

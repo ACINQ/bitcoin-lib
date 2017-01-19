@@ -35,7 +35,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val serialized = out.toByteArray
     val hashed = Crypto.hash256(serialized)
     val pkey_encoded = Base58.decode("92f9274aR3s6zd1vuAgxquv4KP5S5thJadF3k54NHuTV4fXL1vW")
-    val pkey = Scalar(pkey_encoded.slice(1, pkey_encoded.size - 4))
+    val pkey = PrivateKey(pkey_encoded.slice(1, pkey_encoded.size - 4))
     val (r, s) = Crypto.sign(hashed, pkey)
     val sig = Crypto.encodeSignature(r, s)
     // DER encoded
@@ -44,7 +44,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     sigOut.write(sig.toArray)
     writeUInt8(1, sigOut)
     // hash code type
-    val pub = pkey.toPoint
+    val pub = pkey.publicKey
     writeUInt8(pub.length, sigOut)
     sigOut.write(pub.toBin)
     val sigScript = sigOut.toByteArray
@@ -105,10 +105,10 @@ class TransactionSpec extends FlatSpec with Matchers {
     val sig = Crypto.encodeSignature(r, s) // DER encoded
 
     // this is the public key that is associated to the private key we used for signing
-    val publicKey = privateKey.toPoint
+    val publicKey = privateKey.publicKey
     // we check that is really is the public key that is encoded in the address the previous tx was paid to
     val providedHash = Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2
-    val computedHash = publicKey.hash
+    val computedHash = publicKey.hash160
     assert(providedHash == computedHash)
 
     // step #5: now we replace the sigscript with sig + public key, and we get what would be sent to the btc network
@@ -121,7 +121,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     ))
 
     // check signature
-    assert(Crypto.verifySignature(hashed, sig, publicKey.toBin))
+    assert(Crypto.verifySignature(hashed, sig, publicKey))
 
     // check script
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
@@ -133,7 +133,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val amount = 10000 satoshi
 
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
-    val publicKey = privateKey.toPoint
+    val publicKey = privateKey.publicKey
 
     val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
 
@@ -155,7 +155,7 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // step #2: sign the tx
     val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, privateKey)
-    val tx2 = tx1.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey.toBin) :: Nil)
+    val tx2 = tx1.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
 
     // redeem the tx
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
@@ -173,8 +173,8 @@ class TransactionSpec extends FlatSpec with Matchers {
     )
 
     val keys = List(
-      SignData(previousTx(0).txOut(0).publicKeyScript, Base58Check.decode("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs")._2),
-      SignData(previousTx(1).txOut(0).publicKeyScript, Base58Check.decode("93NJN4mhL21FxRbfHZJ2Cou1YnrJmWNkujmZxeT7CPKauJkGv5g")._2)
+      SignData(previousTx(0).txOut(0).publicKeyScript, PrivateKey.fromBase58("cV7LGVeY2VPuCyCSarqEqFCUNig2NzwiAEBTTA89vNRQ4Vqjfurs", Base58.Prefix.SecretKeyTestnet)),
+      SignData(previousTx(1).txOut(0).publicKeyScript, PrivateKey.fromBase58("93NJN4mhL21FxRbfHZJ2Cou1YnrJmWNkujmZxeT7CPKauJkGv5g", Base58.Prefix.SecretKeyTestnet))
     )
 
     // create a tx with empty input signature scripts
@@ -201,17 +201,17 @@ class TransactionSpec extends FlatSpec with Matchers {
 
   it should "create and sign p2sh transactions" in {
 
-    val key1: PrivateKey = BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01")
-    val pub1 = key1.toPoint
-    val key2: PrivateKey = BinaryData("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01")
-    val pub2 = key2.toPoint
-    val key3: PrivateKey = BinaryData("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01")
-    val pub3 = key3.toPoint
+    val key1 = PrivateKey(BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
+    val pub1 = key1.publicKey
+    val key2 = PrivateKey(BinaryData("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01"))
+    val pub2 = key2.publicKey
+    val key3 = PrivateKey(BinaryData("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01"))
+    val pub3 = key3.publicKey
 
     // we want to spend the first output of this tx
     val previousTx = Transaction.read("01000000014100d6a4d20ff14dfffd772aa3610881d66332ed160fc1094a338490513b0cf800000000fc0047304402201182201b586c6bfe6fd0346382900834149674d3cbb4081c304965440b1c0af20220023b62a997f4385e9279dc1078590556c6c6a85c3ec20fda407e95eb270e4de90147304402200c75f91f8bd741a8e71d11ff6a3e931838e32ceead34ccccfe3f73f01a81e45f02201795881473644b5f5ee6a8d8a90fe16e60eacace40e88900c375af2e0c51e26d014c69522103bd95bfc136869e2e5e3b0491e45c32634b0201a03903e210b01be248e04df8702103e04f714a4010ca5bb1423ef97012cb1008fb0dfd2f02acbcd3650771c46e4a8f2102913bd21425454688bdc2df2f0e518c5f3109b1c1be56e6e783a41c394c95dc0953aeffffffff0140420f00000000001976a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac00000000")
     val privateKey = PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet)
-    val publicKey = privateKey.toPoint
+    val publicKey = privateKey.publicKey
 
     // create and serialize a "2 out of 3" multisig script
     val redeemScript = Script.write(Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3)))
@@ -234,7 +234,7 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // and sign it
     val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, privateKey)
-    val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.toPoint.toBin) :: Nil)
+    val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey) :: Nil)
     Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // how to spend our tx ? let's try to sent its output to our public key
@@ -263,9 +263,9 @@ class TransactionSpec extends FlatSpec with Matchers {
       Transaction.read("01000000016d1f1a7f8c1307139ef78080ba8442852c6766d3fbb826d2ac0e6fb2f72dd8dc000000008b483045022100bdd23d0f98a4173a64fa432b8bf4ac41261a671f2c6c690d57ac839866d78bb202207bddb87ca95c9cef45de30a75144e5513571aa7938635b9e051b1c20f01088a60141044aec194c55c97f4519535f50f5539c6915045ecb79a36281dee6db55ffe1ad2e55f4a1c0e0950d3511e8f205b45cafa348a4a2ab2359246cb3c93f6532c4e8f5ffffffff0140548900000000001976a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac00000000")
     )
     val keys = List(
-      SignData(previousTx(0).txOut(1).publicKeyScript, Base58Check.decode("cW6bSKtH3oMPA18cXSMR8ASHztrmbwmCyqvvN8x3Tc7WG6TyrJDg")._2),
-      SignData(previousTx(1).txOut(0).publicKeyScript, Base58Check.decode("93Ag8t83NW9WmPbhqLCSUNckARpbpgWtp4EWGidtj6h6pVQgGN4")._2),
-      SignData(previousTx(2).txOut(0).publicKeyScript, Base58Check.decode("921vnTeSQCN7GMHdiHyaoZ1JSugTtzvg8rqyXH9HmFtBgrNDxCT")._2)
+      SignData(previousTx(0).txOut(1).publicKeyScript, PrivateKey.fromBase58("cW6bSKtH3oMPA18cXSMR8ASHztrmbwmCyqvvN8x3Tc7WG6TyrJDg", Base58.Prefix.SecretKeyTestnet)),
+      SignData(previousTx(1).txOut(0).publicKeyScript, PrivateKey.fromBase58("93Ag8t83NW9WmPbhqLCSUNckARpbpgWtp4EWGidtj6h6pVQgGN4", Base58.Prefix.SecretKeyTestnet)),
+      SignData(previousTx(2).txOut(0).publicKeyScript, PrivateKey.fromBase58("921vnTeSQCN7GMHdiHyaoZ1JSugTtzvg8rqyXH9HmFtBgrNDxCT", Base58.Prefix.SecretKeyTestnet))
     )
 
     val dest1 = "n2Jrcf7cJH7wMJdhKZGVi2jaSnV2BwYE9m"

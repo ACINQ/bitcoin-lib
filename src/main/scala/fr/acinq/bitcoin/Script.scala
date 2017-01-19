@@ -429,7 +429,7 @@ object Script {
         if (sigBytes1.isEmpty) false
         else {
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
-          val result = Crypto.verifySignature(hash, sigBytes, Point(pubKey))
+          val result = Crypto.verifySignature(hash, sigBytes, PublicKey(pubKey))
           result
         }
       }
@@ -994,7 +994,7 @@ object Script {
     val op_m = ScriptElt.code2elt(m + 0x50)
     // 1 -> OP_1, 2 -> OP_2, ... 16 -> OP_16
     val op_n = ScriptElt.code2elt(pubkeys.size + 0x50)
-    op_m :: pubkeys.toList.map(OP_PUSHDATA(_)) ::: op_n :: OP_CHECKMULTISIG :: Nil
+    op_m :: pubkeys.toList.map(pub => OP_PUSHDATA(pub.toBin)) ::: op_n :: OP_CHECKMULTISIG :: Nil
   }
 
   /**
@@ -1002,7 +1002,7 @@ object Script {
     * @param pubKey public key
     * @return a pay-to-public-key-hash script
     */
-  def pay2pkh(pubKey: PublicKey): Seq[ScriptElt] = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubKey.hash) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
+  def pay2pkh(pubKey: PublicKey): Seq[ScriptElt] = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubKey.hash160) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
 
   /**
     *
@@ -1037,5 +1037,5 @@ object Script {
     * @param pubKey public key
     * @return a pay-to-witness-public-key-hash script
     */
-  def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(pubKey.hash) :: Nil
+  def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(pubKey.hash160) :: Nil
 }
