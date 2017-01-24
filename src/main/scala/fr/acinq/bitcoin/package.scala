@@ -3,6 +3,8 @@ package fr.acinq
 import java.io._
 import java.math.BigInteger
 
+import org.bouncycastle.util.encoders.Hex
+
 /**
   * see https://en.bitcoin.it/wiki/Protocol_specification
   */
@@ -108,9 +110,9 @@ package object bitcoin {
 
   implicit def millisatoshi2millibtc(input: MilliSatoshi): MilliBtc = satoshi2millibtc(millisatoshi2satoshi(input))
 
-  def toHexString(blob: Seq[Byte]) = blob.map("%02x".format(_)).mkString
+  def toHexString(blob: BinaryData) = Hex.toHexString(blob)
 
-  def fromHexString(hex: String): Array[Byte] = hex.stripPrefix("0x").sliding(2, 2).toArray.map(Integer.parseInt(_, 16).toByte)
+  def fromHexString(hex: String): BinaryData = Hex.decode(hex.stripPrefix("0x"))
 
   implicit def string2binaryData(input: String): BinaryData = BinaryData(fromHexString(input))
 

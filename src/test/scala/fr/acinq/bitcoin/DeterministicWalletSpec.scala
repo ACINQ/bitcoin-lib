@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
 import java.math.BigInteger
+import java.nio.ByteOrder
 
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -106,7 +107,7 @@ class DeterministicWalletSpec extends FlatSpec {
 
     // now we have: the master public key, and a child private key, and we want to climb the tree back up
     // to the parent private key
-    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes.data ++ writeUInt32BigEndian(42L))
+    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes.data ++ writeUInt32(42, ByteOrder.BIG_ENDIAN))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val guess = new BigInteger(1, m42.secretkeybytes).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)

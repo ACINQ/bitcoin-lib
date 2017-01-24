@@ -17,16 +17,16 @@ class CryptoSpec extends FlatSpec {
     val privateKey = "cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp"
 
     val (version, data) = Base58Check.decode(privateKey)
-    val priv = Scalar(data)
-    val publicKey = priv.toPoint
+    val priv = PrivateKey(data)
+    val publicKey = priv.publicKey
     val computedAddress = Base58Check.encode(Prefix.PubkeyAddressTestnet, Crypto.hash160(publicKey.toBin))
     assert(computedAddress === address)
   }
 
   // see https://en.bitcoin.it/wiki/Technical_background_of_Bitcoin_addresses
   it should "generate public keys from private keys" in {
-    val privateKey: Scalar = BinaryData("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725")
-    val publicKey = privateKey.toPoint
+    val privateKey = PrivateKey(BinaryData("18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725"))
+    val publicKey = privateKey.publicKey
     assert(publicKey.toBin === BinaryData("0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6"))
 
     val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toBin))
@@ -34,8 +34,8 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "generate public keys from private keys 2" in {
-    val privateKey: Scalar = BinaryData("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
-    val publicKey = privateKey.toPoint
+    val privateKey = PrivateKey(BinaryData("BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55"))
+    val publicKey = privateKey.publicKey
     assert(publicKey.toBin === BinaryData("04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827"))
 
     val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toBin))
@@ -45,11 +45,11 @@ class CryptoSpec extends FlatSpec {
   it should "sign and verify signatures" in {
     val random = new Random()
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
-    val publicKey = privateKey.toPoint
+    val publicKey = privateKey.publicKey
     val data = "this is a test".getBytes("UTF-8")
     val (r, s) = Crypto.sign(data, privateKey)
     val encoded = Crypto.encodeSignature(r, s)
-    assert(Crypto.verifySignature(data, encoded, publicKey.toBin))
+    assert(Crypto.verifySignature(data, encoded, publicKey))
   }
 
   it should "generate deterministic signatures" in {
@@ -82,7 +82,7 @@ class CryptoSpec extends FlatSpec {
 
     dataset.map {
       case (k, m, s) =>
-        val sig: BinaryData = Crypto.encodeSignature(Crypto.sign(Crypto.sha256(BinaryData(m.getBytes("UTF-8"))), BinaryData(k)))
+        val sig: BinaryData = Crypto.encodeSignature(Crypto.sign(Crypto.sha256(BinaryData(m.getBytes("UTF-8"))), PrivateKey(BinaryData(k))))
         assert(sig == BinaryData(s))
     }
   }

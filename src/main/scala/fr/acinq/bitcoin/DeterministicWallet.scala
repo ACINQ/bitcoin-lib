@@ -1,7 +1,8 @@
 package fr.acinq.bitcoin
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
+import java.nio.ByteOrder
 
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import fr.acinq.bitcoin.Protocol._
@@ -37,24 +38,24 @@ object DeterministicWallet {
     require(secretkeybytes.length == 32)
     require(chaincode.length == 32)
 
-    def privateKey: PrivateKey = Scalar(secretkeybytes :+ 1.toByte)
+    def privateKey: PrivateKey = PrivateKey(Scalar(secretkeybytes), compressed = true)
 
-    def publicKey: PublicKey = privateKey.toPoint
+    def publicKey: PublicKey = privateKey.publicKey
   }
 
   case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
     require(publickeybytes.length == 33)
     require(chaincode.length == 32)
 
-    def publicKey: PublicKey = Point(publickeybytes)
+    def publicKey: PublicKey = PublicKey(publickeybytes)
   }
 
   def encode(input: ExtendedPrivateKey, testnet: Boolean): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32BigEndian(if (testnet) tprv else xprv, out)
+    writeUInt32(if (testnet) tprv else xprv, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
-    writeUInt32BigEndian(input.parent, out)
-    writeUInt32BigEndian(input.path.lastChildNumber, out)
+    writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
+    writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
     out.write(input.chaincode)
     out.write(0)
     out.write(input.secretkeybytes)
@@ -65,10 +66,10 @@ object DeterministicWallet {
 
   def encode(input: ExtendedPublicKey, testnet: Boolean): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32BigEndian(if (testnet) tpub else xpub, out)
+    writeUInt32(if (testnet) tpub else xpub, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
-    writeUInt32BigEndian(input.parent, out)
-    writeUInt32BigEndian(input.path.lastChildNumber, out)
+    writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
+    writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
     out.write(input.chaincode)
     out.write(input.publickeybytes)
     val buffer = out.toByteArray
@@ -94,7 +95,7 @@ object DeterministicWallet {
     * @return the public key for this private key
     */
   def publicKey(input: ExtendedPrivateKey): ExtendedPublicKey = {
-    ExtendedPublicKey(input.publicKey, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
+    ExtendedPublicKey(input.publicKey.toBin, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
   }
 
   /**
@@ -102,7 +103,7 @@ object DeterministicWallet {
     * @param input extended public key
     * @return the fingerprint for this public key
     */
-  def fingerprint(input: ExtendedPublicKey): Long = uint32(Crypto.hash160(input.publickeybytes).take(4).reverse)
+  def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes).take(4).reverse.toArray))
 
   /**
     *
@@ -120,10 +121,10 @@ object DeterministicWallet {
   def derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = {
     val I = if (isHardened(index)) {
       val buffer = 0.toByte +: parent.secretkeybytes.data
-      Crypto.hmac512(parent.chaincode, buffer ++ writeUInt32BigEndian(index))
+      Crypto.hmac512(parent.chaincode, buffer ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     } else {
       val pub = publicKey(parent).publickeybytes
-      Crypto.hmac512(parent.chaincode, pub.data ++ writeUInt32BigEndian(index))
+      Crypto.hmac512(parent.chaincode, pub.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     }
     val IL = I.take(32)
     val IR = I.takeRight(32)
@@ -142,7 +143,7 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = {
     require(!isHardened(index), "Cannot derive public keys from public hardened keys")
 
-    val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes.data ++ writeUInt32BigEndian(index))
+    val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val p = new BigInteger(1, IL.toArray)

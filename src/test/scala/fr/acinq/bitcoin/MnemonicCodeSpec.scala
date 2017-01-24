@@ -9,11 +9,14 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 object MnemonicCodeSpec {
+
   case class TestVectors(english: Array[Array[String]])
+
 }
 
 @RunWith(classOf[JUnitRunner])
 class MnemonicCodeSpec extends FlatSpec {
+
   import MnemonicCode._
   import MnemonicCodeSpec._
 
@@ -24,8 +27,8 @@ class MnemonicCodeSpec extends FlatSpec {
     val vectors = JsonMethods.parse(new InputStreamReader(stream)).extract[TestVectors]
     vectors.english.map(_ match {
       case Array(raw, mnemonics, seed) =>
-        assert(toMnemonics(fromHexString(raw)).mkString(" ") === mnemonics)
-        assert(toHexString(toSeed(toMnemonics(fromHexString(raw)), "TREZOR")) === seed)
+        assert(toMnemonics(BinaryData(raw)).mkString(" ") === mnemonics)
+        assert(toSeed(toMnemonics(BinaryData(raw)), "TREZOR") === BinaryData(seed))
     })
   }
 }
