@@ -1,5 +1,7 @@
 package fr.acinq.bitcoin
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -85,5 +87,34 @@ class CryptoSpec extends FlatSpec {
         val sig: BinaryData = Crypto.encodeSignature(Crypto.sign(Crypto.sha256(BinaryData(m.getBytes("UTF-8"))), PrivateKey(BinaryData(k))))
         assert(sig == BinaryData(s))
     }
+  }
+
+  def serialize[T](t: T): BinaryData = {
+    val bos = new ByteArrayOutputStream()
+    val oos = new ObjectOutputStream(bos)
+    oos.writeObject(t)
+    bos.toByteArray
+  }
+
+  def deserialize[T](input: BinaryData): T = {
+    val bis = new ByteArrayInputStream(input)
+    val osi = new ObjectInputStream(bis)
+    osi.readObject().asInstanceOf[T]
+  }
+
+  it should "serialize points and scalars" in {
+    val secret = Scalar(BinaryData("01" * 32))
+    val point = secret.toPoint
+
+    assert(deserialize[Scalar](serialize(secret)) == secret)
+    assert(deserialize[Point](serialize(point)) == point)
+  }
+
+  it should "serialize public and private keys" in {
+    val priv = PrivateKey(BinaryData("01" * 32))
+    val pub = priv.publicKey
+
+    assert(deserialize[PrivateKey](serialize(priv)) == priv)
+    assert(deserialize[PublicKey](serialize(pub)) == pub)
   }
 }

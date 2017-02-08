@@ -122,9 +122,15 @@ object Crypto {
       */
     def toBin(compressed: Boolean): BinaryData = value.getEncoded(compressed)
 
+    // because ECPoint is not serializable
+    private def writeReplace: Any = PointProxy(toBin(true))
+
     override def toString = toBin(true).toString
   }
 
+  private case class PointProxy(bin: BinaryData) {
+    def readResolve: Any = Point(bin)
+  }
 
   object Point {
     def apply(data: BinaryData): Point = Point(curve.getCurve.decodePoint(data))
