@@ -37,6 +37,12 @@ object Crypto {
 
     def multiply(scalar: Scalar): Scalar = Scalar(value.multiply(scalar.value).mod(Crypto.curve.getN))
 
+    def +(that: Scalar): Scalar = add(that)
+
+    def -(that: Scalar): Scalar = substract(that)
+
+    def *(that: Scalar): Scalar = multiply(that)
+
     /**
       *
       * @return a 32 bytes binary representation of this value
@@ -47,7 +53,7 @@ object Crypto {
       *
       * @return this * G where G is the curve generator
       */
-    def toPoint: Point = Point(params.getG().multiply(value))
+    def toPoint: Point = Point(params.getG() * value)
 
     override def toString = this.toBin.toString
   }
@@ -114,7 +120,17 @@ object Crypto {
   case class Point(value: ECPoint) {
     def add(point: Point): Point = Point(value.add(point.value))
 
+    def substract(point: Point): Point = Point(value.subtract(point.value))
+
     def multiply(scalar: Scalar): Point = Point(value.multiply(scalar.value))
+
+    def normalize = Point(value.normalize())
+
+    def +(that: Point): Point = add(that)
+
+    def -(that: Point): Point = substract(that)
+
+    def *(that: Scalar): Point = multiply(that)
 
     /**
       *

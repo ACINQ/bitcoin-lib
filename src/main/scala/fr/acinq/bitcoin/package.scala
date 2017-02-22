@@ -44,6 +44,10 @@ package object bitcoin {
     def *(m: Long) = Satoshi(amount * m)
     def /(d: Long) = Satoshi(amount / d)
     def compare(other: Satoshi): Int = if (amount == other.toLong) 0 else if (amount < other.amount) -1 else 1
+    def <= (that: Satoshi): Boolean = compare(that) <= 0
+    def >= (that: Satoshi): Boolean = compare(that) >= 0
+    def <  (that: Satoshi): Boolean = compare(that) <  0
+    def >  (that: Satoshi): Boolean = compare(that) > 0
     // @formatter:on
   }
 

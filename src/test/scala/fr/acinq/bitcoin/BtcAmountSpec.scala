@@ -48,4 +48,17 @@ class BtcAmountSpec extends FunSuite {
     assert((z * 3) / 3 === z)
     assert(Seq(500 satoshi, 100 satoshi, 50 satoshi).sum === Satoshi(650))
   }
+
+  test("basic comparisons") {
+    val x: Satoshi = 1.001 btc
+    val y: Satoshi = 1 btc
+    val z: Satoshi = 1 millibtc
+
+    assert(x >= x)
+    assert(x <= x)
+    assert(x > y)
+    assert(y < x)
+    assert(x < y + z + z)
+    assert(x == y + z)
+  }
 }
