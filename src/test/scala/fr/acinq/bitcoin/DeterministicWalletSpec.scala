@@ -89,10 +89,17 @@ class DeterministicWalletSpec extends FlatSpec {
     assert(encode(m0_2147483647h_1_2147483646h_pub, testnet = false) === "xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL")
 
     val m0_2147483647h_1_2147483646h_2 = derivePrivateKey(m0_2147483647h_1_2147483646h, 2)
-    assert(m0_2147483647h_1_2147483646h_2.path.toString === "m/0/2147483647h/1/2147483646h/2")
+    assert(m0_2147483647h_1_2147483646h_2.path.toString === "m/0/2147483647'/1/2147483646'/2")
     assert(encode(m0_2147483647h_1_2147483646h_2, testnet = false) === "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j")
     val m0_2147483647h_1_2147483646h_2_pub = publicKey(m0_2147483647h_1_2147483646h_2)
     assert(encode(m0_2147483647h_1_2147483646h_2_pub, testnet = false) === "xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt")
+  }
+  it should "generate and derive keys (test vector #3)" in {
+    val m = generate(BinaryData("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be"))
+    assert(encode(m, testnet = false) === "xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6")
+    assert(encode(publicKey(m), testnet = false) == "xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13")
+    assert(encode(derivePrivateKey(m, hardened(0)), testnet = false) === "xprv9uPDJpEQgRQfDcW7BkF7eTya6RPxXeJCqCJGHuCJ4GiRVLzkTXBAJMu2qaMWPrS7AANYqdq6vcBcBUdJCVVFceUvJFjaPdGZ2y9WACViL4L")
+    assert(encode(publicKey(derivePrivateKey(m, hardened(0))), testnet = false) == "xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y")
   }
   it should "be possible to go up the private key chain if you have the master pub key and a child private key!!" in {
     val m = generate(fromHexString("000102030405060708090a0b0c0d0e0f"))

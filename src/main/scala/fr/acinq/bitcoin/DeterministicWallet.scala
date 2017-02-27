@@ -21,7 +21,7 @@ object DeterministicWallet {
   }
 
   object KeyPath {
-    def childNumberToString(childNumber: Long) = if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString + "h") else childNumber.toString
+    def childNumberToString(childNumber: Long) = if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString + "'") else childNumber.toString
   }
 
   implicit def keypath2longseq(input: KeyPath): Seq[Long] = input.path
