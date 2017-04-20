@@ -3,7 +3,7 @@ package fr.acinq
 import java.io._
 import java.math.BigInteger
 
-import org.bouncycastle.util.encoders.Hex
+import org.spongycastle.util.encoders.Hex
 
 /**
   * see https://en.bitcoin.it/wiki/Protocol_specification

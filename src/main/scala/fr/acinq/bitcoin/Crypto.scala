@@ -3,14 +3,14 @@ package fr.acinq.bitcoin
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 
-import org.bouncycastle.asn1.sec.SECNamedCurves
-import org.bouncycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
-import org.bouncycastle.crypto.Digest
-import org.bouncycastle.crypto.digests._
-import org.bouncycastle.crypto.macs.HMac
-import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters, KeyParameter}
-import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
-import org.bouncycastle.math.ec.ECPoint
+import org.spongycastle.asn1.sec.SECNamedCurves
+import org.spongycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
+import org.spongycastle.crypto.Digest
+import org.spongycastle.crypto.digests._
+import org.spongycastle.crypto.macs.HMac
+import org.spongycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters, KeyParameter}
+import org.spongycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
+import org.spongycastle.math.ec.ECPoint
 
 
 object Crypto {

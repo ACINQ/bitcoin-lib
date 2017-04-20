@@ -188,9 +188,9 @@
             <version>${scala.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk15on</artifactId>
-            <version>1.55</version>
+            <groupId>com.madgag.spongycastle</groupId>
+            <artifactId>prov</artifactId>
+            <version>1.56.0.0</version>
         </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>
