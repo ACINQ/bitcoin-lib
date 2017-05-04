@@ -117,4 +117,35 @@ class CryptoSpec extends FlatSpec {
     assert(deserialize[PrivateKey](serialize(priv)) == priv)
     assert(deserialize[PublicKey](serialize(pub)) == pub)
   }
+
+  it should "recover public keys from signatures (basic test)" in {
+    val priv = PrivateKey(BinaryData("01" * 32), compressed = true)
+    val message = BinaryData("02" * 32)
+    val pub = priv.publicKey
+    val (r, s) = Crypto.sign(message, priv)
+    val (pub1, pub2) = recoverPublicKey((r, s), message)
+
+    assert(verifySignature(message, (r, s), pub1))
+    assert(verifySignature(message, (r, s), pub2))
+    assert(pub == pub1 || pub == pub2)
+  }
+
+  it should "recover public keys from signatures (random tests)" in {
+    val random = new Random()
+    val privbytes = new Array[Byte](32)
+    val message = new Array[Byte](32)
+    for (i <- 0 until 100) {
+      random.nextBytes(privbytes)
+      random.nextBytes(message)
+
+      val priv = PrivateKey(privbytes, compressed = true)
+      val pub = priv.publicKey
+      val (r, s) = Crypto.sign(message, priv)
+      val (pub1, pub2) = recoverPublicKey((r, s), message)
+
+      assert(verifySignature(message, (r, s), pub1))
+      assert(verifySignature(message, (r, s), pub2))
+      assert(pub == pub1 || pub == pub2)
+    }
+  }
 }

@@ -433,4 +433,40 @@ object Crypto {
       (r, s)
     }
   }
+
+  /**
+    *
+    * @param x x coordinate
+    * @return a tuple (p1, p2) where p1 and p2 are points on the curve and p1.x = p2.x = x
+    *         p1.y is even, p2.y is odd
+    */
+  def recoverPoint(x: BigInteger) : (Point, Point) = {
+    val x1 = Crypto.curve.getCurve.fromBigInteger(x)
+    val square = x1.square().add(Crypto.curve.getCurve.getA).multiply(x1).add(Crypto.curve.getCurve.getB)
+    val y1 = square.sqrt()
+    val y2 = y1.negate()
+    val R1 = Crypto.curve.getCurve.createPoint(x1.toBigInteger, y1.toBigInteger).normalize()
+    val R2 = Crypto.curve.getCurve.createPoint(x1.toBigInteger, y2.toBigInteger).normalize()
+    if (y1.testBitZero()) (R2, R1) else (R1, R2)
+  }
+
+  /**
+    * Recover public keys from a signature and the message that was signed. This method will return 2 public keys, and the signature
+    * can be verified with both, but only one of them matches that private key that was used to generate the signature.
+    * @param t signature
+    * @param message message that was signed
+    * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
+    *         pub1 if the recovery id is even and pub2 if it is odd
+    */
+  def recoverPublicKey(t: (BigInteger, BigInteger), message: BinaryData) : (PublicKey, PublicKey) = {
+    val (r, s) = t
+    val m = new BigInteger(1, message)
+
+    val (p1, p2) = recoverPoint(r)
+    val Q1 = (p1.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
+    val Q2 = (p2.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
+    (PublicKey(Q1), PublicKey(Q2))
+  }
+
+  def recoverPublicKey(sig: BinaryData, message: BinaryData) : (PublicKey, PublicKey) = recoverPublicKey(Crypto.decodeSignature(sig), message)
 }
