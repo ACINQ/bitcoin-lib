@@ -3,16 +3,14 @@ package fr.acinq.bitcoin
 import java.io._
 import java.math.BigInteger
 import java.net.{Inet4Address, Inet6Address, InetAddress}
+import java.nio.{ByteBuffer, ByteOrder}
 import java.util
-
-import com.typesafe.config.ConfigFactory
-import fr.acinq.bitcoin.Script.Runner
 
 import scala.collection.mutable.ArrayBuffer
 
 /**
- * see https://en.bitcoin.it/wiki/Protocol_specification
- */
+  * see https://en.bitcoin.it/wiki/Protocol_specification
+  */
 
 object BinaryData {
   def apply(hex: String): BinaryData = hex
@@ -28,127 +26,76 @@ case class BinaryData(data: Seq[Byte]) {
 
 object Protocol {
   /**
-   * basic serialization functions
-   */
+    * basic serialization functions
+    */
 
-  val PROTOCOL_VERSION = ConfigFactory.load().getLong("bitcoin-lib.protocol-version")
+  val PROTOCOL_VERSION = 70015
 
-  def uint8(blob: Seq[Byte]) = blob(0) & 0xffl
+  def uint8(input: InputStream): Int = input.read()
 
-  def uint8(input: InputStream): Long = input.read().toLong
+  def writeUInt8(input: Int, out: OutputStream): Unit = out.write(input & 0xff)
 
-  def writeUInt8(input: Long, out: OutputStream): Unit = out.write((input & 0xff).asInstanceOf[Int])
-
-  def writeUInt8(input: Int, out: OutputStream): Unit = writeUInt8(input.toLong, out)
-
-  def writeUInt8(input: Int): Array[Byte] = {
-    val out = new ByteArrayOutputStream()
-    writeUInt8(input, out)
-    out.toByteArray
+  def uint16(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Int = {
+    val bin = new Array[Byte](2)
+    input.read(bin)
+    uint16(bin, order)
   }
 
-  def uint16(a: Int, b: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8)
-
-  def uint16BigEndian(a: Int, b: Int): Long = ((b & 0xffl) << 0) | ((a & 0xffl) << 8)
-
-  def uint16(blob: Seq[Byte]): Long = uint16(blob(0), blob(1))
-
-  def uint16BigEndian(blob: Array[Byte]): Long = uint16BigEndian(blob(0), blob(1))
-
-  def uint16(input: InputStream): Long = uint16(input.read(), input.read())
-
-  def uint16BigEndian(input: InputStream): Long = uint16BigEndian(input.read(), input.read())
-
-  def writeUInt16(input: Long, out: OutputStream): Unit = {
-    writeUInt8((input) & 0xff, out)
-    writeUInt8((input >> 8) & 0xff, out)
+  def uint16(input: BinaryData, order: ByteOrder): Int = {
+    val buffer = ByteBuffer.wrap(input).order(order)
+    buffer.getShort & 0xFFFF
   }
 
-  def writeUInt16(input: Int, out: OutputStream): Unit = writeUInt16(input.toLong, out)
+  def writeUInt16(input: Int, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt16(input, order))
 
-  def writeUInt16BigEndian(input: Long, out: OutputStream): Unit = {
-    writeUInt8((input >> 8) & 0xff, out)
-    writeUInt8((input) & 0xff, out)
+  def writeUInt16(input: Int, order: ByteOrder): BinaryData = {
+    val bin = new Array[Byte](2)
+    val buffer = ByteBuffer.wrap(bin).order(order)
+    buffer.putShort(input.toShort)
+    bin
   }
 
-  def writeUInt16BigEndian(input: Long): Array[Byte] = {
-    val out = new ByteArrayOutputStream(2)
-    writeUInt16BigEndian(input, out)
-    out.toByteArray
+  def uint32(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Long = {
+    val bin = new Array[Byte](4)
+    input.read(bin)
+    uint32(bin, order)
   }
 
-  def writeUInt16BigEndian(input: Int): Array[Byte] = writeUInt16BigEndian(input.toLong)
-
-  def uint32(a: Int, b: Int, c: Int, d: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8) | ((c & 0xffl) << 16) | ((d & 0xffl) << 24)
-
-  def uint32(blob: Seq[Byte]): Long = uint32(blob(0), blob(1), blob(2), blob(3))
-
-  def uint32(input: InputStream): Long = {
-    val blob = new Array[Byte](4)
-    input.read(blob)
-    uint32(blob)
+  def uint32(input: BinaryData, order: ByteOrder): Long = {
+    val buffer = ByteBuffer.wrap(input).order(order)
+    buffer.getInt() & 0xFFFFFFFFL
   }
 
-  def writeUInt32(input: Long, out: OutputStream): Unit = {
-    writeUInt8((input) & 0xff, out)
-    writeUInt8((input >>> 8) & 0xff, out)
-    writeUInt8((input >>> 16) & 0xff, out)
-    writeUInt8((input >>> 24) & 0xff, out)
+  def writeUInt32(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt32(input, order))
+
+  def writeUInt32(input: Long, order: ByteOrder): Array[Byte] = {
+    val bin = new Array[Byte](4)
+    val buffer = ByteBuffer.wrap(bin).order(order)
+    buffer.putInt((input & 0xffffffff).toInt)
+    bin
   }
 
-  def writeUInt32(input: Int, out: OutputStream): Unit = writeUInt32(input.toLong, out)
+  def writeUInt32(input: Long): Array[Byte] = writeUInt32(input, ByteOrder.LITTLE_ENDIAN)
 
-  def writeUInt32(input: Int): Array[Byte] = {
-    val out = new ByteArrayOutputStream()
-    writeUInt32(input, out)
-    out.toByteArray
+  def uint64(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Long = {
+    val bin = new Array[Byte](8)
+    input.read(bin)
+    uint64(bin, order)
   }
 
-  def writeUInt32(input: Long): Array[Byte] = {
-    val out = new ByteArrayOutputStream(4)
-    writeUInt32(input, out)
-    out.toByteArray
+  def uint64(input: BinaryData, order: ByteOrder): Long = {
+    val buffer = ByteBuffer.wrap(input).order(order)
+    buffer.getLong()
   }
 
-  def writeUInt32BigEndian(input: Long, out: OutputStream): Unit = {
-    writeUInt8((input >>> 24) & 0xff, out)
-    writeUInt8((input >>> 16) & 0xff, out)
-    writeUInt8((input >>> 8) & 0xff, out)
-    writeUInt8((input) & 0xff, out)
+  def writeUInt64(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt64(input, order))
+
+  def writeUInt64(input: Long, order: ByteOrder): Array[Byte] = {
+    val bin = new Array[Byte](8)
+    val buffer = ByteBuffer.wrap(bin).order(order)
+    buffer.putLong(input)
+    bin
   }
-
-  def writeUInt32BigEndian(input: Long): Array[Byte] = {
-    val out = new ByteArrayOutputStream(4)
-    writeUInt32BigEndian(input, out)
-    out.toByteArray
-  }
-
-  def writeUInt32BigEndian(input: Int): Array[Byte] = writeUInt32BigEndian(input.toLong)
-
-  def uint64(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int, h: Int): Long = ((a & 0xffl) << 0) | ((b & 0xffl) << 8) | ((c & 0xffl) << 16) | ((d & 0xffl) << 24) | ((e & 0xffl) << 32) | ((f & 0xffl) << 40) | ((g & 0xffl) << 48) | ((h & 0xffl) << 56)
-
-  def uint64(blob: Seq[Byte]): Long = uint64(blob(0), blob(1), blob(2), blob(3), blob(4), blob(5), blob(6), blob(7))
-
-  def uint64(input: InputStream): Long = uint64(input.read(), input.read(), input.read(), input.read(), input.read(), input.read(), input.read(), input.read())
-
-  def writeUInt64(input: Long, out: OutputStream): Unit = {
-    writeUInt8((input) & 0xff, out)
-    writeUInt8((input >>> 8) & 0xff, out)
-    writeUInt8((input >>> 16) & 0xff, out)
-    writeUInt8((input >>> 24) & 0xff, out)
-    writeUInt8((input >>> 32) & 0xff, out)
-    writeUInt8((input >>> 40) & 0xff, out)
-    writeUInt8((input >>> 48) & 0xff, out)
-    writeUInt8((input >>> 56) & 0xff, out)
-  }
-
-  def writeUInt64(input: Long): Array[Byte] = {
-    val out = new ByteArrayOutputStream(8)
-    writeUInt64(input, out)
-    out.toByteArray
-  }
-
-  def writeUInt64(input: Int, out: OutputStream): Unit = writeUInt64(input.toLong, out)
 
   def varint(blob: Array[Byte]): Long = varint(new ByteArrayInputStream(blob))
 
@@ -162,24 +109,24 @@ object Protocol {
   def writeVarint(input: Int, out: OutputStream): Unit = writeVarint(input.toLong, out)
 
   def writeVarint(input: Long, out: OutputStream): Unit = {
-    if (input < 0xfdL) writeUInt8(input, out)
+    if (input < 0xfdL) writeUInt8(input.toInt, out)
     else if (input < 65535L) {
-      writeUInt8(0xfdL, out)
-      writeUInt16(input, out)
+      writeUInt8(0xfd, out)
+      writeUInt16(input.toInt, out)
     }
     else if (input < 1048576L) {
-      writeUInt8(0xfeL, out)
-      writeUInt32(input, out)
+      writeUInt8(0xfe, out)
+      writeUInt32(input.toInt, out)
     }
     else {
-      writeUInt8(0xffL, out)
+      writeUInt8(0xff, out)
       writeUInt64(input, out)
     }
   }
 
-  def bytes(input: InputStream, size: Long): Array[Byte] = bytes(input, size.toInt)
+  def bytes(input: InputStream, size: Long): BinaryData = bytes(input, size.toInt)
 
-  def bytes(input: InputStream, size: Int): Array[Byte] = {
+  def bytes(input: InputStream, size: Int): BinaryData = {
     val blob = new Array[Byte](size)
     if (size > 0) {
       val count = input.read(blob)
@@ -188,6 +135,8 @@ object Protocol {
     blob
   }
 
+  def writeBytes(input: Array[Byte], out: OutputStream): Unit = out.write(input)
+
   def varstring(input: InputStream): String = {
     val length = varint(input)
     new String(bytes(input, length), "UTF-8")
@@ -195,21 +144,19 @@ object Protocol {
 
   def writeVarstring(input: String, out: OutputStream) = {
     writeVarint(input.length, out)
-    out.write(input.getBytes("UTF-8"))
+    writeBytes(input.getBytes("UTF-8"), out)
   }
 
-  def hash(input: InputStream): Array[Byte] = bytes(input, 32) // a hash is always 256 bits
+  def hash(input: InputStream): BinaryData = bytes(input, 32) // a hash is always 256 bits
 
   def script(input: InputStream): BinaryData = {
     val length = varint(input) // read size
     bytes(input, length.toInt) // read bytes
   }
 
-  //def writeScript(input: BinaryData, out: OutputStream): Unit = writeScript(input.toArray, out)
-
   def writeScript(input: Array[Byte], out: OutputStream): Unit = {
     writeVarint(input.length.toLong, out)
-    out.write(input)
+    writeBytes(input, out)
   }
 
   implicit val txInSer = TxIn
@@ -219,30 +166,30 @@ object Protocol {
   implicit val networkAddressWithTimestampSer = NetworkAddressWithTimestamp
   implicit val inventoryVectorOutSer = InventoryVector
 
-  def readCollection[T](input: InputStream, maxElement: Option[Int], protocolVersion: Long)(implicit ser: BtcMessage[T]) : Seq[T] =
+  def readCollection[T](input: InputStream, maxElement: Option[Int], protocolVersion: Long)(implicit ser: BtcMessage[T]): Seq[T] =
     readCollection(input, ser.read, maxElement, protocolVersion)
 
   def readCollection[T](input: InputStream, protocolVersion: Long)(implicit ser: BtcMessage[T]): Seq[T] =
     readCollection(input, None, protocolVersion)(ser)
 
-  def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, maxElement: Option[Int], protocolVersion: Long) : Seq[T] = {
+  def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, maxElement: Option[Int], protocolVersion: Long): Seq[T] = {
     val count = varint(input)
     maxElement.map(max => require(count <= max, "invalid length"))
     val items = ArrayBuffer.empty[T]
     for (i <- 1L to count) {
       items += reader(input, protocolVersion)
     }
-    items.toSeq
+    items
   }
 
-  def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, protocolVersion: Long) : Seq[T] = readCollection(input, reader, None, protocolVersion)
+  def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, protocolVersion: Long): Seq[T] = readCollection(input, reader, None, protocolVersion)
 
-  def writeCollection[T](seq: Seq[T], out: OutputStream, protocolVersion: Long)(implicit ser: BtcMessage[T]) : Unit = {
+  def writeCollection[T](seq: Seq[T], out: OutputStream, protocolVersion: Long)(implicit ser: BtcMessage[T]): Unit = {
     writeVarint(seq.length, out)
     seq.map(t => ser.write(t, out, protocolVersion))
   }
 
-  def writeCollection[T](seq: Seq[T], writer: (T, OutputStream, Long) => Unit, out: OutputStream, protocolVersion: Long) : Unit = {
+  def writeCollection[T](seq: Seq[T], writer: (T, OutputStream, Long) => Unit, out: OutputStream, protocolVersion: Long): Unit = {
     writeVarint(seq.length, out)
     seq.map(t => writer(t, out, protocolVersion))
   }
@@ -252,55 +199,55 @@ import Protocol._
 
 trait BtcMessage[T] {
   /**
-   * write a message to a stream
+    * write a message to a stream
     *
-    * @param t message
-   * @param out output stream
-   */
+    * @param t   message
+    * @param out output stream
+    */
   def write(t: T, out: OutputStream, protocolVersion: Long): Unit
 
-  def write(t:T, out: OutputStream): Unit = write(t, out, PROTOCOL_VERSION)
+  def write(t: T, out: OutputStream): Unit = write(t, out, PROTOCOL_VERSION)
 
   /**
-   * write a message to a byte array
+    * write a message to a byte array
     *
     * @param t message
-   * @return a serialized message
-   */
-  def write(t: T, protocolVersion: Long): Array[Byte] = {
+    * @return a serialized message
+    */
+  def write(t: T, protocolVersion: Long): BinaryData = {
     val out = new ByteArrayOutputStream()
     write(t, out, protocolVersion)
     out.toByteArray
   }
 
-  def write(t: T): Seq[Byte] = write(t, PROTOCOL_VERSION)
+  def write(t: T): BinaryData = write(t, PROTOCOL_VERSION)
 
-    /**
-   * read a message from a stream
-      *
-      * @param in input stream
-   * @return a deserialized message
-   */
+  /**
+    * read a message from a stream
+    *
+    * @param in input stream
+    * @return a deserialized message
+    */
   def read(in: InputStream, protocolVersion: Long): T
 
   def read(in: InputStream): T = read(in, PROTOCOL_VERSION)
 
   /**
-   * read a message from a byte array
+    * read a message from a byte array
     *
     * @param in serialized message
-   * @return a deserialized message
-   */
+    * @return a deserialized message
+    */
   def read(in: Seq[Byte], protocolVersion: Long): T = read(new ByteArrayInputStream(in.toArray), protocolVersion)
 
   def read(in: Seq[Byte]): T = read(in, PROTOCOL_VERSION)
 
   /**
-   * read a message from a hex string
+    * read a message from a hex string
     *
     * @param in message binary data in hex format
-   * @return a deserialized message of type T
-   */
+    * @return a deserialized message of type T
+    */
   def read(in: String, protocolVersion: Long): T = read(fromHexString(in), protocolVersion)
 
   def read(in: String): T = read(in, PROTOCOL_VERSION)
@@ -320,12 +267,12 @@ object BlockHeader extends BtcMessage[BlockHeader] {
   }
 
   override def write(input: BlockHeader, out: OutputStream, protocolVersion: Long) = {
-    writeUInt32(input.version, out)
-    out.write(input.hashPreviousBlock)
-    out.write(input.hashMerkleRoot)
-    writeUInt32(input.time, out)
-    writeUInt32(input.bits, out)
-    writeUInt32(input.nonce, out)
+    writeUInt32(input.version.toInt, out)
+    writeBytes(input.hashPreviousBlock, out)
+    writeBytes(input.hashMerkleRoot, out)
+    writeUInt32(input.time.toInt, out)
+    writeUInt32(input.bits.toInt, out)
+    writeUInt32(input.nonce.toInt, out)
   }
 
   def getDifficulty(header: BlockHeader): BigInteger = {
@@ -341,15 +288,15 @@ object BlockHeader extends BtcMessage[BlockHeader] {
 }
 
 /**
- *
- * @param version Block version information, based upon the software version creating this block
- * @param hashPreviousBlock The hash value of the previous block this particular block references. Please not that
- *                          this hash is not reversed (as opposed to Block.hash)
- * @param hashMerkleRoot The reference to a Merkle tree collection which is a hash of all transactions related to this block
- * @param time A timestamp recording when this block was created (Will overflow in 2106[2])
- * @param bits The calculated difficulty target being used for this block
- * @param nonce The nonce used to generate this block… to allow variations of the header and compute different hashes
- */
+  *
+  * @param version           Block version information, based upon the software version creating this block
+  * @param hashPreviousBlock The hash value of the previous block this particular block references. Please not that
+  *                          this hash is not reversed (as opposed to Block.hash)
+  * @param hashMerkleRoot    The reference to a Merkle tree collection which is a hash of all transactions related to this block
+  * @param time              A timestamp recording when this block was created (Will overflow in 2106[2])
+  * @param bits              The calculated difficulty target being used for this block
+  * @param nonce             The nonce used to generate this block… to allow variations of the header and compute different hashes
+  */
 case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleRoot: BinaryData, time: Long, bits: Long, nonce: Long) {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
@@ -357,13 +304,13 @@ case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleR
 }
 
 /**
- * see https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
- */
+  * see https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
+  */
 object MerkleTree {
   def computeRoot(tree: Seq[Seq[Byte]]): BinaryData = tree.length match {
     case 1 => tree(0)
     case n if n % 2 != 0 => computeRoot(tree :+ tree.last) // append last element again
-    case _ => computeRoot(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1))).toSeq)
+    case _ => computeRoot(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1)).toSeq).toSeq)
   }
 }
 
@@ -388,7 +335,7 @@ object Block extends BtcMessage[Block] {
 
   // genesis blocks
   val LivenetGenesisBlock = {
-    val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(writeUInt8(4)) :: OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8")) :: Nil
+    val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(BinaryData("04")) :: OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8")) :: Nil
     val scriptPubKey = OP_PUSHDATA("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") :: OP_CHECKSIG :: Nil
     Block(
       BlockHeader(version = 1, hashPreviousBlock = Hash.Zeroes, hashMerkleRoot = "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a", time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
@@ -407,11 +354,11 @@ object Block extends BtcMessage[Block] {
   val SegnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(bits = 503447551, time = 1452831101, nonce = 0))
 
   /**
-   * Proof of work: hash(block) <= target difficulty
+    * Proof of work: hash(block) <= target difficulty
     *
     * @param block
-   * @return true if the input block validates its expected proof of work
-   */
+    * @return true if the input block validates its expected proof of work
+    */
   def checkProofOfWork(block: Block): Boolean = {
     val (target, _, _) = decodeCompact(block.header.bits)
     val hash = new BigInteger(1, block.blockId.toArray)
@@ -420,11 +367,11 @@ object Block extends BtcMessage[Block] {
 }
 
 /**
- * Bitcoin block
+  * Bitcoin block
   *
   * @param header block header
- * @param tx transactions
- */
+  * @param tx     transactions
+  */
 case class Block(header: BlockHeader, tx: Seq[Transaction]) {
   lazy val hash = header.hash
 
@@ -437,7 +384,7 @@ object Message extends BtcMessage[Message] {
   val MagicTestNet = 0xDAB5BFFAL
   val MagicTestnet3 = 0x0709110BL
   val MagicNamecoin = 0xFEB4BEF9L
-  val MagicSegnet =  0xC4A1ABDC
+  val MagicSegnet = 0xC4A1ABDC
 
   override def read(in: InputStream, protocolVersion: Long): Message = {
     val magic = uint32(in)
@@ -450,29 +397,29 @@ object Message extends BtcMessage[Message] {
     val checksum = uint32(in)
     val payload = new Array[Byte](length.toInt)
     in.read(payload)
-    require(checksum == uint32(Crypto.hash256(payload).take(4)), "invalid checksum")
+    require(checksum == uint32(new ByteArrayInputStream(Crypto.hash256(payload).take(4).toArray)), "invalid checksum")
     Message(magic, command, payload)
   }
 
   override def write(input: Message, out: OutputStream, protocolVersion: Long) = {
-    writeUInt32(input.magic, out)
+    writeUInt32(input.magic.toInt, out)
     val buffer = new Array[Byte](12)
     input.command.getBytes("ISO-8859-1").copyToArray(buffer)
-    out.write(buffer)
+    writeBytes(buffer, out)
     writeUInt32(input.payload.length, out)
     val checksum = Crypto.hash256(input.payload).take(4).toArray
-    out.write(checksum)
-    out.write(input.payload)
+    writeBytes(checksum, out)
+    writeBytes(input.payload, out)
   }
 }
 
 /**
- * Bitcoin message exchanged by nodes over the network
+  * Bitcoin message exchanged by nodes over the network
   *
-  * @param magic Magic value indicating message origin network, and used to seek to next message when stream state is unknown
- * @param command ASCII string identifying the packet content, NULL padded (non-NULL padding results in packet rejected)
- * @param payload The actual data
- */
+  * @param magic   Magic value indicating message origin network, and used to seek to next message when stream state is unknown
+  * @param command ASCII string identifying the packet content, NULL padded (non-NULL padding results in packet rejected)
+  * @param payload The actual data
+  */
 case class Message(magic: Long, command: String, payload: BinaryData) {
   require(command.length <= 12)
 }
@@ -484,19 +431,19 @@ object NetworkAddressWithTimestamp extends BtcMessage[NetworkAddressWithTimestam
     val raw = new Array[Byte](16)
     in.read(raw)
     val address = InetAddress.getByAddress(raw)
-    val port = uint16BigEndian(in)
+    val port = uint16(in, ByteOrder.BIG_ENDIAN)
     NetworkAddressWithTimestamp(time, services, address, port)
   }
 
   override def write(input: NetworkAddressWithTimestamp, out: OutputStream, protocolVersion: Long) = {
-    writeUInt32(input.time, out)
+    writeUInt32(input.time.toInt, out)
     writeUInt64(input.services, out)
     input.address match {
-      case _: Inet4Address => out.write(fromHexString("00000000000000000000ffff"))
+      case _: Inet4Address => writeBytes(fromHexString("00000000000000000000ffff"), out)
       case _: Inet6Address => ()
     }
-    out.write(input.address.getAddress)
-    writeUInt16BigEndian(input.port, out)
+    writeBytes(input.address.getAddress, out)
+    writeUInt16(input.port.toInt, out, ByteOrder.BIG_ENDIAN)
   }
 }
 
@@ -508,18 +455,18 @@ object NetworkAddress extends BtcMessage[NetworkAddress] {
     val raw = new Array[Byte](16)
     in.read(raw)
     val address = InetAddress.getByAddress(raw)
-    val port = uint16BigEndian(in)
+    val port = uint16(in, ByteOrder.BIG_ENDIAN)
     NetworkAddress(services, address, port)
   }
 
   override def write(input: NetworkAddress, out: OutputStream, protocolVersion: Long) = {
     writeUInt64(input.services, out)
     input.address match {
-      case _: Inet4Address => out.write(fromHexString("00000000000000000000ffff"))
+      case _: Inet4Address => writeBytes(fromHexString("00000000000000000000ffff"), out)
       case _: Inet6Address => ()
     }
-    out.write(input.address.getAddress)
-    writeUInt16BigEndian(input.port, out) // wtf ?? why BE there ?
+    writeBytes(input.address.getAddress, out)
+    writeUInt16(input.port.toInt, out, ByteOrder.BIG_ENDIAN) // wtf ?? why BE there ?
   }
 }
 
@@ -534,8 +481,7 @@ object Version extends BtcMessage[Version] {
     val addr_from = NetworkAddress.read(in)
     val nonce = uint64(in)
     val length = varint(in)
-    val buffer = new Array[Byte](length.toInt)
-    in.read(buffer)
+    val buffer = bytes(in, length)
     val user_agent = new String(buffer, "ISO-8859-1")
     val start_height = uint32(in)
     val relay = if (uint8(in) == 0) false else true
@@ -543,33 +489,33 @@ object Version extends BtcMessage[Version] {
   }
 
   override def write(input: Version, out: OutputStream, protocolVersion: Long) = {
-    writeUInt32(input.version, out)
+    writeUInt32(input.version.toInt, out)
     writeUInt64(input.services, out)
     writeUInt64(input.timestamp, out)
     NetworkAddress.write(input.addr_recv, out)
     NetworkAddress.write(input.addr_from, out)
     writeUInt64(input.nonce, out)
     writeVarint(input.user_agent.length, out)
-    out.write(input.user_agent.getBytes("ISO-8859-1"))
-    writeUInt32(input.start_height, out)
+    writeBytes(input.user_agent.getBytes("ISO-8859-1"), out)
+    writeUInt32(input.start_height.toInt, out)
     writeUInt8(if (input.relay) 1 else 0, out)
   }
 }
 
 /**
- *
- * @param version Identifies protocol version being used by the node
- * @param services bitfield of features to be enabled for this connection
- * @param timestamp standard UNIX timestamp in seconds
- * @param addr_recv The network address of the node receiving this message
- * @param addr_from The network address of the node emitting this message
- * @param nonce Node random nonce, randomly generated every time a version packet is sent. This nonce is used to detect
- *              connections to self.
- * @param user_agent User Agent
- * @param start_height The last block received by the emitting node
- * @param relay Whether the remote peer should announce relayed transactions or not, see BIP 0037,
- *              since version >= 70001
- */
+  *
+  * @param version      Identifies protocol version being used by the node
+  * @param services     bitfield of features to be enabled for this connection
+  * @param timestamp    standard UNIX timestamp in seconds
+  * @param addr_recv    The network address of the node receiving this message
+  * @param addr_from    The network address of the node emitting this message
+  * @param nonce        Node random nonce, randomly generated every time a version packet is sent. This nonce is used to detect
+  *                     connections to self.
+  * @param user_agent   User Agent
+  * @param start_height The last block received by the emitting node
+  * @param relay        Whether the remote peer should announce relayed transactions or not, see BIP 0037,
+  *                     since version >= 70001
+  */
 case class Version(version: Long, services: Long, timestamp: Long, addr_recv: NetworkAddress, addr_from: NetworkAddress, nonce: Long, user_agent: String, start_height: Long, relay: Boolean)
 
 object Addr extends BtcMessage[Addr] {
@@ -587,8 +533,8 @@ object InventoryVector extends BtcMessage[InventoryVector] {
   val MSG_BLOCK = 2L
 
   override def write(t: InventoryVector, out: OutputStream, protocolVersion: Long): Unit = {
-    writeUInt32(t.`type`, out)
-    out.write(t.hash)
+    writeUInt32(t.`type`.toInt, out)
+    writeBytes(t.hash, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): InventoryVector = InventoryVector(uint32(in), hash(in))
@@ -608,9 +554,9 @@ case class Inventory(inventory: Seq[InventoryVector])
 
 object Getheaders extends BtcMessage[Getheaders] {
   override def write(t: Getheaders, out: OutputStream, protocolVersion: Long): Unit = {
-    writeUInt32(t.version, out)
-    writeCollection(t.locatorHashes, (h:BinaryData, o:OutputStream, _: Long) => o.write(h), out, protocolVersion)
-    out.write(t.stopHash)
+    writeUInt32(t.version.toInt, out)
+    writeCollection(t.locatorHashes, (h: BinaryData, o: OutputStream, _: Long) => o.write(h), out, protocolVersion)
+    writeBytes(t.stopHash, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): Getheaders = {
@@ -625,7 +571,7 @@ case class Getheaders(version: Long, locatorHashes: Seq[BinaryData], stopHash: B
 
 object Headers extends BtcMessage[Headers] {
   override def write(t: Headers, out: OutputStream, protocolVersion: Long): Unit = {
-    writeCollection(t.headers, (t:BlockHeader, o:OutputStream, v: Long) => {
+    writeCollection(t.headers, (t: BlockHeader, o: OutputStream, v: Long) => {
       BlockHeader.write(t, o, v)
       writeVarint(0, o)
     }, out, protocolVersion)
@@ -645,13 +591,13 @@ case class Headers(headers: Seq[BlockHeader])
 
 object Getblocks extends BtcMessage[Getblocks] {
   override def write(t: Getblocks, out: OutputStream, protocolVersion: Long): Unit = {
-    writeUInt32(t.version, out)
-    writeCollection(t.locatorHashes, (h: BinaryData, o:OutputStream, _: Long) => o.write(h), out, protocolVersion)
-    out.write(t.stopHash)
+    writeUInt32(t.version.toInt, out)
+    writeCollection(t.locatorHashes, (h: BinaryData, o: OutputStream, _: Long) => o.write(h), out, protocolVersion)
+    writeBytes(t.stopHash, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): Getblocks = {
-    Getblocks(version =  uint32(in), locatorHashes = readCollection(in, (i: InputStream, _: Long) => BinaryData(hash(i)), protocolVersion), stopHash = hash(in))
+    Getblocks(version = uint32(in), locatorHashes = readCollection(in, (i: InputStream, _: Long) => BinaryData(hash(i)), protocolVersion), stopHash = hash(in))
   }
 }
 
@@ -671,12 +617,12 @@ case class Getdata(inventory: Seq[InventoryVector])
 object Reject extends BtcMessage[Reject] {
   override def write(t: Reject, out: OutputStream, protocolVersion: Long): Unit = {
     writeVarstring(t.message, out)
-    writeUInt8(t.code, out)
+    writeUInt8(t.code.toInt, out)
     writeVarstring(t.reason, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): Reject = {
-    Reject(message = varstring(in), code = uint8(in), reason =  varstring(in), Array.empty[Byte])
+    Reject(message = varstring(in), code = uint8(in), reason = varstring(in), Array.empty[Byte])
   }
 }
 

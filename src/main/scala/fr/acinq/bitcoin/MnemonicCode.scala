@@ -49,7 +49,7 @@ object MnemonicCode {
     * @param passphrase passphrase
     * @return a seed derived from the mnemonic words and passphrase
     */
-  def toSeed(mnemonics: Seq[String], passphrase: String): Seq[Byte] = {
+  def toSeed(mnemonics: Seq[String], passphrase: String): BinaryData = {
     val gen = new PKCS5S2ParametersGenerator(new SHA512Digest())
     gen.init(mnemonics.mkString(" ").getBytes("UTF-8"), ("mnemonic" + passphrase).getBytes("UTF-8"), 2048)
     val keyParams = gen.generateDerivedParameters(512).asInstanceOf[KeyParameter]

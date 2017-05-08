@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
 import java.math.BigInteger
+import java.nio.ByteOrder
 
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -10,6 +11,7 @@ import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class DeterministicWalletSpec extends FlatSpec {
+
   import fr.acinq.bitcoin.DeterministicWallet._
   import Protocol._
 
@@ -87,15 +89,22 @@ class DeterministicWalletSpec extends FlatSpec {
     assert(encode(m0_2147483647h_1_2147483646h_pub, testnet = false) === "xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL")
 
     val m0_2147483647h_1_2147483646h_2 = derivePrivateKey(m0_2147483647h_1_2147483646h, 2)
-    assert(m0_2147483647h_1_2147483646h_2.path.toString === "m/0/2147483647h/1/2147483646h/2")
+    assert(m0_2147483647h_1_2147483646h_2.path.toString === "m/0/2147483647'/1/2147483646'/2")
     assert(encode(m0_2147483647h_1_2147483646h_2, testnet = false) === "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j")
     val m0_2147483647h_1_2147483646h_2_pub = publicKey(m0_2147483647h_1_2147483646h_2)
     assert(encode(m0_2147483647h_1_2147483646h_2_pub, testnet = false) === "xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt")
   }
+  it should "generate and derive keys (test vector #3)" in {
+    val m = generate(BinaryData("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be"))
+    assert(encode(m, testnet = false) === "xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6")
+    assert(encode(publicKey(m), testnet = false) == "xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13")
+    assert(encode(derivePrivateKey(m, hardened(0)), testnet = false) === "xprv9uPDJpEQgRQfDcW7BkF7eTya6RPxXeJCqCJGHuCJ4GiRVLzkTXBAJMu2qaMWPrS7AANYqdq6vcBcBUdJCVVFceUvJFjaPdGZ2y9WACViL4L")
+    assert(encode(publicKey(derivePrivateKey(m, hardened(0))), testnet = false) == "xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y")
+  }
   it should "be possible to go up the private key chain if you have the master pub key and a child private key!!" in {
     val m = generate(fromHexString("000102030405060708090a0b0c0d0e0f"))
     assert(encode(m, testnet = false) === "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi")
-    val k = new BigInteger(1, m.secretkey.data.toArray) // k is our master private key
+    val k = new BigInteger(1, m.secretkeybytes.data.toArray) // k is our master private key
 
     val m_pub = publicKey(m)
     assert(encode(m_pub, testnet = false) === "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8")
@@ -105,10 +114,10 @@ class DeterministicWalletSpec extends FlatSpec {
 
     // now we have: the master public key, and a child private key, and we want to climb the tree back up
     // to the parent private key
-    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickey.data ++ writeUInt32BigEndian(42L))
+    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes.data ++ writeUInt32(42, ByteOrder.BIG_ENDIAN))
     val IL = I.take(32)
     val IR = I.takeRight(32)
-    val guess = new BigInteger(1, m42.secretkey).subtract(new BigInteger(1, IL)).mod(Crypto.curve.getN)
+    val guess = new BigInteger(1, m42.secretkeybytes).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)
     assert(guess === k)
   }
   it should "be able to derive private keys" in {

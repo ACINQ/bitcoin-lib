@@ -4,6 +4,7 @@ import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 
 import fr.acinq.bitcoin.Script.Runner
 import Protocol._
+import fr.acinq.bitcoin.Crypto.PrivateKey
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -14,7 +15,7 @@ object OutPoint extends BtcMessage[OutPoint] {
 
   override def write(input: OutPoint, out: OutputStream, protocolVersion: Long) = {
     out.write(input.hash)
-    writeUInt32(input.index, out)
+    writeUInt32(input.index.toInt, out)
   }
 
   def isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == Hash.Zeroes
@@ -73,7 +74,7 @@ object TxIn extends BtcMessage[TxIn] {
   override def write(input: TxIn, out: OutputStream, protocolVersion: Long) = {
     OutPoint.write(input.outPoint, out)
     writeScript(input.signatureScript, out)
-    writeUInt32(input.sequence, out)
+    writeUInt32(input.sequence.toInt, out)
   }
 
   override def validate(input: TxIn): Unit = {
@@ -99,6 +100,7 @@ object TxIn extends BtcMessage[TxIn] {
   */
 case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) {
   def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
+
   def hasWitness: Boolean = witness.isNotNull
 }
 
@@ -187,18 +189,18 @@ object Transaction extends BtcMessage[Transaction] {
 
   override def write(tx: Transaction, out: OutputStream, protocolVersion: Long) = {
     if (serializeTxWitness(protocolVersion) && tx.hasWitness) {
-      writeUInt32(tx.version, out)
+      writeUInt32(tx.version.toInt, out)
       writeUInt8(0x00, out)
       writeUInt8(0x01, out)
       writeCollection(tx.txIn, out, protocolVersion)
       writeCollection(tx.txOut, out, protocolVersion)
       for (i <- 0 until tx.txIn.size) ScriptWitness.write(tx.txIn(i).witness, out, protocolVersion)
-      writeUInt32(tx.lockTime, out)
+      writeUInt32(tx.lockTime.toInt, out)
     } else {
-      writeUInt32(tx.version, out)
+      writeUInt32(tx.version.toInt, out)
       writeCollection(tx.txIn, out, protocolVersion)
       writeCollection(tx.txOut, out, protocolVersion)
-      writeUInt32(tx.lockTime, out)
+      writeUInt32(tx.lockTime.toInt, out)
     }
   }
 
@@ -219,6 +221,12 @@ object Transaction extends BtcMessage[Transaction] {
     }
   }
 
+  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion | SERIALIZE_TRANSACTION_NO_WITNESS).length
+
+  def totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).length
+
+  def weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
+
   def isCoinbase(input: Transaction) = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn(0).outPoint)
 
   /**
@@ -234,8 +242,11 @@ object Transaction extends BtcMessage[Transaction] {
     val filteredScript = Script.write(Script.parse(previousOutputScript).filterNot(_ == OP_CODESEPARATOR))
 
     def removeSignatureScript(txin: TxIn): TxIn = txin.copy(signatureScript = Array.empty[Byte])
+
     def removeAllSignatureScripts(tx: Transaction): Transaction = tx.copy(txIn = tx.txIn.map(removeSignatureScript))
+
     def updateSignatureScript(tx: Transaction, index: Int, script: Array[Byte]): Transaction = tx.copy(txIn = tx.txIn.updated(index, tx.txIn(index).copy(signatureScript = script)))
+
     def resetSequence(txins: Seq[TxIn], inputIndex: Int): Seq[TxIn] = for (i <- 0 until txins.size) yield {
       if (i == inputIndex) txins(i)
       else txins(i).copy(sequence = 0)
@@ -317,7 +328,7 @@ object Transaction extends BtcMessage[Transaction] {
         } else Hash.Zeroes
 
         val hashSequence: BinaryData = if (!isAnyoneCanPay(sighashType) && !isHashSingle(sighashType) && !isHashNone(sighashType)) {
-          Crypto.hash256(tx.txIn.map(_.sequence).map(Protocol.writeUInt32).flatten)
+          Crypto.hash256(tx.txIn.map(_.sequence).map(s => Protocol.writeUInt32(s.toInt)).flatten)
         } else Hash.Zeroes
 
         val hashOutputs: BinaryData = if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
@@ -327,15 +338,15 @@ object Transaction extends BtcMessage[Transaction] {
         } else Hash.Zeroes
 
         val out = new ByteArrayOutputStream()
-        Protocol.writeUInt32(tx.version, out)
+        Protocol.writeUInt32(tx.version.toInt, out)
         out.write(hashPrevOut)
         out.write(hashSequence)
         out.write(OutPoint.write(tx.txIn(inputIndex).outPoint, Protocol.PROTOCOL_VERSION))
         Protocol.writeScript(previousOutputScript, out)
         Protocol.writeUInt64(amount.toLong, out)
-        Protocol.writeUInt32(tx.txIn(inputIndex).sequence, out)
+        Protocol.writeUInt32(tx.txIn(inputIndex).sequence.toInt, out)
         out.write(hashOutputs)
-        Protocol.writeUInt32(tx.lockTime, out)
+        Protocol.writeUInt32(tx.lockTime.toInt, out)
         Protocol.writeUInt32(sighashType, out)
         val preimage: BinaryData = out.toByteArray
         Crypto.hash256(preimage)
@@ -369,10 +380,10 @@ object Transaction extends BtcMessage[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] = {
-    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(Crypto.isPrivateKeyCompressed(privateKey), "private key must be compressed in segwit")
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): BinaryData = {
+    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(privateKey.compressed, "private key must be compressed in segwit")
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-    val (r, s) = Crypto.sign(hash, privateKey.take(32))
+    val (r, s) = Crypto.sign(hash, privateKey)
     val sig = Crypto.encodeSignature(r, s)
     sig :+ (sighashType.toByte)
   }
@@ -389,7 +400,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: Seq[Byte]): Seq[Byte] =
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): BinaryData =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
 
   /**
@@ -402,8 +413,8 @@ object Transaction extends BtcMessage[Transaction] {
     * @return the encoded signature of this tx for this specific tx input
     */
   @deprecated
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: Seq[Byte]): Seq[Byte] =
-    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
+  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: PrivateKey): BinaryData =
+  signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
 
   /**
     * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
@@ -421,7 +432,7 @@ object Transaction extends BtcMessage[Transaction] {
       val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey)
 
       // this is the public key that is associated with the private key we used for signing
-      val publicKey = Crypto.publicKeyFromPrivateKey(signData(i).privateKey)
+      val publicKey = signData(i).privateKey.publicKey
 
       // signature script: push signature and public key
       val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
@@ -459,7 +470,7 @@ object Transaction extends BtcMessage[Transaction] {
 }
 
 object SignData {
-  def apply(prevPubKeyScript: Seq[ScriptElt], privateKey: BinaryData): SignData = new SignData(Script.write(prevPubKeyScript), privateKey)
+  def apply(prevPubKeyScript: Seq[ScriptElt], privateKey: PrivateKey): SignData = new SignData(Script.write(prevPubKeyScript), privateKey)
 }
 
 /**
@@ -468,7 +479,7 @@ object SignData {
   * @param prevPubKeyScript previous output public key script
   * @param privateKey       private key associated with the previous output public key
   */
-case class SignData(prevPubKeyScript: BinaryData, privateKey: BinaryData)
+case class SignData(prevPubKeyScript: BinaryData, privateKey: PrivateKey)
 
 /**
   * Transaction
@@ -517,9 +528,9 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
 
   def updateWitness(i: Int, witness: ScriptWitness): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(witness = witness)))
 
-  def updateWitnesses(witnesses: Seq[ScriptWitness]) : Transaction = {
+  def updateWitnesses(witnesses: Seq[ScriptWitness]): Transaction = {
     require(witnesses.length == txIn.length)
-    witnesses.zipWithIndex.foldLeft(this){
+    witnesses.zipWithIndex.foldLeft(this) {
       case (tx, (witness, index)) => tx.updateWitness(index, witness)
     }
   }
@@ -539,4 +550,11 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
     * @return a new transaction which includes the newly added output
     */
   def addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut :+ output)
+
+  def baseSize(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.baseSize(this, protocolVersion)
+
+  def totalSize(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.totalSize(this, protocolVersion)
+
+  def weight(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.weight(this, protocolVersion)
+
 }
