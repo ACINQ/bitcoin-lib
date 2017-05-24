@@ -6,8 +6,11 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import Base58.Prefix
+import com.google.common.io.Files
 import fr.acinq.bitcoin.Crypto._
+import org.bouncycastle.util.io.Streams
 
+import scala.io.Source
 import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
@@ -128,6 +131,35 @@ class CryptoSpec extends FlatSpec {
     assert(verifySignature(message, (r, s), pub1))
     assert(verifySignature(message, (r, s), pub2))
     assert(pub == pub1 || pub == pub2)
+  }
+
+  it should "recover public keys from signatures (secp256k1 test)" in {
+    val stream = classOf[CryptoSpec].getResourceAsStream("/recid.txt")
+    val iterator = Source.fromInputStream(stream).getLines()
+    var priv: PrivateKey = null
+    var message: BinaryData = null
+    var pub: PublicKey = null
+    var sig: BinaryData = null
+    var recid: Int = -1
+    while(iterator.hasNext) {
+      val line = iterator.next()
+      val Array(lhs, rhs) = line.split(" = ")
+      lhs match {
+        case "privkey" => priv = PrivateKey(rhs, compressed = true)
+        case "message" => message = rhs
+        case "pubkey" => pub = PublicKey(rhs)
+        case "sig" => sig = rhs
+        case "recid" =>
+          recid = rhs.toInt
+          assert(priv.publicKey == pub)
+          val (r, s) = Crypto.sign(message, priv)
+          val (pub1, pub2) = recoverPublicKey((r, s), message)
+          recid match {
+            case 0 => assert(pub == pub1)
+            case 1 => assert(pub == pub2)
+          }
+      }
+    }
   }
 
   it should "recover public keys from signatures (random tests)" in {

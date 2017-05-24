@@ -20,7 +20,7 @@ object Crypto {
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
 
-  private def fixSize(data: BinaryData): BinaryData = data.length match {
+  def fixSize(data: BinaryData): BinaryData = data.length match {
     case 32 => data
     case length if length < 32 => Array.fill(32 - length)(0.toByte) ++ data
   }
