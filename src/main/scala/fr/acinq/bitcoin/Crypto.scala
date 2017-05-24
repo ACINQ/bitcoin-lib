@@ -1,6 +1,6 @@
 package fr.acinq.bitcoin
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayOutputStream, ObjectStreamException}
 import java.math.BigInteger
 
 import org.spongycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
@@ -139,13 +139,14 @@ object Crypto {
     def toBin(compressed: Boolean): BinaryData = value.getEncoded(compressed)
 
     // because ECPoint is not serializable
-    private def writeReplace: Any = PointProxy(toBin(true))
+    private def writeReplace: Object = PointProxy(toBin(true))
 
     override def toString = toBin(true).toString
-  }
 
-  private case class PointProxy(bin: BinaryData) {
-    def readResolve: Any = Point(bin)
+   }
+
+   case class PointProxy(bin: BinaryData) {
+    def readResolve: Object = Point(bin)
   }
 
   object Point {
