@@ -2,13 +2,11 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
+import fr.acinq.bitcoin.Base58.Prefix
+import fr.acinq.bitcoin.Crypto._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import Base58.Prefix
-import com.google.common.io.Files
-import fr.acinq.bitcoin.Crypto._
-import org.bouncycastle.util.io.Streams
 
 import scala.io.Source
 import scala.util.Random
