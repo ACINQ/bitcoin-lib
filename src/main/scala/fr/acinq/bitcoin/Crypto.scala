@@ -1,10 +1,10 @@
 package fr.acinq.bitcoin
 
-import java.io.{ByteArrayOutputStream, ObjectStreamException}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 
-import org.spongycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
 import org.spongycastle.asn1.sec.SECNamedCurves
+import org.spongycastle.asn1.{ASN1Integer, DERSequenceGenerator}
 import org.spongycastle.crypto.Digest
 import org.spongycastle.crypto.digests.{RIPEMD160Digest, SHA1Digest, SHA256Digest, SHA512Digest}
 import org.spongycastle.crypto.macs.HMac
@@ -378,15 +378,39 @@ object Crypto {
     * @return the decoded (r, s) signature
     */
   def decodeSignature(blob: Seq[Byte]): (BigInteger, BigInteger) = {
-    val decoder = new ASN1InputStream(blob.toArray)
-    val seq = decoder.readObject.asInstanceOf[DLSequence]
-    val r = seq.getObjectAt(0).asInstanceOf[ASN1Integer]
-    val s = seq.getObjectAt(1).asInstanceOf[ASN1Integer]
-    decoder.close()
-    (r.getPositiveValue, s.getPositiveValue)
+    decodeSignatureLax(blob)
   }
 
-  def verifySignature(data: Seq[Byte], signature: (BigInteger, BigInteger), publicKey: PublicKey): Boolean = {
+  def decodeSignatureLax(input :ByteArrayInputStream) : (BigInteger, BigInteger) = {
+    require(input.read() == 0x30)
+
+    def readLength: Int = {
+      val len = input.read()
+      if ((len & 0x80) == 0) len else {
+        var n = len - 0x80
+        var len1 = 0
+        while (n > 0) {
+          len1 = (len1 << 8) + input.read()
+          n = n - 1
+        }
+        len1
+      }
+    }
+    readLength
+    require(input.read() == 0x02)
+    val lenR = readLength
+    val r = new Array[Byte](lenR)
+    input.read(r)
+    require(input.read() == 0x02)
+    val lenS = readLength
+    val s = new Array[Byte](lenS)
+    input.read(s)
+    (new BigInteger(1, r), new BigInteger(1, s))
+  }
+
+  def decodeSignatureLax(input: BinaryData) : (BigInteger, BigInteger) = decodeSignatureLax(new ByteArrayInputStream(input))
+
+    def verifySignature(data: Seq[Byte], signature: (BigInteger, BigInteger), publicKey: PublicKey): Boolean = {
     val (r, s) = signature
     require(r.compareTo(one) >= 0, "r must be >= 1")
     require(r.compareTo(curve.getN) < 0, "r must be < N")
