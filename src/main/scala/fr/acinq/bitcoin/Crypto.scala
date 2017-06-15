@@ -123,7 +123,7 @@ object Crypto {
 
     def substract(point: Point): Point = Point(value.subtract(point.value))
 
-    def multiply(scalar: Scalar): Point = Point(value.multiply(scalar.value))
+    def multiply(scalar: Scalar): Point = Point(NativeSecp256k1.pubKeyTweakMul(toBin(true), scalar.toBin))
 
     def normalize = Point(value.normalize())
 
