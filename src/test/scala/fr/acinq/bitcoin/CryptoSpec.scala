@@ -49,7 +49,7 @@ class CryptoSpec extends FlatSpec {
     val random = new Random()
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
     val publicKey = privateKey.publicKey
-    val data = "this is a test".getBytes("UTF-8")
+    val data = Crypto.sha256("this is a test".getBytes("UTF-8"))
     val (r, s) = Crypto.sign(data, privateKey)
     val encoded = Crypto.encodeSignature(r, s)
     assert(Crypto.verifySignature(data, encoded, publicKey))
