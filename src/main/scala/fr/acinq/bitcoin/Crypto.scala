@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 
+import org.bitcoin.NativeSecp256k1
 import org.spongycastle.asn1.sec.SECNamedCurves
 import org.spongycastle.asn1.{ASN1Integer, DERSequenceGenerator}
 import org.spongycastle.crypto.Digest
@@ -31,11 +32,11 @@ object Crypto {
     * @param value value to initialize this scalar with
     */
   case class Scalar(value: BigInteger) {
-    def add(scalar: Scalar): Scalar = Scalar(value.add(scalar.value)).mod(Crypto.curve.getN)
+    def add(scalar: Scalar): Scalar = Scalar(NativeSecp256k1.privKeyTweakAdd(toBin, scalar.toBin))
 
     def substract(scalar: Scalar): Scalar = Scalar(value.subtract(scalar.value)).mod(Crypto.curve.getN)
 
-    def multiply(scalar: Scalar): Scalar = Scalar(value.multiply(scalar.value).mod(Crypto.curve.getN))
+    def multiply(scalar: Scalar): Scalar = Scalar(NativeSecp256k1.privKeyTweakMul(toBin, scalar.toBin))
 
     def +(that: Scalar): Scalar = add(that)
 
@@ -53,7 +54,7 @@ object Crypto {
       *
       * @return this * G where G is the curve generator
       */
-    def toPoint: Point = Point(params.getG() * value)
+    def toPoint: Point = Point(NativeSecp256k1.computePubkey(toBin))
 
     override def toString = this.toBin.toString
   }
