@@ -34,7 +34,7 @@ class ScriptSpec extends FlatSpec {
   }
   it should "parse if/else/endif" in {
     val tx = Transaction(version = 1,
-      txIn = TxIn(OutPoint(new Array[Byte](32), 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
+      txIn = TxIn(OutPoint(new Array[Byte](32), 0xffffffffL), Script.write(OP_NOP :: Nil), 0xffffffffL) :: Nil,
       txOut = TxOut(0x12a05f200L satoshi, Array.empty[Byte]) :: Nil,
       lockTime = 0)
     val ctx = Script.Context(tx, 0, 0 satoshi)
@@ -61,5 +61,22 @@ class ScriptSpec extends FlatSpec {
     assert(Script.castToBoolean(Array.empty[Byte]) === false)
     assert(Script.castToBoolean(Seq(0, 0, 0)) === false)
     assert(Script.castToBoolean(Array(0x80.toByte)) === false)
+  }
+
+  it should "pushing 4bytes length data end up throwing Push value size limit exceeded error" in {
+    val data = BinaryData((1 to 65535).map(x => Byte.MaxValue))
+    val script =  OP_PUSHDATA(data) :: OP_PUSHDATA(data) :: OP_EQUAL :: Nil
+    val tx = Transaction(version = 1,
+      txIn = TxIn(OutPoint(new Array[Byte](32), 0xffffffffL), Script.write(OP_NOP :: Nil), 0xffffffffL) :: Nil,
+      txOut = TxOut(0x12a05f200L satoshi, Array.empty[Byte]) :: Nil,
+      lockTime = 0)
+    println(tx.txIn.seq)
+    val result = try {
+      Right(new Script.Runner(Script.Context(tx, 0, 0 satoshi)).run(script))
+    }catch {
+      case e:Exception => Left(e)
+    }
+    assert(result.left.toOption.map(_.getMessage).contains("Push value size limit exceeded"))
+
   }
 }

@@ -25,7 +25,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     out.write(srcTx) // tx in id
     writeUInt32(vout, out)
     writeScript(fromHexString("76a914ea2902457015b386bd2323b2b99591b96138d62a88ac"), out) //scriptPubKey of prev tx for signing
-    writeUInt32(0xffffffff, out) // sequence
+    writeUInt32(0xffffffffL, out) // sequence
     writeVarint(1, out) // number of outputs
     writeUInt64(amount, out)
     writeScript(destAdress, out) //output script
@@ -55,7 +55,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     signedOut.write(srcTx) // tx in id
     writeUInt32(vout, signedOut) // output index
     writeScript(sigScript, signedOut)
-    writeUInt32(0xffffffff, signedOut) // sequence
+    writeUInt32(0xffffffffL, signedOut) // sequence
     writeVarint(1, signedOut) // number of outputs
     writeUInt64(amount, signedOut) // amount in satoshi
     writeScript(destAdress, signedOut) //output script

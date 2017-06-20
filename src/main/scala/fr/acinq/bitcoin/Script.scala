@@ -166,7 +166,7 @@ object Script {
     case OP_PUSHDATA(data, length) :: tail if data.length < 0x4c && data.length == length => out.write(data.length); out.write(data); write(tail, out)
     case OP_PUSHDATA(data, 0x4c) :: tail if data.length < 0xff => writeUInt8(0x4c, out); writeUInt8(data.length, out); out.write(data); write(tail, out)
     case OP_PUSHDATA(data, 0x4d) :: tail if data.length < 0xffff => writeUInt8(0x4d, out); writeUInt16(data.length, out); out.write(data); write(tail, out)
-    case OP_PUSHDATA(data, 0x4e) :: tail if data.length < 0xffffffff => writeUInt8(0x4e, out); writeUInt32(data.length, out); out.write(data); write(tail, out)
+    case OP_PUSHDATA(data, 0x4e) :: tail if data.length < 0xffffffffL => writeUInt8(0x4e, out); writeUInt32(data.length, out); out.write(data); write(tail, out)
     case op@OP_PUSHDATA(data, code) :: tail => throw new RuntimeException(s"invalid element $op")
     case head :: tail => out.write(elt2code(head)); write(tail, out)
   }

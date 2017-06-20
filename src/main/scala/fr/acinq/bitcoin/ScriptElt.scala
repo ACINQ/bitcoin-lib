@@ -119,7 +119,7 @@ object OP_PUSHDATA {
   def apply(data: BinaryData) = if (data.length < 0x4c) new OP_PUSHDATA(data, data.length)
   else if (data.length < 0xff) new OP_PUSHDATA(data, 0x4c)
   else if (data.length < 0xffff) new OP_PUSHDATA(data, 0x4d)
-  else if (data.length < 0xffffffff) new OP_PUSHDATA(data, 0x4e)
+  else if (data.length < 0xffffffffL) new OP_PUSHDATA(data, 0x4e)
   else throw new IllegalArgumentException(s"data is ${data.length}, too big for OP_PUSHDATA")
 
   def isMinimal(data: BinaryData, code: Int): Boolean = if (data.length == 0) code == ScriptElt.elt2code(OP_0)

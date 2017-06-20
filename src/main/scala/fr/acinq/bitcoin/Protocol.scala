@@ -71,7 +71,7 @@ object Protocol {
   def writeUInt32(input: Long, order: ByteOrder): Array[Byte] = {
     val bin = new Array[Byte](4)
     val buffer = ByteBuffer.wrap(bin).order(order)
-    buffer.putInt((input & 0xffffffff).toInt)
+    buffer.putInt((input & 0xffffffffL).toInt)
     bin
   }
 
