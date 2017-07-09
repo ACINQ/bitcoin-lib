@@ -1,8 +1,9 @@
 language: scala
 before_install:
  - sudo apt-get install libgmp-dev
- - export LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/src/test/resources
-script: mvn test
+script: 
+ - mvn test
+ - LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/src/test/resources mvn test
 scala:
 - 2.11.7
 jdk:

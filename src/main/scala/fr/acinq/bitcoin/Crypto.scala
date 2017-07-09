@@ -3,7 +3,7 @@ package fr.acinq.bitcoin
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 
-import org.bitcoin.NativeSecp256k1
+import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
 import org.spongycastle.asn1.sec.SECNamedCurves
 import org.spongycastle.asn1.{ASN1Integer, DERSequenceGenerator}
 import org.spongycastle.crypto.Digest
@@ -32,11 +32,17 @@ object Crypto {
     * @param value value to initialize this scalar with
     */
   case class Scalar(value: BigInteger) {
-    def add(scalar: Scalar): Scalar = Scalar(NativeSecp256k1.privKeyTweakAdd(toBin, scalar.toBin))
+    def add(scalar: Scalar): Scalar = if (Secp256k1Context.isEnabled)
+      Scalar(NativeSecp256k1.privKeyTweakAdd(toBin, scalar.toBin))
+    else
+      Scalar(value.add(scalar.value)).mod(Crypto.curve.getN)
 
     def substract(scalar: Scalar): Scalar = Scalar(value.subtract(scalar.value)).mod(Crypto.curve.getN)
 
-    def multiply(scalar: Scalar): Scalar = Scalar(NativeSecp256k1.privKeyTweakMul(toBin, scalar.toBin))
+    def multiply(scalar: Scalar): Scalar = if (Secp256k1Context.isEnabled)
+      Scalar(NativeSecp256k1.privKeyTweakMul(toBin, scalar.toBin))
+    else
+      Scalar(value.multiply(scalar.value).mod(Crypto.curve.getN))
 
     def +(that: Scalar): Scalar = add(that)
 
@@ -54,7 +60,10 @@ object Crypto {
       *
       * @return this * G where G is the curve generator
       */
-    def toPoint: Point = Point(NativeSecp256k1.computePubkey(toBin))
+    def toPoint: Point = if (Secp256k1Context.isEnabled)
+      Point(NativeSecp256k1.computePubkey(toBin))
+    else
+      Point(params.getG() * value)
 
     override def toString = this.toBin.toString
   }
@@ -123,7 +132,10 @@ object Crypto {
 
     def substract(point: Point): Point = Point(value.subtract(point.value))
 
-    def multiply(scalar: Scalar): Point = Point(NativeSecp256k1.pubKeyTweakMul(toBin(true), scalar.toBin))
+    def multiply(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
+      Point(NativeSecp256k1.pubKeyTweakMul(toBin(true), scalar.toBin))
+    else
+      Point(value.multiply(scalar.value))
 
     def normalize = Point(value.normalize())
 
@@ -431,9 +443,22 @@ object Crypto {
     * @return true is signature is valid for this data with this public key
     */
   def verifySignature(data: BinaryData, signature: BinaryData, publicKey: PublicKey): Boolean = {
-    val signature1 = normalizeSignature(signature)
-    val native = NativeSecp256k1.verify(data, signature1, publicKey.toBin)
-    native
+    if (Secp256k1Context.isEnabled) {
+      val signature1 = normalizeSignature(signature)
+      val native = NativeSecp256k1.verify(data, signature1, publicKey.toBin)
+      native
+    } else {
+      val (r, s) = decodeSignature(signature)
+      require(r.compareTo(one) >= 0, "r must be >= 1")
+      require(r.compareTo(curve.getN) < 0, "r must be < N")
+      require(s.compareTo(one) >= 0, "s must be >= 1")
+      require(s.compareTo(curve.getN) < 0, "s must be < N")
+
+      val signer = new ECDSASigner
+      val params = new ECPublicKeyParameters(publicKey.value, curve)
+      signer.init(false, params)
+      signer.verifySignature(data.toArray, r, s)
+    }
   }
 
   /**
@@ -452,8 +477,21 @@ object Crypto {
     * @return a (r, s) ECDSA signature pair
     */
   def sign(data: BinaryData, privateKey: PrivateKey): (BigInteger, BigInteger) = {
-    val bin = NativeSecp256k1.sign(data, privateKey.value.toBin)
-    Crypto.decodeSignature(bin)
+    if (Secp256k1Context.isEnabled) {
+      val bin = NativeSecp256k1.sign(data, privateKey.value.toBin)
+      Crypto.decodeSignature(bin)
+    } else {
+      val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
+      val privateKeyParameters = new ECPrivateKeyParameters(privateKey.value, curve)
+      signer.init(true, privateKeyParameters)
+      val Array(r, s) = signer.generateSignature(data.toArray)
+
+      if (s.compareTo(halfCurveOrder) > 0) {
+        (r, curve.getN().subtract(s)) // if s > N/2 then s = N - s
+      } else {
+        (r, s)
+      }
+    }
   }
 
   /**
