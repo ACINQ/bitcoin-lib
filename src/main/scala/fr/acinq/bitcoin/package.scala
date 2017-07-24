@@ -1,6 +1,5 @@
 package fr.acinq
 
-import java.io._
 import java.math.BigInteger
 
 import org.spongycastle.util.encoders.Hex

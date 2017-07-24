@@ -1,7 +1,6 @@
 package fr.acinq.bitcoin
 
 import java.math.BigInteger
-import java.util
 
 import scala.annotation.tailrec
 

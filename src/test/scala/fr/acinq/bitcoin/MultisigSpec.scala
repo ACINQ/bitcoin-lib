@@ -1,12 +1,10 @@
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Base58.Prefix
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
-import Protocol._
-import Base58.Prefix
-import fr.acinq.bitcoin
-import fr.acinq.bitcoin.Crypto.{PrivateKey, Scalar}
 
 @RunWith(classOf[JUnitRunner])
 class MultisigSpec extends FlatSpec with Matchers {

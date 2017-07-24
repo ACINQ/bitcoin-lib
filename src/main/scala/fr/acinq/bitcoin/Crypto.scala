@@ -164,9 +164,9 @@ object Crypto {
 
     override def toString = toBin(true).toString
 
-   }
+  }
 
-   case class PointProxy(bin: BinaryData) {
+  case class PointProxy(bin: BinaryData) {
     def readResolve: Object = Point(bin)
   }
 
@@ -412,7 +412,7 @@ object Crypto {
     decodeSignatureLax(blob)
   }
 
-  def decodeSignatureLax(input :ByteArrayInputStream) : (BigInteger, BigInteger) = {
+  def decodeSignatureLax(input: ByteArrayInputStream): (BigInteger, BigInteger) = {
     require(input.read() == 0x30)
 
     def readLength: Int = {
@@ -427,6 +427,7 @@ object Crypto {
         len1
       }
     }
+
     readLength
     require(input.read() == 0x02)
     val lenR = readLength
@@ -439,7 +440,7 @@ object Crypto {
     (new BigInteger(1, r), new BigInteger(1, s))
   }
 
-  def decodeSignatureLax(input: BinaryData) : (BigInteger, BigInteger) = decodeSignatureLax(new ByteArrayInputStream(input))
+  def decodeSignatureLax(input: BinaryData): (BigInteger, BigInteger) = decodeSignatureLax(new ByteArrayInputStream(input))
 
   def verifySignature(data: Seq[Byte], signature: (BigInteger, BigInteger), publicKey: PublicKey): Boolean =
     verifySignature(data, encodeSignature(signature), publicKey)
@@ -508,7 +509,7 @@ object Crypto {
     * @return a tuple (p1, p2) where p1 and p2 are points on the curve and p1.x = p2.x = x
     *         p1.y is even, p2.y is odd
     */
-  def recoverPoint(x: BigInteger) : (Point, Point) = {
+  def recoverPoint(x: BigInteger): (Point, Point) = {
     val x1 = Crypto.curve.getCurve.fromBigInteger(x)
     val square = x1.square().add(Crypto.curve.getCurve.getA).multiply(x1).add(Crypto.curve.getCurve.getB)
     val y1 = square.sqrt()
@@ -521,12 +522,13 @@ object Crypto {
   /**
     * Recover public keys from a signature and the message that was signed. This method will return 2 public keys, and the signature
     * can be verified with both, but only one of them matches that private key that was used to generate the signature.
-    * @param t signature
+    *
+    * @param t       signature
     * @param message message that was signed
     * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
     *         pub1 if the recovery id is even and pub2 if it is odd
     */
-  def recoverPublicKey(t: (BigInteger, BigInteger), message: BinaryData) : (PublicKey, PublicKey) = {
+  def recoverPublicKey(t: (BigInteger, BigInteger), message: BinaryData): (PublicKey, PublicKey) = {
     val (r, s) = t
     val m = new BigInteger(1, message)
 
@@ -536,5 +538,5 @@ object Crypto {
     (PublicKey(Q1), PublicKey(Q2))
   }
 
-  def recoverPublicKey(sig: BinaryData, message: BinaryData) : (PublicKey, PublicKey) = recoverPublicKey(Crypto.decodeSignature(sig), message)
+  def recoverPublicKey(sig: BinaryData, message: BinaryData): (PublicKey, PublicKey) = recoverPublicKey(Crypto.decodeSignature(sig), message)
 }

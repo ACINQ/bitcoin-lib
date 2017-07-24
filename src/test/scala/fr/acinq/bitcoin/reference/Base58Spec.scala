@@ -3,14 +3,14 @@ package fr.acinq.bitcoin.reference
 import java.io.InputStreamReader
 import java.util
 
+import fr.acinq.bitcoin.Base58.Prefix
 import fr.acinq.bitcoin._
 import org.json4s.DefaultFormats
-import org.json4s.JsonAST.{JBool, JString, JObject, JValue}
+import org.json4s.JsonAST.{JBool, JString, JValue}
 import org.json4s.jackson.{JsonMethods, Serialization}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import Base58.Prefix
 
 @RunWith(classOf[JUnitRunner])
 class Base58Spec extends FlatSpec {

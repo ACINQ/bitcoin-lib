@@ -1,13 +1,12 @@
 package fr.acinq.bitcoin
 
 import java.io.ByteArrayOutputStream
-import java.util
 
+import fr.acinq.bitcoin.Crypto._
+import fr.acinq.bitcoin.Protocol._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
-import Protocol._
-import fr.acinq.bitcoin.Crypto._
 
 @RunWith(classOf[JUnitRunner])
 class TransactionSpec extends FlatSpec with Matchers {

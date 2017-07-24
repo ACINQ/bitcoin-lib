@@ -2,9 +2,9 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 
-import fr.acinq.bitcoin.Script.Runner
-import Protocol._
 import fr.acinq.bitcoin.Crypto.PrivateKey
+import fr.acinq.bitcoin.Protocol._
+import fr.acinq.bitcoin.Script.Runner
 
 import scala.collection.mutable.ArrayBuffer
 

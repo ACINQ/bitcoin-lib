@@ -195,7 +195,7 @@ object Protocol {
   }
 }
 
-import Protocol._
+import fr.acinq.bitcoin.Protocol._
 
 trait BtcSerializer[T] {
   /**

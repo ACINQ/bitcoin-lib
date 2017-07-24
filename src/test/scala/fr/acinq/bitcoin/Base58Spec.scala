@@ -9,6 +9,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class Base58Spec extends FlatSpec {
+
   import fr.acinq.bitcoin.Base58._
 
   "Base58" should "encode byte arrays" in {
