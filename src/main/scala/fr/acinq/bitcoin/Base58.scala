@@ -119,9 +119,10 @@ object Base58Check {
   /**
     * Decodes Base58 data that has been encoded with a single byte prefix
     *
+    * NB: requirement check will throw an IllegalArgumentException if the checksum that is part of the encoded data cannot be verified
+    *
     * @param encoded encoded data
     * @return a (prefix, data) tuple
-    * @throws RuntimeException if the checksum that is part of the encoded data cannot be verified
     */
   def decode(encoded: String): (Byte, BinaryData) = {
     val raw = Base58.decode(encoded)
