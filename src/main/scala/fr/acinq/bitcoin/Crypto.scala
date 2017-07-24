@@ -4,6 +4,7 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 
 import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
+import org.slf4j.LoggerFactory
 import org.spongycastle.asn1.sec.SECNamedCurves
 import org.spongycastle.asn1.{ASN1Integer, DERSequenceGenerator}
 import org.spongycastle.crypto.Digest
@@ -20,6 +21,13 @@ object Crypto {
   val halfCurveOrder = params.getN().shiftRight(1)
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
+
+  private val logger = LoggerFactory.getLogger(classOf[Secp256k1Context])
+  if (Secp256k1Context.isEnabled) {
+    logger.info("secp256k1 library successfully loaded")
+  } else {
+    logger.info("couldn't find secp256k1 library, defaulting to spongycastle")
+  }
 
   def fixSize(data: BinaryData): BinaryData = data.length match {
     case 32 => data
