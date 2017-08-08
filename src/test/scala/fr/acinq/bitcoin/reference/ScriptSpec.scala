@@ -3,11 +3,11 @@ package fr.acinq.bitcoin.reference
 import java.io.InputStreamReader
 
 import fr.acinq.bitcoin._
-import org.json4s.{DefaultFormats, JValue}
 import org.json4s.JsonAST.{JArray, JDouble, JString}
 import org.json4s.jackson.JsonMethods
+import org.json4s.{DefaultFormats, JValue}
 import org.junit.runner.RunWith
-import org.scalatest.{FlatSpec, FunSuite}
+import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
 
 import scala.util.Try
@@ -35,6 +35,7 @@ object ScriptSpec {
       case head :: tail if head.startsWith("0x") => parseInternal(tail, acc ++ fromHexString(head))
       case head :: tail if head.startsWith("'") && head.endsWith("'") => parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(head.stripPrefix("'").stripSuffix("'").getBytes("UTF-8")) :: Nil))
     }
+
     try {
       val tokens = input.split(' ').filterNot(_.isEmpty).map(_.stripPrefix("OP_")).toList
       val bytes = parseInternal(tokens)

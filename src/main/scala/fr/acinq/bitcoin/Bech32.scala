@@ -33,6 +33,7 @@ object Bech32 {
 
   /**
     * decodes a bech32 string
+    *
     * @param bech32 bech32 string
     * @return a (hrp, data) tuple
     */
@@ -48,14 +49,14 @@ object Bech32 {
 
   /**
     *
-    * @param hrp Human Readable Part
+    * @param hrp  Human Readable Part
     * @param data data (a sequence of 5 bits integers)
     * @return a checksum computed over hrp and data
     */
-  def checksum(hrp: String, data : Seq[Int5]): Seq[Int5] = {
+  def checksum(hrp: String, data: Seq[Int5]): Seq[Int5] = {
     val values = expand(hrp) ++ data
-    val poly = polymod(values ++ Seq(0.toByte,0.toByte,0.toByte,0.toByte,0.toByte,0.toByte)) ^ 1.toByte
-    for(i <- 0 to 5) yield ((poly >>> 5 * (5 - i)) & 31).toByte
+    val poly = polymod(values ++ Seq(0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte)) ^ 1.toByte
+    for (i <- 0 to 5) yield ((poly >>> 5 * (5 - i)) & 31).toByte
   }
 
   /**
@@ -103,12 +104,13 @@ object Bech32 {
 
   /**
     * encode a bitcoin witness address
-    * @param hrp should be "bc" or "tb"
+    *
+    * @param hrp            should be "bc" or "tb"
     * @param witnessVersion witness version (0 to 16, only 0 is currently defined)
-    * @param data witness program: if version is 0, either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
+    * @param data           witness program: if version is 0, either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
     * @return a bech32 encoded witness address
     */
-  def encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: BinaryData) : String = {
+  def encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: BinaryData): String = {
     // prepend witness version: 0
     val data1 = witnessVersion +: Bech32.eight2five(data)
     val checksum = Bech32.checksum(hrp, data1)
@@ -117,6 +119,7 @@ object Bech32 {
 
   /**
     * decode a bitcoin witness address
+    *
     * @param address witness address
     * @return a (version, program) tuple where version is the witness version and program the decoded witness program.
     *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH)

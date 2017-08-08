@@ -12,8 +12,8 @@ import scala.util.Random
 @RunWith(classOf[JUnitRunner])
 class DeterministicWalletSpec extends FlatSpec {
 
-  import fr.acinq.bitcoin.DeterministicWallet._
   import Protocol._
+  import fr.acinq.bitcoin.DeterministicWallet._
 
   // these tests are the "official" ones (see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
 

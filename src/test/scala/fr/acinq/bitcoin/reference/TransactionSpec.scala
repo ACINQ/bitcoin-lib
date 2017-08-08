@@ -36,7 +36,7 @@ object TransactionSpec {
         val tx = Transaction.read(serializedTransaction, Protocol.PROTOCOL_VERSION)
         Try {
           Transaction.validate(tx)
-          for(i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
+          for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
             val prevOutputScript = prevoutMap(tx.txIn(i).outPoint)
             val amount = prevamountMap.get(tx.txIn(i).outPoint).getOrElse(0 satoshi)
             val ctx = new Script.Context(tx, i, amount)
@@ -54,7 +54,7 @@ object TransactionSpec {
     })
   }
 
-  def process(stream: InputStream, valid: Boolean) : Unit = {
+  def process(stream: InputStream, valid: Boolean): Unit = {
     implicit val format = DefaultFormats
     val json = JsonMethods.parse(new InputStreamReader(stream))
     process(json, valid)
@@ -63,12 +63,13 @@ object TransactionSpec {
 
 @RunWith(classOf[JUnitRunner])
 class TransactionSpec extends FlatSpec with Matchers {
+
   import TransactionSpec._
 
   "Bitcoins library" should "pass reference tx valid tests" in {
     val stream = classOf[ScriptSpec].getResourceAsStream("/data/tx_valid.json")
     process(stream, true)
- }
+  }
 
   it should "pass reference tx invalid tests" in {
     val stream = classOf[ScriptSpec].getResourceAsStream("/data/tx_invalid.json")

@@ -2,9 +2,9 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 
-import fr.acinq.bitcoin.Script.Runner
-import Protocol._
 import fr.acinq.bitcoin.Crypto.PrivateKey
+import fr.acinq.bitcoin.Protocol._
+import fr.acinq.bitcoin.Script.Runner
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -420,7 +420,7 @@ object Transaction extends BtcSerializer[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  @deprecated
+  @deprecated("", since = "0.9.6")
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: PrivateKey): BinaryData =
   signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
 

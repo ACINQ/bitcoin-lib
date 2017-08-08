@@ -139,7 +139,7 @@ class CryptoSpec extends FlatSpec {
     var pub: PublicKey = null
     var sig: BinaryData = null
     var recid: Int = -1
-    while(iterator.hasNext) {
+    while (iterator.hasNext) {
       val line = iterator.next()
       val Array(lhs, rhs) = line.split(" = ")
       lhs match {

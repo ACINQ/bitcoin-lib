@@ -7,10 +7,10 @@ import java.security.spec.PKCS8EncodedKeySpec
 
 import com.google.protobuf.ByteString
 import org.bitcoin.protocols.payments.Protos.{Output, PaymentDetails, PaymentRequest}
-import org.spongycastle.util.io.pem.PemReader
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.spongycastle.util.io.pem.PemReader
 
 import scala.compat.Platform
 

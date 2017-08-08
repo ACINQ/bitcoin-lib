@@ -6,8 +6,9 @@ package org.bitcoin;
 public class Preconditions {
     private Preconditions() {
     }
+
     public static void checkArgument(boolean expression) {
-        if(!expression) {
+        if (!expression) {
             throw new IllegalArgumentException();
         }
     }
