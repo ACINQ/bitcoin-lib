@@ -70,16 +70,16 @@ class MultisigSpec extends FlatSpec with Matchers {
       txIn = List(TxIn(OutPoint(previousTx, 0), Array.empty[Byte], 0xffffffffL)),
       txOut = List(TxOut(
         amount = amount,
-        publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
+        publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
       lockTime = 0L
     )
 
     // we only need 2 signatures because this is a 2-on-3 multisig
-    val sig1 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, key1)
-    val sig2 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, key2)
+    val sig1 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key1)
+    val sig2 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key2)
 
     // OP_0 because of a bug in OP_CHECKMULTISIG
-    val scriptSig = Script.write(OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil)
+    val scriptSig = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
     val signedTx = tx.updateSigScript(0, scriptSig)
 
     //this works because signature is not randomized

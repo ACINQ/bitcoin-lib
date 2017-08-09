@@ -437,7 +437,7 @@ object Transaction extends BtcSerializer[Transaction] {
 
     // sign each input
     val signedInputs = for (i <- 0 until input.txIn.length) yield {
-      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey)
+      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, signData(i).privateKey)
 
       // this is the public key that is associated with the private key we used for signing
       val publicKey = signData(i).privateKey.publicKey

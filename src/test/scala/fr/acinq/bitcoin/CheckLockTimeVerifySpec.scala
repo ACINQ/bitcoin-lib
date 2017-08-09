@@ -53,10 +53,10 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         lockTime = 100L
       )
 
-      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, keyAlice)
+      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyAlice)
 
       // our script sig is simple our signature followed by "true"
-      val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_1 :: Nil)
+      val sigScript = OP_PUSHDATA(sig) :: OP_1 :: Nil
 
       tmpTx.updateSigScript(0, sigScript)
       //tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = sigScript)))
@@ -73,10 +73,10 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         lockTime = 99L
       )
 
-      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, keyAlice)
+      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyAlice)
 
       // our script sig is simple our signature followed by "true"
-      val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_1 :: Nil)
+      val sigScript = OP_PUSHDATA(sig) :: OP_1 :: Nil
 
       tmpTx.updateSigScript(0, sigScript)
       //tmpTx.copy(txIn = tmpTx.txIn.updated(0, tmpTx.txIn(0).copy(signatureScript = sigScript)))
@@ -95,9 +95,9 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         lockTime = 0L
       )
 
-      val sig1 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, keyAlice)
-      val sig2 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, keyBob)
-      val sigScript = Script.write(OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_0 :: Nil)
+      val sig1 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyAlice)
+      val sig2 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyBob)
+      val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_0 :: Nil
 
       tmpTx.updateSigScript(0, sigScript)
     }
