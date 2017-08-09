@@ -501,8 +501,13 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
 
   import Transaction._
 
+  // standard transaction hash, used to identify transactions (in transactions outputs for example)
   lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS))
   lazy val txid: BinaryData = hash.reverse
+  // witness transaction hash htat includes witness data. used to compute the witness commitment included in the coinbase
+  // transaction of segwit blocks
+  lazy val whash: BinaryData = Crypto.hash256(Transaction.write(this))
+  lazy val wtxid: BinaryData = whash.reverse
 
   /**
     *

@@ -313,10 +313,10 @@ case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleR
   * see https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
   */
 object MerkleTree {
-  def computeRoot(tree: Seq[Seq[Byte]]): BinaryData = tree.length match {
+  def computeRoot(tree: Seq[BinaryData]): BinaryData = tree.length match {
     case 1 => tree(0)
     case n if n % 2 != 0 => computeRoot(tree :+ tree.last) // append last element again
-    case _ => computeRoot(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1)).toSeq).toSeq)
+    case _ => computeRoot(tree.grouped(2).map(a => Crypto.hash256(a(0) ++ a(1))).toSeq)
   }
 }
 
@@ -334,7 +334,7 @@ object Block extends BtcSerializer[Block] {
 
   override def validate(input: Block): Unit = {
     BlockHeader.validate(input.header)
-    require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx.map(_.hash.toSeq))), "invalid block:  merkle root mismatch")
+    require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx.map(_.hash))), "invalid block:  merkle root mismatch")
     require(input.tx.map(_.txid).toSet.size == input.tx.size, "invalid block: duplicate transactions")
     input.tx.map(Transaction.validate)
   }
@@ -369,6 +369,45 @@ object Block extends BtcSerializer[Block] {
     val (target, _, _) = decodeCompact(block.header.bits)
     val hash = new BigInteger(1, block.blockId.toArray)
     hash.compareTo(target) <= 0
+  }
+
+  /**
+    *
+    * @param tx coinbase transaction
+    * @return the witness reserved value included in the input of this tx if any
+    */
+  def witnessReservedValue(tx: Transaction) : Option[BinaryData] = tx.txIn(0).witness match {
+    case ScriptWitness(Seq(nonce)) if nonce.length == 32 => Some(nonce)
+    case _ => None
+  }
+
+  /**
+    *
+    * @param tx coinbase transaction
+    * @return the witness commitment included in this transaction, if any
+    */
+  def witnessCommitment(tx: Transaction): Option[BinaryData] = tx.txOut.map(o => Script.parse(o.publicKeyScript)).reverse.collectFirst {
+    // we've reversed the outputs because if there are more than one scriptPubKey matching the pattern, the one with
+    // the highest output index is assumed to be the commitment.
+    case OP_RETURN :: OP_PUSHDATA(commitmentHeader, _) :: Nil if commitmentHeader.length == 36 && Protocol.uint32(commitmentHeader.take(4), ByteOrder.BIG_ENDIAN) == 0xaa21a9edL => commitmentHeader.takeRight(32)
+  }
+
+  /**
+    * Checks the witness commitment of a block
+    * @param block block
+    * @return true if the witness commitment for this block is valid, or if this block does not contain a witness commitment
+    *         nor any segwit transactions.
+    */
+  def checkWitnessCommitment(block: Block) : Boolean = {
+    val coinbase = block.tx.head
+    (witnessReservedValue(coinbase), witnessCommitment(coinbase)) match {
+      case (Some(nonce), Some(commitment)) =>
+        val rootHash = MerkleTree.computeRoot(Hash.Zeroes +: block.tx.tail.map(_.whash))
+        val commitmentHash = Crypto.hash256(rootHash ++ nonce)
+        commitment == commitmentHash
+      case _ if block.tx.exists(_.hasWitness) => false // block has segwit transactions but no witness commitment
+      case _ => true
+    }
   }
 }
 
