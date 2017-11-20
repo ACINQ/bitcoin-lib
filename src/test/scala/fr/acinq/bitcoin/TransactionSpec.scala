@@ -4,11 +4,11 @@ import java.io.ByteArrayOutputStream
 
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.Protocol._
-import org.junit.runner.RunWith
+
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
 
-@RunWith(classOf[JUnitRunner])
+
 class TransactionSpec extends FlatSpec with Matchers {
   "Bitcoins library" should "create and sign transaction" in {
     val srcTx = fromHexString("dcd82df7b26f0eacd226b8fbd366672c854284ba8080f79e1307138c7f1a1f6d".sliding(2, 2).toList.reverse.mkString(""))

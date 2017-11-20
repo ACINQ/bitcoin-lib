@@ -1,13 +1,13 @@
 package fr.acinq.bitcoin
 
-import org.junit.runner.RunWith
+
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
 
 /**
   * Created by fabrice on 19/04/17.
   */
-@RunWith(classOf[JUnitRunner])
+
 class Bech32Spec extends FunSuite {
   test("valid checksums") {
     val inputs = Seq(

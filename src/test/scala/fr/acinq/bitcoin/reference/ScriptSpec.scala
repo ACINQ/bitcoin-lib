@@ -6,7 +6,7 @@ import fr.acinq.bitcoin._
 import org.json4s.JsonAST.{JArray, JDouble, JString}
 import org.json4s.jackson.JsonMethods
 import org.json4s.{DefaultFormats, JValue}
-import org.junit.runner.RunWith
+
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
 
@@ -140,7 +140,7 @@ object ScriptSpec {
   }
 }
 
-@RunWith(classOf[JUnitRunner])
+
 class ScriptSpec extends FunSuite {
   test("reference client script tests") {
     val stream = classOf[ScriptSpec].getResourceAsStream("/data/script_tests.json")
