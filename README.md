@@ -17,10 +17,11 @@ This is a simple scala library which implements most of the bitcoin protocol:
 * BIP 32 (deterministic wallets)
 * BIP 39 (mnemonic code for generating deterministic keys)
 * BIP 70
+* BIP 173 (Base32 address format for native v0-16 witness outputs)
 
 ## Objectives
 
-Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes. And, of course, we use it for our own work on Lightning.
+Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes. And, of course, we use it for our own work on Lightning (see https://github.com/ACINQ/eclair).
 
 ## Status
 - [X] Message parsing (blocks, transactions, inv, ...)
@@ -47,12 +48,12 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.10</version>
+    <version>0.9.13</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.11-SNAPSHOT, the latest released version is 0.9.10
+The latest snapshot (development) version is 0.9.14-SNAPSHOT, the latest released version is 0.9.13
 
 ## Segwit support
 

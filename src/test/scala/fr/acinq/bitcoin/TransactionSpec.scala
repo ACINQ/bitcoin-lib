@@ -1,13 +1,12 @@
 package fr.acinq.bitcoin
 
 import java.io.ByteArrayOutputStream
-import java.util
 
+import fr.acinq.bitcoin.Crypto._
+import fr.acinq.bitcoin.Protocol._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
-import Protocol._
-import fr.acinq.bitcoin.Crypto._
 
 @RunWith(classOf[JUnitRunner])
 class TransactionSpec extends FlatSpec with Matchers {
@@ -154,7 +153,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     )
 
     // step #2: sign the tx
-    val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, privateKey)
+    val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, privateKey)
     val tx2 = tx1.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
 
     // redeem the tx
@@ -184,10 +183,10 @@ class TransactionSpec extends FlatSpec with Matchers {
       txOut = List(
         TxOut(
           amount = destAmount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(destAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(destAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
         TxOut(
           amount = changeAmount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(changeAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))),
+          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(changeAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
       lockTime = 0L
     )
 
@@ -233,7 +232,7 @@ class TransactionSpec extends FlatSpec with Matchers {
       lockTime = 0L)
 
     // and sign it
-    val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, privateKey)
+    val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, privateKey)
     val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey) :: Nil)
     Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
@@ -246,12 +245,12 @@ class TransactionSpec extends FlatSpec with Matchers {
       lockTime = 0L)
 
     // we need at least 2 signatures
-    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key1)
-    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, key2)
+    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key1)
+    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key2)
 
     // update our tx with the correct sig script
     val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
-    val signedSpendingTx = spendingTx.updateSigScript(0, Script.write(sigScript))
+    val signedSpendingTx = spendingTx.updateSigScript(0, sigScript)
     Transaction.correctlySpends(signedSpendingTx, signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 

@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.Script.{Context, Runner}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner

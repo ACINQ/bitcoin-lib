@@ -2,10 +2,10 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
+import fr.acinq.bitcoin.Protocol._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import Protocol._
 
 @RunWith(classOf[JUnitRunner])
 class ToolsSpec extends FlatSpec {

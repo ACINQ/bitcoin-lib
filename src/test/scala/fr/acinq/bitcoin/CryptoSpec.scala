@@ -2,12 +2,13 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
+import fr.acinq.bitcoin.Base58.Prefix
+import fr.acinq.bitcoin.Crypto._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import Base58.Prefix
-import fr.acinq.bitcoin.Crypto._
 
+import scala.io.Source
 import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
@@ -48,7 +49,7 @@ class CryptoSpec extends FlatSpec {
     val random = new Random()
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
     val publicKey = privateKey.publicKey
-    val data = "this is a test".getBytes("UTF-8")
+    val data = Crypto.sha256("this is a test".getBytes("UTF-8"))
     val (r, s) = Crypto.sign(data, privateKey)
     val encoded = Crypto.encodeSignature(r, s)
     assert(Crypto.verifySignature(data, encoded, publicKey))
@@ -116,5 +117,65 @@ class CryptoSpec extends FlatSpec {
 
     assert(deserialize[PrivateKey](serialize(priv)) == priv)
     assert(deserialize[PublicKey](serialize(pub)) == pub)
+  }
+
+  it should "recover public keys from signatures (basic test)" in {
+    val priv = PrivateKey(BinaryData("01" * 32), compressed = true)
+    val message = BinaryData("02" * 32)
+    val pub = priv.publicKey
+    val (r, s) = Crypto.sign(message, priv)
+    val (pub1, pub2) = recoverPublicKey((r, s), message)
+
+    assert(verifySignature(message, (r, s), pub1))
+    assert(verifySignature(message, (r, s), pub2))
+    assert(pub == pub1 || pub == pub2)
+  }
+
+  it should "recover public keys from signatures (secp256k1 test)" in {
+    val stream = classOf[CryptoSpec].getResourceAsStream("/recid.txt")
+    val iterator = Source.fromInputStream(stream).getLines()
+    var priv: PrivateKey = null
+    var message: BinaryData = null
+    var pub: PublicKey = null
+    var sig: BinaryData = null
+    var recid: Int = -1
+    while (iterator.hasNext) {
+      val line = iterator.next()
+      val Array(lhs, rhs) = line.split(" = ")
+      lhs match {
+        case "privkey" => priv = PrivateKey(rhs, compressed = true)
+        case "message" => message = rhs
+        case "pubkey" => pub = PublicKey(rhs)
+        case "sig" => sig = rhs
+        case "recid" =>
+          recid = rhs.toInt
+          assert(priv.publicKey == pub)
+          val (r, s) = Crypto.sign(message, priv)
+          val (pub1, pub2) = recoverPublicKey((r, s), message)
+          recid match {
+            case 0 => assert(pub == pub1)
+            case 1 => assert(pub == pub2)
+          }
+      }
+    }
+  }
+
+  it should "recover public keys from signatures (random tests)" in {
+    val random = new Random()
+    val privbytes = new Array[Byte](32)
+    val message = new Array[Byte](32)
+    for (i <- 0 until 100) {
+      random.nextBytes(privbytes)
+      random.nextBytes(message)
+
+      val priv = PrivateKey(privbytes, compressed = true)
+      val pub = priv.publicKey
+      val (r, s) = Crypto.sign(message, priv)
+      val (pub1, pub2) = recoverPublicKey((r, s), message)
+
+      assert(verifySignature(message, (r, s), pub1))
+      assert(verifySignature(message, (r, s), pub2))
+      assert(pub == pub1 || pub == pub2)
+    }
   }
 }
