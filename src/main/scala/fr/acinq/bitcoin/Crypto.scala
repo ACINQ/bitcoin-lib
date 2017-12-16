@@ -6,13 +6,14 @@ import java.math.BigInteger
 import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
 import org.slf4j.LoggerFactory
 import org.spongycastle.asn1.sec.SECNamedCurves
-import org.spongycastle.asn1.{ASN1Integer, DERSequenceGenerator}
+import org.spongycastle.asn1.{ASN1InputStream, ASN1Integer, DERSequenceGenerator, DLSequence}
 import org.spongycastle.crypto.Digest
 import org.spongycastle.crypto.digests.{RIPEMD160Digest, SHA1Digest, SHA256Digest, SHA512Digest}
 import org.spongycastle.crypto.macs.HMac
 import org.spongycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters, KeyParameter}
 import org.spongycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.spongycastle.math.ec.ECPoint
+import org.spongycastle.util.Properties
 
 
 object Crypto {
@@ -409,38 +410,17 @@ object Crypto {
     * @return the decoded (r, s) signature
     */
   def decodeSignature(blob: Seq[Byte]): (BigInteger, BigInteger) = {
-    decodeSignatureLax(blob)
+    Properties.setThreadOverride("org.spongycastle.asn1.allow_unsafe_integer", true)
+
+    val decoder = new ASN1InputStream(blob.toArray)
+    val seq = decoder.readObject.asInstanceOf[DLSequence]
+    val r = seq.getObjectAt(0).asInstanceOf[ASN1Integer]
+    val s = seq.getObjectAt(1).asInstanceOf[ASN1Integer]
+    decoder.close()
+
+    Properties.removeThreadOverride("org.spongycastle.asn1.allow_unsafe_integer")
+    (r.getPositiveValue, s.getPositiveValue)
   }
-
-  def decodeSignatureLax(input: ByteArrayInputStream): (BigInteger, BigInteger) = {
-    require(input.read() == 0x30)
-
-    def readLength: Int = {
-      val len = input.read()
-      if ((len & 0x80) == 0) len else {
-        var n = len - 0x80
-        var len1 = 0
-        while (n > 0) {
-          len1 = (len1 << 8) + input.read()
-          n = n - 1
-        }
-        len1
-      }
-    }
-
-    readLength
-    require(input.read() == 0x02)
-    val lenR = readLength
-    val r = new Array[Byte](lenR)
-    input.read(r)
-    require(input.read() == 0x02)
-    val lenS = readLength
-    val s = new Array[Byte](lenS)
-    input.read(s)
-    (new BigInteger(1, r), new BigInteger(1, s))
-  }
-
-  def decodeSignatureLax(input: BinaryData): (BigInteger, BigInteger) = decodeSignatureLax(new ByteArrayInputStream(input))
 
   def verifySignature(data: Seq[Byte], signature: (BigInteger, BigInteger), publicKey: PublicKey): Boolean =
     verifySignature(data, encodeSignature(signature), publicKey)
