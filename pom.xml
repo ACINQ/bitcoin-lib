@@ -228,13 +228,13 @@
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_2.11</artifactId>
+            <artifactId>scalatest_${scala.version.short}</artifactId>
             <version>3.0.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.json4s</groupId>
-            <artifactId>json4s-jackson_2.11</artifactId>
+            <artifactId>json4s-jackson_${scala.version.short}</artifactId>
             <version>3.5.2</version>
             <scope>test</scope>
         </dependency>
