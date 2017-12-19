@@ -4,7 +4,7 @@ import java.io.InputStreamReader
 
 import org.json4s.DefaultFormats
 import org.json4s.jackson.JsonMethods
-import org.junit.runner.RunWith
+
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
@@ -14,7 +14,7 @@ object MnemonicCodeSpec {
 
 }
 
-@RunWith(classOf[JUnitRunner])
+
 class MnemonicCodeSpec extends FlatSpec {
 
   import MnemonicCode._

@@ -8,11 +8,11 @@ import fr.acinq.bitcoin._
 import org.json4s.DefaultFormats
 import org.json4s.JsonAST.{JBool, JString, JValue}
 import org.json4s.jackson.{JsonMethods, Serialization}
-import org.junit.runner.RunWith
+
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
+
 class Base58Spec extends FlatSpec {
 
   implicit val format = DefaultFormats
