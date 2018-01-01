@@ -68,4 +68,8 @@ class BtcAmountSpec extends FunSuite {
     assert(MilliBtc(32) > MilliBtc(31))
     assert(MilliSatoshi(32) > MilliSatoshi(31))
   }
+
+  test("negate amount") {
+    assert(Satoshi(-20) == -Satoshi(20))
+  }
 }
