@@ -2,7 +2,7 @@ organization := "fr.acinq"
 
 name := "bitcoin-lib"
 
-version := "0.9.14-SNAPSHOT"
+version := "0.9.15-SNAPSHOT"
 
 scalaVersion := "2.12.4"
 
