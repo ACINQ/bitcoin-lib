@@ -34,7 +34,9 @@ object DeterministicWallet {
 
   def isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-  case class ExtendedPrivateKey(secretkeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+  trait ExtendedKey
+
+  case class ExtendedPrivateKey(secretkeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) extends ExtendedKey {
     require(secretkeybytes.length == 32)
     require(chaincode.length == 32)
 
@@ -43,16 +45,15 @@ object DeterministicWallet {
     def publicKey: PublicKey = privateKey.publicKey
   }
 
-  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) extends ExtendedKey {
     require(publickeybytes.length == 33)
     require(chaincode.length == 32)
 
     def publicKey: PublicKey = PublicKey(publickeybytes)
   }
 
-  def encode(input: ExtendedPrivateKey, testnet: Boolean): String = {
+  def encode(input: ExtendedPrivateKey, version: AddressVersion.Value): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32(if (testnet) tprv else xprv, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
@@ -60,21 +61,37 @@ object DeterministicWallet {
     out.write(0)
     out.write(input.secretkeybytes)
     val buffer = out.toByteArray
-    val checksum = Crypto.hash256(buffer).take(4)
-    Base58.encode(buffer ++ checksum)
+    Base58Check.encode(version.prv, buffer)
   }
 
-  def encode(input: ExtendedPublicKey, testnet: Boolean): String = {
+  def encode(input: ExtendedPublicKey, version: AddressVersion.Value): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32(if (testnet) tpub else xpub, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
     out.write(input.chaincode)
     out.write(input.publickeybytes)
     val buffer = out.toByteArray
-    val checksum = Crypto.hash256(buffer).take(4)
-    Base58.encode(buffer ++ checksum)
+    Base58Check.encode(version.pub, buffer)
+  }
+
+  def decode(input: String, parentPath: KeyPath): (ExtendedKey, AddressVersion.Value) = {
+    val (version, data) = Base58Check.decodeWithIntPrefix(input)
+    val addressVersion = AddressVersion.values.find(v => v.prv == version || v.pub == version)
+      .getOrElse(throw new IllegalArgumentException("requirement failed: invalid extended key version prefix"))
+    val isPrivate = version == addressVersion.prv
+    val in = new ByteArrayInputStream(data)
+    val depth = uint8(in)
+    val parentFingerprint = uint32(in, ByteOrder.BIG_ENDIAN)
+    val childNumber = uint32(in, ByteOrder.BIG_ENDIAN)
+    val chainCode = bytes(in, 32)
+    val key = bytes(in, 33)
+    if (isPrivate) {
+      require(key.head == 0, "invalid private key")
+      (ExtendedPrivateKey(key.tail, chainCode, depth, parentPath.derive(childNumber), parentFingerprint), addressVersion)
+    } else {
+      (ExtendedPublicKey(key, chainCode, depth, parentPath.derive(childNumber), parentFingerprint), addressVersion)
+    }
   }
 
   /**
@@ -162,16 +179,31 @@ object DeterministicWallet {
 
   def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent)(derivePublicKey)
 
-  // mainnet
-  val xprv = 0x0488ade4
-  val xpub = 0x0488b21e
-
-  // testnet
-  val tprv = 0x04358394
-  val tpub = 0x043587cf
-
-  // segnet
-  val sprv = 0x05358394
-  val spub = 0x053587cf
 }
 
+
+object AddressVersion extends Enumeration {
+  protected case class Val(prv: Int, pub: Int, testnet: Boolean) extends super.Val
+  implicit def valueToVal(x: Value): Val = x.asInstanceOf[Val]
+
+  // mainnet
+  protected val xprv = 0x0488ade4
+  protected val xpub = 0x0488b21e
+
+  // testnet
+  protected val tprv = 0x04358394
+  protected val tpub = 0x043587cf
+
+  // segwit mainnet (P2WPKH in P2SH)
+  protected val yprv = 0x049d7878
+  protected val ypub = 0x049d7cb2
+
+  // segwit testnet (P2WPKH in P2SH)
+  protected val uprv = 0x044a4e28
+  protected val upub = 0x044a5262
+
+  val MainNetP2PKH        = Val(xprv, xpub, false)
+  val MainNetP2WPKHinP2SH = Val(yprv, ypub, false)
+  val TestNetP2PKH        = Val(tprv, tpub, true)
+  val TestNetP2WPKHinP2SH = Val(uprv, upub, true)
+}
