@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
 import java.math.BigInteger
+import java.nio.ByteOrder
 
 import scala.annotation.tailrec
 
@@ -101,8 +102,17 @@ object Base58Check {
     * @return a Base58 string
     */
   def encode(prefix: Byte, data: Seq[Byte]): String = {
-    val prefixAndData = prefix +: data
-    Base58.encode(prefixAndData ++ checksum(prefixAndData))
+    encode(Seq(prefix), data)
+  }
+
+  /**
+    *
+    * @param prefix version prefix (integer, as used with BIP32 ExtendedKeys for example)
+    * @param data   data to be encoded
+    * @return a Base58 String
+    */
+  def encode(prefix: Int, data: Seq[Byte]): String = {
+    encode(Protocol.writeUInt32(prefix, ByteOrder.BIG_ENDIAN), data)
   }
 
   /**
@@ -125,10 +135,36 @@ object Base58Check {
     * @return a (prefix, data) tuple
     */
   def decode(encoded: String): (Byte, BinaryData) = {
+    val (prefix, data) = decodeWithPrefixLen(encoded, 1)
+    (prefix(0), data)
+  }
+
+  /**
+    * Decodes Base58 data that has been encoded with an integer prefix
+    *
+    * NB: requirement check will throw an IllegalArgumentException if the checksum that is part of the encoded data cannot be verified
+    *
+    * @param encoded encoded data
+    * @return a (prefix, data) tuple
+    */
+  def decodeWithIntPrefix(encoded: String): (Int, BinaryData) = {
+    val (prefix, data) = decodeWithPrefixLen(encoded, 4)
+    (Protocol.uint32(BinaryData(prefix), ByteOrder.BIG_ENDIAN).toInt, data)
+  }
+
+  /**
+    * Decodes Base58 data that has been encoded with several bytes prefix
+    *
+    * NB: requirement check will throw an IllegalArgumentException if the checksum that is part of the encoded data cannot be verified
+    *
+    * @param encoded encoded data
+    * @return a (prefix, data) tuple
+    */
+  def decodeWithPrefixLen(encoded: String, prefixLen: Int): (Seq[Byte], BinaryData) = {
     val raw = Base58.decode(encoded)
     val versionAndHash = raw.dropRight(4)
     val checksum = raw.takeRight(4)
     require(checksum == Base58Check.checksum(versionAndHash), s"invalid Base58Check data $encoded")
-    (versionAndHash(0), versionAndHash.tail)
+    (versionAndHash.take(prefixLen), versionAndHash.drop(prefixLen))
   }
 }
