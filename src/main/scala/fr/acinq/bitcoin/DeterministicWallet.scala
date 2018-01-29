@@ -145,8 +145,15 @@ object DeterministicWallet {
     }
     val IL = I.take(32)
     val IR = I.takeRight(32)
+    val p = new BigInteger(1, IL.toArray)
+    if (p.compareTo(Crypto.curve.getN) >= 0) {
+      throw new RuntimeException("cannot generated child private key")
+    }
 
     val key = Scalar(IL).add(parent.privateKey)
+    if (key.isZero) {
+      throw new RuntimeException("cannot generated child private key")
+    }
     val buffer = key.toBin.take(32)
     ExtendedPrivateKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
@@ -164,7 +171,7 @@ object DeterministicWallet {
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val p = new BigInteger(1, IL.toArray)
-    if (p.compareTo(Crypto.curve.getN) == 1) {
+    if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child public key")
     }
     val Ki = Scalar(p).toPoint.add(parent.publicKey)

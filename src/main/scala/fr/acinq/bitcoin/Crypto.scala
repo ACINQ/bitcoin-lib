@@ -58,6 +58,8 @@ object Crypto {
 
     def *(that: Scalar): Scalar = multiply(that)
 
+    def isZero: Boolean = value == BigInteger.ZERO
+
     /**
       *
       * @return a 32 bytes binary representation of this value
