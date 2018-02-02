@@ -17,10 +17,13 @@ object DeterministicWallet {
 
     def derive(number: Long) = KeyPath(path :+ number)
 
+    def deriveHardened(number: Long) = KeyPath(path :+ hardened(number))
+
     override def toString = path.map(KeyPath.childNumberToString).foldLeft("m")(_ + "/" + _)
   }
 
   object KeyPath {
+    val Root = KeyPath(Nil)
     def childNumberToString(childNumber: Long) = if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString + "'") else childNumber.toString
   }
 
@@ -40,6 +43,7 @@ object DeterministicWallet {
     val path: KeyPath
     val parent: Long
     def publicKey: PublicKey
+    def extendedPublicKey: ExtendedPublicKey
   }
 
   case class ExtendedPrivateKey(secretkeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) extends ExtendedKey {
@@ -49,6 +53,8 @@ object DeterministicWallet {
     def privateKey: PrivateKey = PrivateKey(Scalar(secretkeybytes), compressed = true)
 
     def publicKey: PublicKey = privateKey.publicKey
+
+    def extendedPublicKey: ExtendedPublicKey = DeterministicWallet.publicKey(this)
   }
 
   case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) extends ExtendedKey {
@@ -56,6 +62,8 @@ object DeterministicWallet {
     require(chaincode.length == 32)
 
     def publicKey: PublicKey = PublicKey(publickeybytes)
+
+    def extendedPublicKey: ExtendedPublicKey = this
   }
 
   def encode(input: ExtendedPrivateKey, version: AddressVersion.Value): String = {
@@ -183,7 +191,7 @@ object DeterministicWallet {
 
   def derivePrivateKey(parent: ExtendedPrivateKey, chain: Seq[Long]): ExtendedPrivateKey = chain.foldLeft(parent)(derivePrivateKey)
 
-  def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent)(derivePublicKey)
+  def derivePublicKey(parent: ExtendedKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent.extendedPublicKey)(derivePublicKey)
 
 }
 
