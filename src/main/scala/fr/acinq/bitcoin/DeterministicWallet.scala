@@ -34,7 +34,13 @@ object DeterministicWallet {
 
   def isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-  trait ExtendedKey
+  trait ExtendedKey {
+    val chaincode: BinaryData
+    val depth: Int
+    val path: KeyPath
+    val parent: Long
+    def publicKey: PublicKey
+  }
 
   case class ExtendedPrivateKey(secretkeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) extends ExtendedKey {
     require(secretkeybytes.length == 32)
@@ -117,17 +123,10 @@ object DeterministicWallet {
 
   /**
     *
-    * @param input extended public key
-    * @return the fingerprint for this public key
+    * @param input extended key
+    * @return the fingerprint of the public key
     */
-  def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes).take(4).reverse.toArray))
-
-  /**
-    *
-    * @param input extended private key
-    * @return the fingerprint for this private key (which is based on the corresponding public key)
-    */
-  def fingerprint(input: ExtendedPrivateKey): Long = fingerprint(publicKey(input))
+  def fingerprint(input: ExtendedKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publicKey.toBin).take(4).reverse.toArray))
 
   /**
     *
@@ -164,10 +163,10 @@ object DeterministicWallet {
     * @param index  index of the child key
     * @return the derived public key at the specified index
     */
-  def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = {
+  def derivePublicKey(parent: ExtendedKey, index: Long): ExtendedPublicKey = {
     require(!isHardened(index), "Cannot derive public keys from public hardened keys")
 
-    val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
+    val I = Crypto.hmac512(parent.chaincode, parent.publicKey.toBin.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val p = new BigInteger(1, IL.toArray)
