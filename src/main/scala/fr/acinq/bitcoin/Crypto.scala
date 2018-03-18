@@ -171,7 +171,10 @@ object Crypto {
   }
 
   object Point {
-    def apply(data: BinaryData): Point = Point(curve.getCurve.decodePoint(data))
+    def apply(data: BinaryData): Point = if (Secp256k1Context.isEnabled)
+      Point(curve.getCurve.decodePoint(NativeSecp256k1.decompress(data)))
+    else
+      Point(curve.getCurve.decodePoint(data))
   }
 
   implicit def point2ecpoint(point: Point): ECPoint = point.value
