@@ -21,10 +21,13 @@ class PaymentProtocolSpec extends FlatSpec {
   val aliases = keystore.aliases()
 
   "Payment protocol" should "verify payment requests" in {
-    val stream = classOf[PaymentProtocolSpec].getResourceAsStream("/r1411736682.bitcoinpaymentrequest")
+    // to generate a test payment request I used the bitpay demo: go to https://bitpay.com/demos,
+    // generate a payment, copy the payment uri and download the payment request with
+    // wget --header="Accept: application/bitcoin-paymentrequest" https://bitpay.com/i/XXXXXXXXXX
+    val stream = classOf[PaymentProtocolSpec].getResourceAsStream("/paymentrequest.bin")
     val request = PaymentRequest.parseFrom(stream)
     val (name, publicKey, trustAnchor) = PaymentProtocol.verifySignature(request, keystore)
-    assert(name === "www.bitcoincore.org")
+    assert(name === "bitpay.com")
 
     // check that we get an exception if we attempt to modify payment details
     val details = PaymentDetails.parseFrom(request.getSerializedPaymentDetails)
