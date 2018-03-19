@@ -69,7 +69,7 @@ object Crypto {
       * @return this * G where G is the curve generator
       */
     def toPoint: Point = if (Secp256k1Context.isEnabled)
-      Point(NativeSecp256k1.computePubkey(toBin))
+      Point(NativeSecp256k1.computePubkey(toBin, false))
     else
       Point(params.getG() * value)
 
@@ -141,7 +141,7 @@ object Crypto {
     def substract(point: Point): Point = Point(value.subtract(point.value))
 
     def multiply(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
-      Point(NativeSecp256k1.pubKeyTweakMul(toBin(true), scalar.toBin))
+      Point(NativeSecp256k1.pubKeyTweakMul(toBin(true), scalar.toBin, false))
     else
       Point(value.multiply(scalar.value))
 
@@ -171,7 +171,10 @@ object Crypto {
   }
 
   object Point {
-    def apply(data: BinaryData): Point = Point(curve.getCurve.decodePoint(data))
+    def apply(data: BinaryData): Point = if (Secp256k1Context.isEnabled)
+      Point(curve.getCurve.decodePoint(NativeSecp256k1.decompress(data)))
+    else
+      Point(curve.getCurve.decodePoint(data))
   }
 
   implicit def point2ecpoint(point: Point): ECPoint = point.value
