@@ -163,6 +163,17 @@ class ProtocolSpec extends FlatSpec {
     val block = Block.read(message.payload)
     assert(block.header.hashPreviousBlock == Block.LivenetGenesisBlock.hash)
     assert(OutPoint.isCoinbase(block.tx(0).txIn(0).outPoint))
+    assert(Block.checkProofOfWork(block))
+  }
+  it should "check proof of work" in {
+    val headers = Seq(
+      "01000000d46774a07109e9863938acd67fd7adf0b265293a38283f29a7e2551600000000256713d0e1b31f2518e7f93b41b9392da12dcd15fd9b871d2f694bfa6e4aaa308d06c34fc0ff3f1c7520e9f3",
+      "0200000035ab154183570282ce9afc0b494c9fc6a3cfea05aa8c1add2ecc56490000000038ba3d78e4500a5a7570dbe61960398add4410d278b21cd9708e6d9743f374d544fc055227f1001c29c1ea3b",
+      "000000201af2487466dc0437a1fc545740abd82c9d51b5a4bab9e5fea5082200000000000b209c935968affb31bd1288e66203a2b635b902a2352f7867b85201f6baaf09044d0758c0cc521bd1cf559f",
+      "00000020620187836ab16deef958960bc1f8321fe2c32971a447ba7888bc050000000000c91a344b1a95579235f66776652529c60fd50099af021977f073388abb44862e8fbdda58c0b3271ca4e63787"
+    ).map(BlockHeader.read)
+
+    headers.foreach(header => assert(BlockHeader.checkProofOfWork(header)))
   }
   it should "read and write reject messages" in {
     val message = Message.read("0b11090772656a6563740000000000001f00000051e3a01d076765746461746101156572726f722070617273696e67206d657373616765")
