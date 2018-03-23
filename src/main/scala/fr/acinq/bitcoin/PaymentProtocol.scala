@@ -10,8 +10,8 @@ import org.bitcoin.protocols.payments.Protos.{PaymentDetails, PaymentRequest, X5
 import scala.collection.JavaConversions._
 
 /**
- * see https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki
- */
+  * see https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki
+  */
 object PaymentProtocol {
 
   def displayName(certificate: X509Certificate): String = {
@@ -50,7 +50,7 @@ object PaymentProtocol {
     (displayName(certificates(0)), publicKey, result.getTrustAnchor)
   }
 
-  def sign(request: PaymentRequest, certificates: Seq[X509Certificate], privateKey: PrivateKey) : PaymentRequest = {
+  def sign(request: PaymentRequest, certificates: Seq[X509Certificate], privateKey: PrivateKey): PaymentRequest = {
     def toByteString(cert: X509Certificate) = ByteString.copyFrom(cert.getEncoded)
 
     // sign a request with all fields set except for the signature which remains empty

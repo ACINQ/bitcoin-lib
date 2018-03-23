@@ -39,7 +39,7 @@ class Secp256k1Spec extends FunSuite {
       Random.nextBytes(priv1)
       Random.nextBytes(priv2)
       val secret1 = Crypto.ecdh(Scalar(priv1), Scalar(priv2).toPoint)
-      val secret2: BinaryData = NativeSecp256k1.createECDHSecret(priv1, NativeSecp256k1.computePubkey(priv2))
+      val secret2: BinaryData = NativeSecp256k1.createECDHSecret(priv1, NativeSecp256k1.computePubkey(priv2, false))
       assert(secret1 == secret2)
     }
   }
