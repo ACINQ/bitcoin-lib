@@ -1,11 +1,11 @@
 package fr.acinq.bitcoin
 
-import Crypto._
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
+
+import fr.acinq.bitcoin.Crypto._
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
-import scala.util.Try
 
 /**
   * script execution flags
@@ -127,9 +127,9 @@ object ScriptFlags {
 
 object Script {
 
-  import fr.acinq.bitcoin.ScriptElt._
-  import ScriptFlags._
   import Protocol._
+  import ScriptFlags._
+  import fr.acinq.bitcoin.ScriptElt._
 
   type Stack = List[Seq[Byte]]
 

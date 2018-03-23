@@ -2,13 +2,13 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 
-import fr.acinq.bitcoin.Script.Runner
-import Protocol._
 import fr.acinq.bitcoin.Crypto.PrivateKey
+import fr.acinq.bitcoin.Protocol._
+import fr.acinq.bitcoin.Script.Runner
 
 import scala.collection.mutable.ArrayBuffer
 
-object OutPoint extends BtcMessage[OutPoint] {
+object OutPoint extends BtcSerializer[OutPoint] {
   def apply(tx: Transaction, index: Int) = new OutPoint(tx.hash, index)
 
   override def read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
@@ -30,7 +30,7 @@ object OutPoint extends BtcMessage[OutPoint] {
   * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
   * @param index index of the output in tx that we want to refer to
   */
-case class OutPoint(hash: BinaryData, index: Long) {
+case class OutPoint(hash: BinaryData, index: Long) extends BtcSerializable[OutPoint] {
   require(hash.length == 32)
   require(index >= -1)
 
@@ -39,9 +39,11 @@ case class OutPoint(hash: BinaryData, index: Long) {
     * @return the id of the transaction this output belongs to
     */
   val txid: BinaryData = hash.data.reverse
+
+  override def serializer: BtcSerializer[OutPoint] = OutPoint
 }
 
-object TxIn extends BtcMessage[TxIn] {
+object TxIn extends BtcSerializer[TxIn] {
   def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long): TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
 
   /* Setting nSequence to this value for every input in a transaction disables nLockTime. */
@@ -98,13 +100,15 @@ object TxIn extends BtcMessage[TxIn] {
   *                        information is updated before inclusion into a block. Repurposed for OP_CSV (see BIPs 68 & 112)
   * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
   */
-case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) {
+case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) extends BtcSerializable[TxIn] {
   def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
 
   def hasWitness: Boolean = witness.isNotNull
+
+  override def serializer: BtcSerializer[TxIn] = TxIn
 }
 
-object TxOut extends BtcMessage[TxOut] {
+object TxOut extends BtcSerializer[TxOut] {
   def apply(amount: Satoshi, publicKeyScript: Seq[ScriptElt]): TxOut = new TxOut(amount, Script.write(publicKeyScript))
 
   override def read(input: InputStream, protocolVersion: Long): TxOut = TxOut(Satoshi(uint64(input)), script(input))
@@ -128,9 +132,11 @@ object TxOut extends BtcMessage[TxOut] {
   * @param amount          amount in Satoshis
   * @param publicKeyScript public key script which sets the conditions for spending this output
   */
-case class TxOut(amount: Satoshi, publicKeyScript: BinaryData)
+case class TxOut(amount: Satoshi, publicKeyScript: BinaryData) extends BtcSerializable[TxOut] {
+  override def serializer: BtcSerializer[TxOut] = TxOut
+}
 
-object ScriptWitness extends BtcMessage[ScriptWitness] {
+object ScriptWitness extends BtcSerializer[ScriptWitness] {
   val empty = ScriptWitness(Seq.empty[BinaryData])
 
   override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit =
@@ -146,13 +152,15 @@ object ScriptWitness extends BtcMessage[ScriptWitness] {
   *
   * @param stack items to be pushed on the stack
   */
-case class ScriptWitness(stack: Seq[BinaryData]) {
+case class ScriptWitness(stack: Seq[BinaryData]) extends BtcSerializable[ScriptWitness] {
   def isNull = stack.isEmpty
 
   def isNotNull = !isNull
+
+  override def serializer: BtcSerializer[ScriptWitness] = ScriptWitness
 }
 
-object Transaction extends BtcMessage[Transaction] {
+object Transaction extends BtcSerializer[Transaction] {
   val SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000L
   // if lockTime >= LOCKTIME_THRESHOLD it is a unix timestamp otherwise it is a block height
   val LOCKTIME_THRESHOLD = 500000000L
@@ -412,7 +420,7 @@ object Transaction extends BtcMessage[Transaction] {
     * @param privateKey           private key
     * @return the encoded signature of this tx for this specific tx input
     */
-  @deprecated
+  @deprecated("", since = "0.9.6")
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int, privateKey: PrivateKey): BinaryData =
   signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
 
@@ -429,7 +437,7 @@ object Transaction extends BtcMessage[Transaction] {
 
     // sign each input
     val signedInputs = for (i <- 0 until input.txIn.length) yield {
-      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, signData(i).privateKey)
+      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, signData(i).privateKey)
 
       // this is the public key that is associated with the private key we used for signing
       val publicKey = signData(i).privateKey.publicKey
@@ -489,12 +497,21 @@ case class SignData(prevPubKeyScript: BinaryData, privateKey: PrivateKey)
   * @param txOut    Transaction outputs
   * @param lockTime The block number or timestamp at which this transaction is locked
   */
-case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) {
+case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) extends BtcSerializable[Transaction] {
 
   import Transaction._
 
+  // standard transaction hash, used to identify transactions (in transactions outputs for example)
   lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS))
   lazy val txid: BinaryData = hash.reverse
+  // witness transaction hash that includes witness data. used to compute the witness commitment included in the coinbase
+  // transaction of segwit blocks
+  lazy val whash: BinaryData = Crypto.hash256(Transaction.write(this))
+  lazy val wtxid: BinaryData = whash.reverse
+  lazy val bin: BinaryData = Transaction.write(this)
+
+  // this is much easier to use than Scala's default toString
+  override def toString: String = bin.toString
 
   /**
     *
@@ -557,4 +574,5 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
 
   def weight(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.weight(this, protocolVersion)
 
+  override def serializer: BtcSerializer[Transaction] = Transaction
 }

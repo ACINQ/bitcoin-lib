@@ -1,10 +1,10 @@
 package fr.acinq.bitcoin
 
 import com.google.common.io.BaseEncoding
+import fr.acinq.bitcoin.Base58.Prefix
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import Base58.Prefix
 
 @RunWith(classOf[JUnitRunner])
 class ScriptSpec extends FlatSpec {

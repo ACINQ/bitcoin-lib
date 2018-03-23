@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.PrivateKey
-import org.scalatest.{FlatSpec, FunSuite}
+import org.scalatest.FunSuite
 
 /**
   * Created by fabrice on 25/10/16.

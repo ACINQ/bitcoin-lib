@@ -7,25 +7,25 @@ import javax.naming.ldap.LdapName
 import com.google.protobuf.ByteString
 import org.bitcoin.protocols.payments.Protos.{PaymentDetails, PaymentRequest, X509Certificates}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 /**
- * see https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki
- */
+  * see https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki
+  */
 object PaymentProtocol {
 
   def displayName(certificate: X509Certificate): String = {
     val dn = certificate.getSubjectX500Principal().getName()
     val ldapDN = new LdapName(dn)
-    ldapDN.getRdns.find(_.getType == "CN").map(_.getValue.asInstanceOf[String]).getOrElse("")
+    ldapDN.getRdns.asScala.find(_.getType == "CN").map(_.getValue.asInstanceOf[String]).getOrElse("")
   }
 
   def verifySignature(request: PaymentRequest, keystore: KeyStore): (String, PublicKey, TrustAnchor) = {
     val details = PaymentDetails.parseFrom(request.getSerializedPaymentDetails)
 
     val factory = CertificateFactory.getInstance("X.509")
-    val certificates = X509Certificates.parseFrom(request.getPkiData).getCertificateList.map(bytes => factory.generateCertificate(bytes.newInput()).asInstanceOf[X509Certificate])
-    val certpath = factory.generateCertPath(certificates)
+    val certificates = X509Certificates.parseFrom(request.getPkiData).getCertificateList.asScala.map(bytes => factory.generateCertificate(bytes.newInput()).asInstanceOf[X509Certificate])
+    val certpath = factory.generateCertPath(certificates.asJava)
 
     // Retrieves the most-trusted CAs from keystore.
     val params = new PKIXParameters(keystore)
@@ -50,13 +50,13 @@ object PaymentProtocol {
     (displayName(certificates(0)), publicKey, result.getTrustAnchor)
   }
 
-  def sign(request: PaymentRequest, certificates: Seq[X509Certificate], privateKey: PrivateKey) : PaymentRequest = {
+  def sign(request: PaymentRequest, certificates: Seq[X509Certificate], privateKey: PrivateKey): PaymentRequest = {
     def toByteString(cert: X509Certificate) = ByteString.copyFrom(cert.getEncoded)
 
     // sign a request with all fields set except for the signature which remains empty
     val request1 = request.toBuilder
       .setPkiType("x509+sha256")
-      .setPkiData(X509Certificates.newBuilder().addAllCertificate(certificates.map(toByteString)).build().toByteString)
+      .setPkiData(X509Certificates.newBuilder().addAllCertificate(certificates.map(toByteString).asJava).build().toByteString)
       .setSignature(ByteString.EMPTY)
       .build()
 
