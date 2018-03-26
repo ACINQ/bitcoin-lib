@@ -61,7 +61,7 @@ class Base58Spec extends FlatSpec {
             assert(data == hash)
           case _ => encoded.substring(0, 2) match {
             case "bc" | "tb" =>
-              val (tag, program) = Bech32.decodeWitnessAddress(encoded)
+              val (_, tag, program) = Bech32.decodeWitnessAddress(encoded)
               val op :: OP_PUSHDATA(hash, _) :: Nil = Script.parse(hex)
               assert(Script.simpleValue(op) == tag)
               assert(program == hash)
