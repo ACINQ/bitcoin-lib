@@ -3,6 +3,7 @@ package fr.acinq.bitcoin.samples
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.DeterministicWallet._
 import fr.acinq.bitcoin.{Base58, Base58Check, Crypto, DeterministicWallet, MnemonicCode, Script}
+import fr.acinq.bitcoin.AddressVersion._
 
 object FindMyAddresses extends App {
   /**
@@ -22,13 +23,13 @@ object FindMyAddresses extends App {
 
   // step #2: generate the master key from the seed
   val master = generate(seed)
-  println(s"master key: $master ${encode(master, testnet)} ${encode(publicKey(master), testnet)}")
+  println(s"master key: $master ${encode(master, if (testnet) TestNetP2WPKHinP2SH else MainNetP2WPKHinP2SH)} ${encode(publicKey(master), if (testnet) TestNetP2WPKHinP2SH else MainNetP2WPKHinP2SH)}")
 
   // step #3: derive the account key from the master key
   val account = derivePrivateKey(master, hardened(49) :: hardened(if (testnet) 1 else 0) :: hardened(0) :: Nil)
 
   val accountPub = publicKey(account)
-  println(s"account public key: $accountPub ${encode(accountPub, testnet)}")
+  println(s"account public key: $accountPub ${encode(accountPub, if (testnet) TestNetP2WPKHinP2SH else MainNetP2WPKHinP2SH)}")
 
   // compute a few keys and addresses...
   for (i <- 0L to 10L) {
