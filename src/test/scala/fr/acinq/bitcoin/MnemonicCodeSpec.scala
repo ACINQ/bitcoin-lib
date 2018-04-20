@@ -26,9 +26,11 @@ class MnemonicCodeSpec extends FlatSpec {
     val stream = classOf[MnemonicCodeSpec].getResourceAsStream("/bip39_vectors.json")
     val vectors = JsonMethods.parse(new InputStreamReader(stream)).extract[TestVectors]
     vectors.english.map(_ match {
-      case Array(raw, mnemonics, seed) =>
+      case Array(raw, mnemonics, seed ,xprv) =>
         assert(toMnemonics(BinaryData(raw)).mkString(" ") === mnemonics)
         assert(toSeed(toMnemonics(BinaryData(raw)), "TREZOR") === BinaryData(seed))
+        val master = DeterministicWallet.generate(BinaryData(seed))
+        assert(DeterministicWallet.encode(master, DeterministicWallet.xprv) == xprv)
     })
   }
 }

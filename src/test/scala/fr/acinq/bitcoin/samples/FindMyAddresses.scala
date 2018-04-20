@@ -22,13 +22,13 @@ object FindMyAddresses extends App {
 
   // step #2: generate the master key from the seed
   val master = generate(seed)
-  println(s"master key: $master ${encode(master, testnet)} ${encode(publicKey(master), testnet)}")
+  println(s"master key: $master ${encode(master, if (testnet) tprv else xprv)} ${encode(publicKey(master), if (testnet) tpub else xpub)}")
 
   // step #3: derive the account key from the master key
   val account = derivePrivateKey(master, hardened(49) :: hardened(if (testnet) 1 else 0) :: hardened(0) :: Nil)
 
   val accountPub = publicKey(account)
-  println(s"account public key: $accountPub ${encode(accountPub, testnet)}")
+  println(s"account public key: $accountPub ${encode(accountPub, if (testnet) tpub else xpub)}")
 
   // compute a few keys and addresses...
   for (i <- 0L to 10L) {
