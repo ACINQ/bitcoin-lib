@@ -43,16 +43,22 @@ object DeterministicWallet {
     def publicKey: PublicKey = privateKey.publicKey
   }
 
-  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
-    require(publickeybytes.length == 33)
-    require(chaincode.length == 32)
-
-    def publicKey: PublicKey = PublicKey(publickeybytes)
+  object ExtendedPrivateKey {
+    def decode(input: String): (Int, ExtendedPrivateKey) = {
+      val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+      val bis = new ByteArrayInputStream((bin))
+      val depth = Protocol.uint8(bis)
+      val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val chaincode = Protocol.bytes(bis, 32)
+      require(bis.read() == 0)
+      val secretkeybytes = Protocol.bytes(bis, 32)
+      (prefix, ExtendedPrivateKey(secretkeybytes, chaincode, depth, KeyPath(childNumber :: Nil), parent))
+    }
   }
 
-  def encode(input: ExtendedPrivateKey, testnet: Boolean): String = {
+  def encode(input: ExtendedPrivateKey, prefix: Int): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32(if (testnet) tprv else xprv, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
@@ -60,22 +66,45 @@ object DeterministicWallet {
     out.write(0)
     out.write(input.secretkeybytes)
     val buffer = out.toByteArray
-    val checksum = Crypto.hash256(buffer).take(4)
-    Base58.encode(buffer ++ checksum)
+    Base58Check.encode(prefix, buffer)
   }
 
-  def encode(input: ExtendedPublicKey, testnet: Boolean): String = {
+  @deprecated("use encode(priv, prefix (xpriv or tpriv for example)) instead", "v0.9.17")
+  def encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
+
+  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+    require(publickeybytes.length == 33)
+    require(chaincode.length == 32)
+
+    def publicKey: PublicKey = PublicKey(publickeybytes)
+  }
+
+  object ExtendedPublicKey {
+    def decode(input: String): (Int, ExtendedPublicKey) = {
+      val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+      val bis = new ByteArrayInputStream((bin))
+      val depth = Protocol.uint8(bis)
+      val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val chaincode = Protocol.bytes(bis, 32)
+      val publickeybytes = Protocol.bytes(bis, 33)
+      (prefix.toInt, ExtendedPublicKey(publickeybytes, chaincode, depth, KeyPath(childNumber :: Nil), parent))
+    }
+  }
+
+  def encode(input: ExtendedPublicKey, prefix: Int): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32(if (testnet) tpub else xpub, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
     out.write(input.chaincode)
     out.write(input.publickeybytes)
     val buffer = out.toByteArray
-    val checksum = Crypto.hash256(buffer).take(4)
-    Base58.encode(buffer ++ checksum)
+    Base58Check.encode(prefix, buffer)
   }
+
+  @deprecated("use encode(pub, prefix (xpub or tpub for example)) instead", "v0.9.17")
+  def encode(input: ExtendedPublicKey, testnet: Boolean): String = encode(input, if (testnet) tpub else xpub)
 
   /**
     *
