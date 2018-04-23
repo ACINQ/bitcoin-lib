@@ -120,6 +120,20 @@ class DeterministicWalletSpec extends FlatSpec {
     val guess = new BigInteger(1, m42.secretkeybytes).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)
     assert(guess === k)
   }
+  it should "parse string-formatted derivation paths" in {
+    assert(KeyPath("m/44'/0'/0'/0") == KeyPath(hardened(44) :: hardened(0) :: hardened(0) :: 0L :: Nil))
+    assert(KeyPath("/44'/0'/0'/0") == KeyPath(hardened(44) :: hardened(0) :: hardened(0) :: 0L :: Nil))
+    assert(KeyPath("44'/0'/0'/0") == KeyPath(hardened(44) :: hardened(0) :: hardened(0) :: 0L :: Nil))
+    assert(KeyPath("m/44/0'/0'/0") == KeyPath(44L :: hardened(0) :: hardened(0) :: 0L :: Nil))
+    val invalidKeyPaths = Seq(
+      "aa/1/2/3", "1/'2/3"
+    )
+    invalidKeyPaths.map(path => {
+      intercept[RuntimeException] {
+        println(KeyPath(path))
+      }
+    })
+  }
   it should "be able to derive private keys" in {
     val random = new Random()
     val seed = new Array[Byte](32)

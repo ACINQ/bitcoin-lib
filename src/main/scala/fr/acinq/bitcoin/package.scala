@@ -2,6 +2,7 @@ package fr.acinq
 
 import java.math.BigInteger
 
+import fr.acinq.bitcoin.Crypto.PublicKey
 import org.spongycastle.util.encoders.Hex
 
 /**
@@ -126,4 +127,19 @@ package object bitcoin {
   def isHashSingle(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_SINGLE
 
   def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_NONE
+
+  /**
+    *
+    * @param pub public key
+    * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
+    * @return the BIP49 address for this key (i.e. the p2swh-of-p2pkh address for this key)
+    */
+  def computeBIP49Address(pub: PublicKey, chainHash: BinaryData): String = {
+    val script = Script.pay2wpkh(pub)
+    val hash = Crypto.hash160(Script.write(script))
+    chainHash match {
+      case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
+      case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddress, hash)
+    }
+  }
 }
