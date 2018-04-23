@@ -43,6 +43,32 @@ object MnemonicCode {
   }
 
   /**
+    * validate that a mnemonic seed is valid
+    * @param mnemonics list of mnemomic words
+    *
+    */
+  def validate(mnemonics: Seq[String], wordlist: Seq[String] = englishWordlist): Unit = {
+    require(wordlist.length == 2048, "invalid word list (size should be 2048)")
+    require(!mnemonics.isEmpty, "mnemonic code cannot be empty")
+    require(mnemonics.length % 3 == 0, s"invalid mnemonic word count ${mnemonics.length}, it must be a multiple of 3")
+    val wordMap = wordlist.zipWithIndex.toMap
+    mnemonics.foreach(word => require(wordMap.contains(word), s"invalid mnemonic word $word"))
+    val indexes = mnemonics.map(word => wordMap(word))
+
+    @tailrec
+    def toBits(index: Int, acc: Seq[Boolean] = Seq.empty[Boolean]): Seq[Boolean] = if (acc.length == 11) acc else toBits(index / 2, (index % 2 != 0) +: acc)
+
+    val bits = indexes.map(i => toBits(i)).flatten
+    val bitlength = (bits.length * 32) / 33
+    val (databits, checksumbits) = bits.splitAt(bitlength)
+    val data: BinaryData = databits.grouped(8).map(fromBinary).map(_.toByte).toSeq
+    val check = toBinary(Crypto.sha256(data)).take(data.length / 4)
+    require(check == checksumbits, "invalid checksum")
+  }
+
+  def validate(mnemonics: String): Unit = validate(mnemonics.split(" "))
+
+    /**
     * BIP39 seed derivation
     *
     * @param mnemonics  mnemonic words
@@ -55,4 +81,6 @@ object MnemonicCode {
     val keyParams = gen.generateDerivedParameters(512).asInstanceOf[KeyParameter]
     keyParams.getKey
   }
+
+  def toSeed(mnemonics: String, passphrase: String) : BinaryData = toSeed(mnemonics.split(" "), passphrase)
 }
