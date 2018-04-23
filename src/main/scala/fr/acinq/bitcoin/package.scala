@@ -132,7 +132,8 @@ package object bitcoin {
     *
     * @param pub public key
     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
-    * @return the BIP49 address for this key (i.e. the p2swh-of-p2pkh address for this key)
+    * @return the BIP49 address for this key (i.e. the p2swh-of-p2pkh address for this key). It is a Base58 address that is
+    *         compatible with most bitcoin wallets
     */
   def computeBIP49Address(pub: PublicKey, chainHash: BinaryData): String = {
     val script = Script.pay2wpkh(pub)
@@ -141,5 +142,22 @@ package object bitcoin {
       case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
       case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddress, hash)
     }
+  }
+
+  /**
+    *
+    * @param pub public key
+    * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
+    * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
+    *         understood only by native sewgit wallets
+    */
+  def computeBIP84Address(pub: PublicKey, chainHash: BinaryData): String = {
+    val hash = pub.hash160
+    val hrp = chainHash match {
+      case Block.LivenetGenesisBlock.hash => "bc"
+      case Block.TestnetGenesisBlock.hash => "tb"
+      case Block.RegtestGenesisBlock.hash => "bcrt"
+    }
+    Bech32.encodeWitnessAddress(hrp, 0, pub.hash160)
   }
 }
