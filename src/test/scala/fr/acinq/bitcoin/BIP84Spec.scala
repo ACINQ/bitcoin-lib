@@ -1,8 +1,7 @@
-package fr.acinq.bitcoin.samples
+package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
-import fr.acinq.bitcoin.{Base58, Base58Check, BinaryData, Block, DeterministicWallet, MnemonicCode, computeBIP84Address}
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
