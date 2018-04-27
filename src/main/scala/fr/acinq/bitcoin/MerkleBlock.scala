@@ -22,7 +22,7 @@ import scala.annotation.tailrec
 case class MerkleBlock(version: Long, previousBlockHash: BinaryData, merkleRoot: BinaryData, timestamp: Long, bits: Long, nonce: Long, txCount: Int, hashes: Seq[BinaryData], flags: BinaryData) extends BtcSerializable[MerkleBlock] {
   require(previousBlockHash.length == 32, "length of preivous block hash should be 32")
   require(merkleRoot.length == 32, "length of merkle root hash should be 32")
-  hashes.map(h => require(h.length == 32, "length of hash should be 32"))
+  hashes.foreach(h => require(h.length == 32, "length of hash should be 32"))
   require(txCount > 1, "transaction count should be greater than 1")
 
   override def serializer: BtcSerializer[MerkleBlock] = MerkleBlock
@@ -56,7 +56,7 @@ object MerkleBlock extends BtcSerializer[MerkleBlock] {
     writeUInt32(input.nonce, out)
     writeUInt32(input.txCount, out)
     writeVarint(input.hashes.length, out)
-    input.hashes.map(bin => writeBytes(bin, out))
+    input.hashes.foreach(bin => writeBytes(bin, out))
     writeScript(input.flags, out)
   }
 
@@ -64,7 +64,7 @@ object MerkleBlock extends BtcSerializer[MerkleBlock] {
 
   def toBits(byte: Byte): List[Boolean] = (for (i <- 0 to 7) yield isBitSet(byte, i)).toList
 
-  def toBits(flags: BinaryData) : List[Boolean] = flags.map(toBits).flatten.toList
+  def toBits(flags: BinaryData) : List[Boolean] = flags.flatMap(toBits).toList
 
   /**
     *

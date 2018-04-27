@@ -21,7 +21,7 @@ object Bech32 {
   def polymod(values: Seq[Int5]): Int = {
     val GEN = Seq(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
     var chk = 1
-    values.map(v => {
+    values.foreach(v => {
       val b = chk >>> 25
       chk = ((chk & 0x1ffffff) << 5) ^ v
       for (i <- 0 until 5) {
@@ -68,7 +68,7 @@ object Bech32 {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
-    input.map(b => {
+    input.foreach(b => {
       buffer = (buffer << 8) | (b & 0xff)
       count = count + 8
       while (count >= 5) {
@@ -89,7 +89,7 @@ object Bech32 {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
-    input.map(b => {
+    input.foreach(b => {
       buffer = (buffer << 5) | (b & 31)
       count = count + 5
       while (count >= 8) {
