@@ -21,6 +21,8 @@ object DeterministicWallet {
   }
 
   object KeyPath {
+    val Root = KeyPath(Nil)
+
     /**
       *
       * @param path key path. A list of integers separated by a `/`. May start with "/" or "m/". A single quote appended
@@ -29,8 +31,8 @@ object DeterministicWallet {
       */
     def apply(path: String) : KeyPath = {
       def toNumber(value: String): Long = if (value.last == '\'') hardened(value.dropRight(1).toLong) else value.toLong
-      val path1 = path.stripPrefix("m/").stripPrefix("/")
-      new KeyPath(path1.split('/').map(toNumber))
+      val path1 = path.stripPrefix("m").stripPrefix("/")
+      if (path1.isEmpty) KeyPath.Root else KeyPath(path1.split('/').map(toNumber))
     }
 
     def childNumberToString(childNumber: Long) = if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString + "'") else childNumber.toString

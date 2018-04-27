@@ -125,6 +125,8 @@ class DeterministicWalletSpec extends FlatSpec {
     assert(KeyPath("/44'/0'/0'/0") == KeyPath(hardened(44) :: hardened(0) :: hardened(0) :: 0L :: Nil))
     assert(KeyPath("44'/0'/0'/0") == KeyPath(hardened(44) :: hardened(0) :: hardened(0) :: 0L :: Nil))
     assert(KeyPath("m/44/0'/0'/0") == KeyPath(44L :: hardened(0) :: hardened(0) :: 0L :: Nil))
+    assert(KeyPath("m") == KeyPath.Root)
+    assert(KeyPath("") == KeyPath.Root)
     val invalidKeyPaths = Seq(
       "aa/1/2/3", "1/'2/3"
     )
