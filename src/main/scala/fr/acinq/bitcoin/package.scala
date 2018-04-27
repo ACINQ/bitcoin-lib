@@ -141,6 +141,7 @@ package object bitcoin {
     chainHash match {
       case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
       case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddress, hash)
+      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
     }
   }
 
@@ -157,6 +158,7 @@ package object bitcoin {
       case Block.LivenetGenesisBlock.hash => "bc"
       case Block.TestnetGenesisBlock.hash => "tb"
       case Block.RegtestGenesisBlock.hash => "bcrt"
+      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
     }
     Bech32.encodeWitnessAddress(hrp, 0, pub.hash160)
   }
