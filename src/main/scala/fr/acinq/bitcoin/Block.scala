@@ -107,7 +107,7 @@ object Block extends BtcSerializer[Block] {
     BlockHeader.validate(input.header)
     require(util.Arrays.equals(input.header.hashMerkleRoot, MerkleTree.computeRoot(input.tx.map(_.hash))), "invalid block:  merkle root mismatch")
     require(input.tx.map(_.txid).toSet.size == input.tx.size, "invalid block: duplicate transactions")
-    input.tx.map(Transaction.validate)
+    input.tx.foreach(Transaction.validate)
   }
 
   def blockProof(block: Block): Double = BlockHeader.blockProof(block.header)

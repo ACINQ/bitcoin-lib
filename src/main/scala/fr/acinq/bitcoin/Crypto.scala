@@ -162,7 +162,7 @@ object Crypto {
     def toBin(compressed: Boolean): BinaryData = value.getEncoded(compressed)
 
     // because ECPoint is not serializable
-    private def writeReplace: Object = PointProxy(toBin(true))
+    protected def writeReplace: Object = PointProxy(toBin(true))
 
     override def toString = toBin(true).toString
 

@@ -261,7 +261,7 @@ object Script {
         }
       }
       var result = 0L
-      for (i <- 0 until input.size) {
+      for (i <- input.indices) {
         result |= (input(i) & 0xffL) << (8 * i)
       }
 
@@ -275,7 +275,7 @@ object Script {
   }
 
   def castToBoolean(input: Seq[Byte]): Boolean = input.reverse.toList match {
-    case head :: tail if head == 0x80.toByte && tail.find(_ != 0).isEmpty => false
+    case head :: tail if head == 0x80.toByte && tail.forall(_ == 0) => false
     case something if something.exists(_ != 0) => true
     case _ => false
   }
@@ -355,7 +355,7 @@ object Script {
     // Mask off any bits that do not have consensus-enforced meaning
     // before doing the integer comparisons
     val nLockTimeMask = TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG | TxIn.SEQUENCE_LOCKTIME_MASK
-    val txToSequenceMasked = txToSequence & nLockTimeMask;
+    val txToSequenceMasked = txToSequence & nLockTimeMask
     val nSequenceMasked = sequence & nLockTimeMask
 
     // There are two kinds of nSequence: lock-by-blockheight
@@ -475,7 +475,7 @@ object Script {
       */
     def run(script: BinaryData, stack: Stack): Stack = run(parse(script), stack)
 
-    def run(script: List[ScriptElt], stack: Stack): Stack = run(script, stack, 0)
+    def run(script: List[ScriptElt], stack: Stack): Stack = run(script, stack, SigVersion.SIGVERSION_BASE)
 
     /**
       * execute a script, starting from an existing stack
@@ -505,14 +505,14 @@ object Script {
       if (opCount > 201) throw new RuntimeException("operation count is over the limit")
       script match {
         // first, things that are always checked even in non-executed IF branches
-        case Nil if !conditions.isEmpty => throw new RuntimeException("IF/ENDIF imbalance")
+        case Nil if conditions.nonEmpty => throw new RuntimeException("IF/ENDIF imbalance")
         case Nil => stack
         case op :: _ if isDisabled(op) => throw new RuntimeException(s"$op isdisabled")
-        case OP_VERIF :: tail => throw new RuntimeException("OP_VERIF is always invalid")
-        case OP_VERNOTIF :: tail => throw new RuntimeException("OP_VERNOTIF is always invalid")
+        case OP_VERIF :: _ => throw new RuntimeException("OP_VERIF is always invalid")
+        case OP_VERNOTIF :: _ => throw new RuntimeException("OP_VERNOTIF is always invalid")
         case OP_PUSHDATA(data, _) :: _ if data.size > MaxScriptElementSize => throw new RuntimeException("Push value size limit exceeded")
         // check whether we are in a non-executed IF branch
-        case OP_IF :: tail if conditions.exists(_ == false) => run(tail, stack, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
+        case OP_IF :: tail if conditions.contains(false) => run(tail, stack, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
         case OP_IF :: tail => stack match {
           case True :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case False :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
@@ -520,7 +520,7 @@ object Script {
           case head :: stacktail if castToBoolean(head) => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case head :: stacktail => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
         }
-        case OP_NOTIF :: tail if conditions.exists(_ == false) => run(tail, stack, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
+        case OP_NOTIF :: tail if conditions.contains(false) => run(tail, stack, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
         case OP_NOTIF :: tail => stack match {
           case False :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case True :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
@@ -530,7 +530,7 @@ object Script {
         }
         case OP_ELSE :: tail => run(tail, stack, state.copy(conditions = !conditions.head :: conditions.tail, opCount = opCount + 1), signatureVersion)
         case OP_ENDIF :: tail => run(tail, stack, state.copy(conditions = conditions.tail, opCount = opCount + 1), signatureVersion)
-        case head :: tail if conditions.exists(_ == false) => run(tail, stack, state.copy(opCount = opCount + cost(head)), signatureVersion)
+        case head :: tail if conditions.contains(false) => run(tail, stack, state.copy(opCount = opCount + cost(head)), signatureVersion)
         // and now, things that are checked only in an executed IF branch
         case OP_0 :: tail => run(tail, Seq.empty[Byte] :: stack, state, signatureVersion)
         case op :: tail if isSimpleValue(op) => run(tail, encodeNumber(simpleValue(op)) :: stack, state, signatureVersion)
@@ -568,7 +568,7 @@ object Script {
           case _ => throw new RuntimeException("cannot run OP_BOOLOR on a stack with less than 2 elements")
         }
         case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) != 0) => stack match {
-          case head :: stacktail =>
+          case head :: _ =>
             // Note that elsewhere numeric opcodes are limited to
             // operands in the range -2**31+1 to 2**31-1, however it is
             // legal for opcodes to produce results exceeding that
@@ -590,10 +590,10 @@ object Script {
             run(tail, stack, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("cannot run OP_CHECKLOCKTIMEVERIFY on an empty stack")
         }
-        case OP_CHECKLOCKTIMEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
+        case OP_CHECKLOCKTIMEVERIFY :: _ if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
         case OP_CHECKLOCKTIMEVERIFY :: tail => run(tail, stack, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_CHECKSEQUENCEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) != 0) => stack match {
-          case head :: stacktail =>
+          case head :: _ =>
             // nSequence, like nLockTime, is a 32-bit unsigned integer
             // field. See the comment in CHECKLOCKTIMEVERIFY regarding
             // 5-byte numeric operands.
@@ -616,7 +616,7 @@ object Script {
             run(tail, stack, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("cannot run OP_CHECKSEQUENCEVERIFY on an empty stack")
         }
-        case OP_CHECKSEQUENCEVERIFY :: tail if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
+        case OP_CHECKSEQUENCEVERIFY :: _ if ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
         case OP_CHECKSEQUENCEVERIFY :: tail => run(tail, stack, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
@@ -648,7 +648,7 @@ object Script {
           // check that we have at least n + 1 items on the stack (+1 because of a bug in the reference client)
           require(stack3.size >= n + 1, "invalid stack operation")
           val sigs = stack3.take(n)
-          if ((scriptFlag & ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack3(n).size == 0, "multisig dummy is not empty")
+          if ((scriptFlag & ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack3(n).isEmpty, "multisig dummy is not empty")
           val stack4 = stack3.drop(n + 1)
 
           // Drop the signature in pre-segwit scripts but not segwit scripts
@@ -666,7 +666,7 @@ object Script {
         case OP_CHECKMULTISIGVERIFY :: tail => run(OP_CHECKMULTISIG :: OP_VERIFY :: tail, stack, state.copy(opCount = opCount - 1), signatureVersion)
         case OP_CODESEPARATOR :: tail => run(tail, stack, state.copy(opCount = opCount + 1, scriptCode = tail), signatureVersion)
         case OP_DEPTH :: tail => run(tail, encodeNumber(stack.length) :: stack, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_SIZE :: tail if stack.isEmpty => throw new RuntimeException("Cannot run OP_SIZE on an empty stack")
+        case OP_SIZE :: _ if stack.isEmpty => throw new RuntimeException("Cannot run OP_SIZE on an empty stack")
         case OP_SIZE :: tail => run(tail, encodeNumber(stack.head.length) :: stack, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_DROP :: tail => run(tail, stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_2DROP :: tail => run(tail, stack.tail.tail, state.copy(opCount = opCount + 1), signatureVersion)
@@ -766,11 +766,11 @@ object Script {
           case _ => throw new RuntimeException("Cannot perform OP_NUMNOTEQUAL on a stack with less than 2 elements")
         }
         case OP_OVER :: tail => stack match {
-          case x1 :: x2 :: _ => run(tail, x2 :: stack, state.copy(opCount = opCount + 1), signatureVersion)
+          case _ :: x2 :: _ => run(tail, x2 :: stack, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("Cannot perform OP_OVER on a stack with less than 2 elements")
         }
         case OP_2OVER :: tail => stack match {
-          case x1 :: x2 :: x3 :: x4 :: _ => run(tail, x3 :: x4 :: stack, state.copy(opCount = opCount + 1), signatureVersion)
+          case _ :: _ :: x3 :: x4 :: _ => run(tail, x3 :: x4 :: stack, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("Cannot perform OP_2OVER on a stack with less than 4 elements")
         }
         case OP_PICK :: tail => stack match {
@@ -779,10 +779,10 @@ object Script {
             run(tail, stacktail(n) :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("Cannot perform OP_PICK on a stack with less than 1 elements")
         }
-        case OP_PUSHDATA(data, code) :: tail if ((scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0) && !OP_PUSHDATA.isMinimal(data, code) => {
+        case OP_PUSHDATA(data, code) :: _ if ((scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0) && !OP_PUSHDATA.isMinimal(data, code) => {
           throw new RuntimeException("not minimal push")
         }
-        case OP_PUSHDATA(data, code) :: tail => run(tail, data.toSeq :: stack, state, signatureVersion)
+        case OP_PUSHDATA(data, _) :: tail => run(tail, data.toSeq :: stack, state, signatureVersion)
         case OP_ROLL :: tail => stack match {
           case head :: stacktail =>
             val n = decodeNumber(head).toInt
@@ -822,8 +822,8 @@ object Script {
         }
         case OP_VERIFY :: tail => stack match {
           case Nil => throw new RuntimeException("cannot run OP_VERIFY on an empty stack")
-          case head :: stacktail if !castToBoolean(head) => throw new RuntimeException("OP_VERIFY failed")
-          case head :: stacktail => run(tail, stacktail, state.copy(opCount = opCount + 1), signatureVersion)
+          case head :: _ if !castToBoolean(head) => throw new RuntimeException("OP_VERIFY failed")
+          case _ :: stacktail => run(tail, stacktail, state.copy(opCount = opCount + 1), signatureVersion)
         }
         case OP_WITHIN :: tail => stack match {
           case encMax :: encMin :: encN :: stacktail =>
@@ -859,7 +859,7 @@ object Script {
       stack.foreach(item => require(item.length <= MaxScriptElementSize, "item is bigger than maximum push size"))
 
       // FIXME: stack.map(...) is fugly
-      val stack1 = run(scriptPubKey, stack.map(_.toSeq).toList.reverse, signatureVersion = 1)
+      val stack1 = run(scriptPubKey, stack.map(_.toSeq).toList.reverse, SigVersion.SIGVERSION_WITNESS_V0)
       require(stack1.length == 1)
       require(castToBoolean(stack1.head))
     }
@@ -902,7 +902,7 @@ object Script {
 
       val spub = Script.parse(scriptPubKey)
       val stack0 = run(spub, stack)
-      require(!stack0.isEmpty, "Script verification failed, stack should not be empty")
+      require(stack0.nonEmpty, "Script verification failed, stack should not be empty")
       require(castToBoolean(stack0.head), "Script verification failed, stack starts with 'false'")
 
       var hadWitness = false
@@ -930,7 +930,7 @@ object Script {
         // and stack would be serialized_script :: sigN :: ... :: sig1 :: Nil
         // we pop the first element of the stack, deserialize it and run it against the rest of the stack
         val stackp2sh = run(stack.head, stack.tail)
-        require(!stackp2sh.isEmpty, "Script verification failed, stack should not be empty")
+        require(stackp2sh.nonEmpty, "Script verification failed, stack should not be empty")
         require(castToBoolean(stackp2sh.head), "Script verification failed, stack starts with 'false'")
 
         if ((scriptFlag & SCRIPT_VERIFY_WITNESS) != 0) {

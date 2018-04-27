@@ -160,6 +160,6 @@ package object bitcoin {
       case Block.RegtestGenesisBlock.hash => "bcrt"
       case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
     }
-    Bech32.encodeWitnessAddress(hrp, 0, pub.hash160)
+    Bech32.encodeWitnessAddress(hrp, 0, hash)
   }
 }
