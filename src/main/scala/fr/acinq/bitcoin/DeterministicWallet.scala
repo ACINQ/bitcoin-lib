@@ -58,7 +58,7 @@ object DeterministicWallet {
   }
 
   object ExtendedPrivateKey {
-    def decode(input: String): (Int, ExtendedPrivateKey) = {
+    def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPrivateKey) = {
       val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
       val bis = new ByteArrayInputStream((bin))
       val depth = Protocol.uint8(bis)
@@ -67,7 +67,7 @@ object DeterministicWallet {
       val chaincode = Protocol.bytes(bis, 32)
       require(bis.read() == 0)
       val secretkeybytes = Protocol.bytes(bis, 32)
-      (prefix, ExtendedPrivateKey(secretkeybytes, chaincode, depth, KeyPath(childNumber :: Nil), parent))
+      (prefix, ExtendedPrivateKey(secretkeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
     }
   }
 
@@ -94,7 +94,7 @@ object DeterministicWallet {
   }
 
   object ExtendedPublicKey {
-    def decode(input: String): (Int, ExtendedPublicKey) = {
+    def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPublicKey) = {
       val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
       val bis = new ByteArrayInputStream((bin))
       val depth = Protocol.uint8(bis)
@@ -102,7 +102,7 @@ object DeterministicWallet {
       val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
       val chaincode = Protocol.bytes(bis, 32)
       val publickeybytes = Protocol.bytes(bis, 33)
-      (prefix.toInt, ExtendedPublicKey(publickeybytes, chaincode, depth, KeyPath(childNumber :: Nil), parent))
+      (prefix.toInt, ExtendedPublicKey(publickeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
     }
   }
 
