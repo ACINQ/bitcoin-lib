@@ -48,12 +48,12 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.9.16</version>
+    <version>0.9.17</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.9.17-SNAPSHOT, the latest released version is 0.9.16
+The latest snapshot (development) version is 0.9.18-SNAPSHOT, the latest released version is 0.9.17
 
 ## Segwit support
 
