@@ -215,7 +215,8 @@ object Transaction extends BtcSerializer[Transaction] {
   override def validate(input: Transaction): Unit = {
     require(input.txIn.nonEmpty, "input list cannot be empty")
     require(input.txOut.nonEmpty, "output list cannot be empty")
-    require(Transaction.write(input).size <= MaxBlockSize)
+    require(baseSize(input) * WITNESS_SCALE_FACTOR <= MAX_BLOCK_WEIGHT)
+    require(input.txOut.map(_.amount.amount).sum >= 0, "sum of outputs amount is invalid")
     require(input.txOut.map(_.amount.amount).sum <= MaxMoney, "sum of outputs amount is invalid")
     input.txIn.foreach(TxIn.validate)
     input.txOut.foreach(TxOut.validate)
