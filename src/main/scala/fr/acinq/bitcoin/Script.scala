@@ -517,7 +517,7 @@ object Script {
         case OP_IF :: tail => stack match {
           case True :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case False :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
-          case _ :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => throw new RuntimeException("OP_IF argument must be minimal")
+          case _ :: _ if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => throw new RuntimeException("OP_IF argument must be minimal")
           case head :: stacktail if castToBoolean(head) => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case head :: stacktail => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
         }
@@ -525,7 +525,7 @@ object Script {
         case OP_NOTIF :: tail => stack match {
           case False :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
           case True :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
-          case _ :: stacktail if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => throw new RuntimeException("OP_NOTIF argument must be minimal")
+          case _ :: _ if signatureVersion == SigVersion.SIGVERSION_WITNESS_V0 && (scriptFlag & SCRIPT_VERIFY_MINIMALIF) != 0 => throw new RuntimeException("OP_NOTIF argument must be minimal")
           case head :: stacktail if castToBoolean(head) => run(tail, stacktail, state.copy(conditions = false :: conditions, opCount = opCount + 1), signatureVersion)
           case head :: stacktail => run(tail, stacktail, state.copy(conditions = true :: conditions, opCount = opCount + 1), signatureVersion)
         }
@@ -536,13 +536,13 @@ object Script {
         case OP_0 :: tail => run(tail, Seq.empty[Byte] :: stack, state, signatureVersion)
         case op :: tail if isSimpleValue(op) => run(tail, encodeNumber(simpleValue(op)) :: stack, state, signatureVersion)
         case OP_NOP :: tail => run(tail, stack, state.copy(opCount = opCount + 1), signatureVersion)
-        case op :: tail if isUpgradableNop(op) && ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
+        case op :: _ if isUpgradableNop(op) && ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
         case op :: tail if isUpgradableNop(op) => run(tail, stack, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_1ADD :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_1ADD on am empty stack")
+        case OP_1ADD :: _ if stack.isEmpty => throw new RuntimeException("cannot run OP_1ADD on am empty stack")
         case OP_1ADD :: tail => run(tail, encodeNumber(decodeNumber(stack.head) + 1) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_1SUB :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_1SUB on am empty stack")
+        case OP_1SUB :: _ if stack.isEmpty => throw new RuntimeException("cannot run OP_1SUB on am empty stack")
         case OP_1SUB :: tail => run(tail, encodeNumber(decodeNumber(stack.head) - 1) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_ABS :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_ABS on am empty stack")
+        case OP_ABS :: _ if stack.isEmpty => throw new RuntimeException("cannot run OP_ABS on am empty stack")
         case OP_ABS :: tail => run(tail, encodeNumber(Math.abs(decodeNumber(stack.head))) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_ADD :: tail => stack match {
           case a :: b :: stacktail =>
@@ -738,15 +738,15 @@ object Script {
             run(tail, encodeNumber(result) :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("Cannot perform OP_MIN on a stack with less than 2 elements")
         }
-        case OP_NEGATE :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_NEGATE on am empty stack")
+        case OP_NEGATE :: _ if stack.isEmpty => throw new RuntimeException("cannot run OP_NEGATE on am empty stack")
         case OP_NEGATE :: tail => run(tail, encodeNumber(-decodeNumber(stack.head)) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_NIP :: tail => stack match {
           case x1 :: x2 :: stacktail => run(tail, x1 :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("Cannot perform OP_NIP on a stack with less than 2 elements")
         }
-        case OP_NOT :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_NOT on am empty stack")
+        case OP_NOT :: _ if stack.isEmpty => throw new RuntimeException("cannot run OP_NOT on am empty stack")
         case OP_NOT :: tail => run(tail, encodeNumber(if (decodeNumber(stack.head) == 0) 1 else 0) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_0NOTEQUAL :: tail if stack.isEmpty => throw new RuntimeException("cannot run OP_0NOTEQUAL on am empty stack")
+        case OP_0NOTEQUAL :: _ if stack.isEmpty => throw new RuntimeException("cannot run OP_0NOTEQUAL on am empty stack")
         case OP_0NOTEQUAL :: tail => run(tail, encodeNumber(if (decodeNumber(stack.head) == 0) 0 else 1) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_NUMEQUAL :: tail => stack match {
           case x1 :: x2 :: stacktail =>
