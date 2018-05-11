@@ -58,6 +58,8 @@ object Crypto {
 
     def *(that: Scalar): Scalar = multiply(that)
 
+    def isZero: Boolean = value == BigInteger.ZERO
+
     /**
       *
       * @return a 32 bytes binary representation of this value
@@ -69,7 +71,7 @@ object Crypto {
       * @return this * G where G is the curve generator
       */
     def toPoint: Point = if (Secp256k1Context.isEnabled)
-      Point(NativeSecp256k1.computePubkey(toBin))
+      Point(NativeSecp256k1.computePubkey(toBin, false))
     else
       Point(params.getG() * value)
 
@@ -141,7 +143,7 @@ object Crypto {
     def substract(point: Point): Point = Point(value.subtract(point.value))
 
     def multiply(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
-      Point(NativeSecp256k1.pubKeyTweakMul(toBin(true), scalar.toBin))
+      Point(NativeSecp256k1.pubKeyTweakMul(toBin(true), scalar.toBin, false))
     else
       Point(value.multiply(scalar.value))
 
@@ -160,7 +162,7 @@ object Crypto {
     def toBin(compressed: Boolean): BinaryData = value.getEncoded(compressed)
 
     // because ECPoint is not serializable
-    private def writeReplace: Object = PointProxy(toBin(true))
+    protected def writeReplace: Object = PointProxy(toBin(true))
 
     override def toString = toBin(true).toString
 
@@ -171,7 +173,10 @@ object Crypto {
   }
 
   object Point {
-    def apply(data: BinaryData): Point = Point(curve.getCurve.decodePoint(data))
+    def apply(data: BinaryData): Point = if (Secp256k1Context.isEnabled)
+      Point(curve.getCurve.decodePoint(NativeSecp256k1.decompress(data)))
+    else
+      Point(curve.getCurve.decodePoint(data))
   }
 
   implicit def point2ecpoint(point: Point): ECPoint = point.value

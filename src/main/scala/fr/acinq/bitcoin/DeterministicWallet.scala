@@ -21,6 +21,20 @@ object DeterministicWallet {
   }
 
   object KeyPath {
+    val Root = KeyPath(Nil)
+
+    /**
+      *
+      * @param path key path. A list of integers separated by a `/`. May start with "/" or "m/". A single quote appended
+      *             at the end means use the hardened version of the ley index (example: m/44'/0'/0'/0)
+      * @return a KeyPath instance
+      */
+    def apply(path: String) : KeyPath = {
+      def toNumber(value: String): Long = if (value.last == '\'') hardened(value.dropRight(1).toLong) else value.toLong
+      val path1 = path.stripPrefix("m").stripPrefix("/")
+      if (path1.isEmpty) KeyPath.Root else new KeyPath(path1.split('/').map(toNumber))
+    }
+
     def childNumberToString(childNumber: Long) = if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString + "'") else childNumber.toString
   }
 
@@ -43,16 +57,22 @@ object DeterministicWallet {
     def publicKey: PublicKey = privateKey.publicKey
   }
 
-  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
-    require(publickeybytes.length == 33)
-    require(chaincode.length == 32)
-
-    def publicKey: PublicKey = PublicKey(publickeybytes)
+  object ExtendedPrivateKey {
+    def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPrivateKey) = {
+      val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+      val bis = new ByteArrayInputStream((bin))
+      val depth = Protocol.uint8(bis)
+      val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val chaincode = Protocol.bytes(bis, 32)
+      require(bis.read() == 0)
+      val secretkeybytes = Protocol.bytes(bis, 32)
+      (prefix, ExtendedPrivateKey(secretkeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
+    }
   }
 
-  def encode(input: ExtendedPrivateKey, testnet: Boolean): String = {
+  def encode(input: ExtendedPrivateKey, prefix: Int): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32(if (testnet) tprv else xprv, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
@@ -60,22 +80,45 @@ object DeterministicWallet {
     out.write(0)
     out.write(input.secretkeybytes)
     val buffer = out.toByteArray
-    val checksum = Crypto.hash256(buffer).take(4)
-    Base58.encode(buffer ++ checksum)
+    Base58Check.encode(prefix, buffer)
   }
 
-  def encode(input: ExtendedPublicKey, testnet: Boolean): String = {
+  @deprecated("use encode(priv, prefix (xpriv or tpriv for example)) instead", "v0.9.17")
+  def encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
+
+  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+    require(publickeybytes.length == 33)
+    require(chaincode.length == 32)
+
+    def publicKey: PublicKey = PublicKey(publickeybytes)
+  }
+
+  object ExtendedPublicKey {
+    def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPublicKey) = {
+      val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
+      val bis = new ByteArrayInputStream((bin))
+      val depth = Protocol.uint8(bis)
+      val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
+      val chaincode = Protocol.bytes(bis, 32)
+      val publickeybytes = Protocol.bytes(bis, 33)
+      (prefix.toInt, ExtendedPublicKey(publickeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
+    }
+  }
+
+  def encode(input: ExtendedPublicKey, prefix: Int): String = {
     val out = new ByteArrayOutputStream()
-    writeUInt32(if (testnet) tpub else xpub, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
     out.write(input.chaincode)
     out.write(input.publickeybytes)
     val buffer = out.toByteArray
-    val checksum = Crypto.hash256(buffer).take(4)
-    Base58.encode(buffer ++ checksum)
+    Base58Check.encode(prefix, buffer)
   }
+
+  @deprecated("use encode(pub, prefix (xpub or tpub for example)) instead", "v0.9.17")
+  def encode(input: ExtendedPublicKey, testnet: Boolean): String = encode(input, if (testnet) tpub else xpub)
 
   /**
     *
@@ -128,8 +171,15 @@ object DeterministicWallet {
     }
     val IL = I.take(32)
     val IR = I.takeRight(32)
+    val p = new BigInteger(1, IL.toArray)
+    if (p.compareTo(Crypto.curve.getN) >= 0) {
+      throw new RuntimeException("cannot generated child private key")
+    }
 
     val key = Scalar(IL).add(parent.privateKey)
+    if (key.isZero) {
+      throw new RuntimeException("cannot generated child private key")
+    }
     val buffer = key.toBin.take(32)
     ExtendedPrivateKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
@@ -147,7 +197,7 @@ object DeterministicWallet {
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val p = new BigInteger(1, IL.toArray)
-    if (p.compareTo(Crypto.curve.getN) == 1) {
+    if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child public key")
     }
     val Ki = Scalar(p).toPoint.add(parent.publicKey)
@@ -160,18 +210,34 @@ object DeterministicWallet {
 
   def derivePrivateKey(parent: ExtendedPrivateKey, chain: Seq[Long]): ExtendedPrivateKey = chain.foldLeft(parent)(derivePrivateKey)
 
+  def derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey = derivePrivateKey(parent, keyPath.path)
+
   def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent)(derivePublicKey)
 
-  // mainnet
+  def derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey = derivePublicKey(parent, keyPath.path)
+
+  // p2pkh mainnet
   val xprv = 0x0488ade4
   val xpub = 0x0488b21e
 
-  // testnet
+  // p2sh-of-p2wpkh mainnet
+  val yprv = 0x049d7878
+  val ypub = 0x049d7cb2
+
+  // p2wpkh mainnet
+  val zprv = 0x04b2430c
+  val zpub = 0x04b24746
+
+  // p2pkh testnet
   val tprv = 0x04358394
   val tpub = 0x043587cf
 
-  // segnet
-  val sprv = 0x05358394
-  val spub = 0x053587cf
+  // p2sh-of-p2wpkh testnet
+  val uprv = 0x044a4e28
+  val upub = 0x044a5262
+
+  // p2wpkh testnet
+  val vprv = 0x045f18bc
+  val vpub = 0x045f1cf6
 }
 

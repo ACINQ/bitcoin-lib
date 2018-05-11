@@ -21,7 +21,7 @@ object Bech32 {
   def polymod(values: Seq[Int5]): Int = {
     val GEN = Seq(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
     var chk = 1
-    values.map(v => {
+    values.foreach(v => {
       val b = chk >>> 25
       chk = ((chk & 0x1ffffff) << 5) ^ v
       for (i <- 0 until 5) {
@@ -68,7 +68,7 @@ object Bech32 {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
-    input.map(b => {
+    input.foreach(b => {
       buffer = (buffer << 8) | (b & 0xff)
       count = count + 8
       while (count >= 5) {
@@ -89,7 +89,7 @@ object Bech32 {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
-    input.map(b => {
+    input.foreach(b => {
       buffer = (buffer << 5) | (b & 31)
       count = count + 5
       while (count >= 8) {
@@ -121,10 +121,11 @@ object Bech32 {
     * decode a bitcoin witness address
     *
     * @param address witness address
-    * @return a (version, program) tuple where version is the witness version and program the decoded witness program.
+    * @return a (prefix, version, program) tuple where prefix is the human-readble prefix, version
+    *         is the witness version and program the decoded witness program.
     *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
     */
-  def decodeWitnessAddress(address: String): (Byte, BinaryData) = {
+  def decodeWitnessAddress(address: String): (String, Byte, BinaryData) = {
     if (address.indexWhere(_.isLower) != -1 && address.indexWhere(_.isUpper) != -1) throw new IllegalArgumentException("input mixes lowercase and uppercase characters")
     val (hrp, data) = decode(address)
     require(hrp == "bc" || hrp == "tb" || hrp == "bcrt", s"invalid HRP $hrp")
@@ -133,7 +134,7 @@ object Bech32 {
     val bin = five2eight(data.drop(1))
     require(bin.length >= 2 && bin.length <= 40, s"invalid witness program length ${bin.length}")
     if (version == 0) require(bin.length == 20 || bin.length == 32, s"invalid witness program length ${bin.length}")
-    (version, bin)
+    (hrp, version, bin)
   }
 
 }

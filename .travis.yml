@@ -1,10 +1,20 @@
 language: scala
-before_install:
- - sudo apt-get install libgmp-dev
+install:
+ # first let's build the libsecp256k1 jni lib
+ - cd secp256k1
+ - ./autogen.sh
+ - ./configure --enable-jni --enable-experimental --enable-module-ecdh
+ - make
+ - cd ..
+ # then we build the java/scala lib
+ - mvn install -DskipTests
 script: 
+ # test with bouncycastle
  - mvn test
- - LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/src/test/resources mvn test
+ # test with libsecp256k1
+ - export LD_LIBRARY_PATH=secp256k1/.libs
+ - mvn test
 scala:
-- 2.11.7
+- 2.11.11
 jdk:
 - oraclejdk8

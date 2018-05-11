@@ -6,22 +6,22 @@ import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.Protocol._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class TransactionSpec extends FlatSpec with Matchers {
-  "Bitcoins library" should "create and sign transaction" in {
+class TransactionSpec extends FunSuite with Matchers {
+  test("create and sign transaction") {
     val srcTx = fromHexString("dcd82df7b26f0eacd226b8fbd366672c854284ba8080f79e1307138c7f1a1f6d".sliding(2, 2).toList.reverse.mkString(""))
     // for some reason it has to be reversed
     val amount = 9000000
-    // amount in satoshi
+    // amount) satoshi
     val vout = 0
-    // output index
+    // output)dex
     val destAdress = fromHexString("76a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac")
     val out = new ByteArrayOutputStream()
     writeUInt32(1, out) //version
-    writeVarint(1, out) // nb of inputs
-    out.write(srcTx) // tx in id
+    writeVarint(1, out) // nb of)puts
+    out.write(srcTx) // tx) id
     writeUInt32(vout, out)
     writeScript(fromHexString("76a914ea2902457015b386bd2323b2b99591b96138d62a88ac"), out) //scriptPubKey of prev tx for signing
     writeUInt32(0xffffffff, out) // sequence
@@ -50,23 +50,23 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     val signedOut = new ByteArrayOutputStream()
     writeUInt32(1, signedOut) //version
-    writeVarint(1, signedOut) // nb of inputs
-    signedOut.write(srcTx) // tx in id
-    writeUInt32(vout, signedOut) // output index
+    writeVarint(1, signedOut) // nb of)puts
+    signedOut.write(srcTx) // tx) id
+    writeUInt32(vout, signedOut) // output)dex
     writeScript(sigScript, signedOut)
     writeUInt32(0xffffffff, signedOut) // sequence
     writeVarint(1, signedOut) // number of outputs
-    writeUInt64(amount, signedOut) // amount in satoshi
+    writeUInt64(amount, signedOut) // amount) satoshi
     writeScript(destAdress, signedOut) //output script
     writeUInt32(0, signedOut)
     assert(toHexString(signedOut.toByteArray) === "01000000016d1f1a7f8c1307139ef78080ba8442852c6766d3fbb826d2ac0e6fb2f72dd8dc000000008b483045022100bdd23d0f98a4173a64fa432b8bf4ac41261a671f2c6c690d57ac839866d78bb202207bddb87ca95c9cef45de30a75144e5513571aa7938635b9e051b1c20f01088a60141044aec194c55c97f4519535f50f5539c6915045ecb79a36281dee6db55ffe1ad2e55f4a1c0e0950d3511e8f205b45cafa348a4a2ab2359246cb3c93f6532c4e8f5ffffffff0140548900000000001976a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac00000000")
   }
-  it should "read and write transactions" in {
+  test("read and write transactions") {
     val hex = BinaryData("0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000")
     val tx = Transaction.read(hex)
-    assert(Transaction.write(tx) === hex)
+    assert(tx.bin === hex)
   }
-  it should "create and verify pay2pk transactions with 1 input/1 output" in {
+  test("create and verify pay2pk transactions with 1)put/1 output") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val amount = 10000 satoshi
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
@@ -105,7 +105,7 @@ class TransactionSpec extends FlatSpec with Matchers {
 
     // this is the public key that is associated to the private key we used for signing
     val publicKey = privateKey.publicKey
-    // we check that is really is the public key that is encoded in the address the previous tx was paid to
+    // we check that is really is the public key that is encoded) the address the previous tx was paid to
     val providedHash = Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2
     val computedHash = publicKey.hash160
     assert(providedHash == computedHash)
@@ -125,8 +125,8 @@ class TransactionSpec extends FlatSpec with Matchers {
     // check script
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
-  // same as above, but using Transaction.sign() instead of signing the tx manually
-  it should "create and verify pay2pk transactions with 1 input/1 output using helper method" in {
+  // same as above, but using Transaction.sign())stead of signing the tx manually
+  test("create and verify pay2pk transactions with 1)put/1 output using helper method") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
     val amount = 10000 satoshi
@@ -159,7 +159,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     // redeem the tx
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
-  it should "create and verify sign pay2pk transactions with multiple inputs and outputs" in {
+  test("create and verify sign pay2pk transactions with multiple)puts and outputs") {
     val destAddress = "moKHwpsxovDtfBJyoXpof21vvWooBExutV"
     val destAmount = 3000000 satoshi
 
@@ -176,7 +176,7 @@ class TransactionSpec extends FlatSpec with Matchers {
       SignData(previousTx(1).txOut(0).publicKeyScript, PrivateKey.fromBase58("93NJN4mhL21FxRbfHZJ2Cou1YnrJmWNkujmZxeT7CPKauJkGv5g", Base58.Prefix.SecretKeyTestnet))
     )
 
-    // create a tx with empty input signature scripts
+    // create a tx with empty)put signature scripts
     val tx = Transaction(
       version = 1L,
       txIn = previousTx.map(tx => TxIn(OutPoint(tx, 0), sequence = 0xFFFFFFFFL, signatureScript = Array.empty[Byte])),
@@ -191,14 +191,14 @@ class TransactionSpec extends FlatSpec with Matchers {
     )
 
     val tx1 = Transaction.sign(tx, keys)
-    assert(Transaction.write(tx1) === BinaryData("01000000026c8a0bb4fef409509800066578a718e9a771082d94e96e0885a4b6a15b720c02000000006b483045022100e5510a2f15f03788ee2aeb2115edc96089596e3a0f0c1b1abfbbf069f4beedb802203faf6ec92a5a4ed2ce5fd42621be99746b57eca0eb46d322dc076080338b6c5a0121030533e1d2e9b7576fef26de1f34d67887158b7af1b040850aab6024b07925d70affffffffaf01f14881716b8acb062c33e7a66fc71e77bb2e4359b1f91b959aeb4f8837f1000000008b483045022100d3e5756f36e39a801c71c406124b3e0a66f0893a7fea46c69939b84715137c40022070a0e96e37c0a8e8c920e84fc63ed1914b4cef114a027f2d027d0a4a04b0b52d0141040081a4cce4c497d51d2f9be2d2109c00cbdef252185ca23074889604ace3504d73fd5f5aaac6423b04e776e467a948e1e79cb8793ded5f4b59c730c4460a0f86ffffffff02c0c62d00000000001976a914558c6b340f5abd22bf97b15cbc1483f8f1b54f5f88aca0f01900000000001976a914a1f93b5b00f9f5e8ade5549b58ed06cdc5c8203e88ac00000000"))
+    assert(tx1.toString == "01000000026c8a0bb4fef409509800066578a718e9a771082d94e96e0885a4b6a15b720c02000000006b483045022100e5510a2f15f03788ee2aeb2115edc96089596e3a0f0c1b1abfbbf069f4beedb802203faf6ec92a5a4ed2ce5fd42621be99746b57eca0eb46d322dc076080338b6c5a0121030533e1d2e9b7576fef26de1f34d67887158b7af1b040850aab6024b07925d70affffffffaf01f14881716b8acb062c33e7a66fc71e77bb2e4359b1f91b959aeb4f8837f1000000008b483045022100d3e5756f36e39a801c71c406124b3e0a66f0893a7fea46c69939b84715137c40022070a0e96e37c0a8e8c920e84fc63ed1914b4cef114a027f2d027d0a4a04b0b52d0141040081a4cce4c497d51d2f9be2d2109c00cbdef252185ca23074889604ace3504d73fd5f5aaac6423b04e776e467a948e1e79cb8793ded5f4b59c730c4460a0f86ffffffff02c0c62d00000000001976a914558c6b340f5abd22bf97b15cbc1483f8f1b54f5f88aca0f01900000000001976a914a1f93b5b00f9f5e8ade5549b58ed06cdc5c8203e88ac00000000")
 
     // now check that we can redeem this tx
     Transaction.correctlySpends(tx1, previousTx, ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
     // the id of this tx on testnet is 882e971dbdb7b762cd07e5db016d3c81267ec5233186a31e6f40457a0a56a311
   }
 
-  it should "create and sign p2sh transactions" in {
+  test("create and sign p2sh transactions") {
 
     val key1 = PrivateKey(BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
     val pub1 = key1.publicKey
@@ -222,12 +222,12 @@ class TransactionSpec extends FlatSpec with Matchers {
     // of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
 
-    // create a tx with empty input signature scripts
+    // create a tx with empty)put signature scripts
     val tx = Transaction(
       version = 1L,
       txIn = TxIn(OutPoint(previousTx.hash, 0), signatureScript = Nil, sequence = 0xFFFFFFFFL) :: Nil,
       txOut = TxOut(
-        amount = 900000 satoshi, // 0.009 BTC in satoshi, meaning the fee will be 0.01-0.009 = 0.001
+        amount = 900000 satoshi, // 0.009 BTC) satoshi, meaning the fee will be 0.01-0.009 = 0.001
         publicKeyScript = OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil) :: Nil,
       lockTime = 0L)
 
@@ -254,7 +254,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     Transaction.correctlySpends(signedSpendingTx, signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
-  it should "sign a 3-to-2 transaction with helper method" in {
+  test("sign a 3-to-2 transaction with helper method") {
 
     val previousTx = List(
       Transaction.read("0100000001cec6dd9f7ddc640f7bb54daf5623040532b8783472df1de3adc70df9b0f04f05000000006b483045022100ea006269fdf8b7308107e9469e575af4eeb2dbf1bcb273416ba6da92106ad56302206affb99984a40334c7d8b991c285a5f89e47ff62879e69b28fafecf7bd70b00f012102a97bf098a7cfc5c81a113b76922ef24abfa27d6e9991db724f9090a8426c9d53ffffffff024084fe00000000001976a914a1c03c1932f6afd5eab9163f9140151cae17df3388ac40420f00000000001976a9148c9648cab53a1fb8861daff0f2378c7b9e81a3ab88ac00000000"),
@@ -271,11 +271,11 @@ class TransactionSpec extends FlatSpec with Matchers {
     //priv: 926iWgQDq5dN84BJ4q2fu4wjSSaVWFxwanE8EegzMh3vGCUBJ94
     val dest2 = "mk6kmMF5EEXksBkZxi7FniwwRgWuZuwDpo"
     //priv: 91r7coHBdzfgfm2p3ToJ3Bu6kcqL3BvSo5m4ENzMZzsimRKH8aq
-    // 0.03 and 0.07 BTC in satoshi, meaning the fee will be (0.01+0.002+0.09)-(0.03+0.07) = 0.002
+    // 0.03 and 0.07 BTC) satoshi, meaning the fee will be (0.01+0.002+0.09)-(0.03+0.07) = 0.002
     val amount1 = 3000000 satoshi
     val amount2 = 7000000 satoshi
 
-    // create a tx with empty input signature scripts
+    // create a tx with empty)put signature scripts
     val tx = Transaction(
       version = 1L,
       txIn = List(
@@ -295,7 +295,7 @@ class TransactionSpec extends FlatSpec with Matchers {
     val signedTx = Transaction.sign(tx, keys)
 
     //this works because signature is not randomized
-    assert(Transaction.write(signedTx) == BinaryData("0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000"))
+    assert(signedTx.toString == "0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000")
 
     // the id of this tx on testnet is e8570dd062de8e354b18f6308ff739a51f25db75563c4ee2bc5849281263528f
 
@@ -303,11 +303,17 @@ class TransactionSpec extends FlatSpec with Matchers {
     Transaction.correctlySpends(signedTx, previousTx, ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
 
-  it should "compute tx size and weight" in {
+  test("compute tx size and weight") {
     val tx = Transaction.read("02000000000101d5babb96fc16d69455555edad0147525dba4581a4698fa5ffa270038663622d00100000000ffffffff04f6540000000000002200205751128e230201252054ab0fe8bfb897bcea7558dcb3cb43b435f11eea307b96f6540000000000001976a91470c0b535309db2aff3feabf5a54ad54ed28860e888acf65400000000000022002014aa3f91b837d2e3907a369b154368bc3a56cb6d2e7ca9f8163bfab480683ccef6540000000000002200206b39ae68b56cf3a1abb4be38fb55aaa6f5607f200642f52941b07c32572e49070400483045022100bb9d60b3d659329d346611fc107cf6aff5d29fb41209f55469978c1766f4571c02205a7466982e4ededb6adaccb44c8e68839b3bb9a7a042d6b3f1fef608cf8ab00601483045022100fe2c561731015d5d20083d57ec6d1b640359191dc239b8867ac064b930c3795d02201f54e0025ea1f074abb9c7d9eaed791d11f8fbd1387235a56e6500d6130e9b66014752210313151c5c6bb22d2d989cba0f12a51545d6179bae0ede36dcea598e06b0a279db2103c28b94b58f539ea687a941f8256c14b9b856d00a33bd526851ab021b69c87b6552ae00000000")
 
     assert(tx.baseSize() == 214)
     assert(tx.totalSize() == 436)
     assert(tx.weight() == 1078)
+  }
+
+  test("compute toString (segwit tx") {
+    val hex = "01000000000102fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f00000000494830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac000247304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee0121025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee635711000000"
+    val tx = Transaction.read(hex)
+    assert(tx.toString == hex)
   }
 }

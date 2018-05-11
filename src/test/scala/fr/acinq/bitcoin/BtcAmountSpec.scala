@@ -47,6 +47,10 @@ class BtcAmountSpec extends FunSuite {
     assert((z + z) / 2 === z)
     assert((z * 3) / 3 === z)
     assert(Seq(500 satoshi, 100 satoshi, 50 satoshi).sum === Satoshi(650))
+    assert(Btc(1) + Btc(2) == Btc(3))
+    assert(MilliBtc(1) + MilliBtc(2) == MilliBtc(3))
+    assert(Satoshi(1) + Satoshi(2) == Satoshi(3))
+    assert(MilliSatoshi(1) + MilliSatoshi(2) == MilliSatoshi(3))
   }
 
   test("basic comparisons") {
@@ -60,5 +64,12 @@ class BtcAmountSpec extends FunSuite {
     assert(y < x)
     assert(x < y + z + z)
     assert(x == y + z)
+    assert(Btc(32) > Btc(31))
+    assert(MilliBtc(32) > MilliBtc(31))
+    assert(MilliSatoshi(32) > MilliSatoshi(31))
+  }
+
+  test("negate amount") {
+    assert(Satoshi(-20) == -Satoshi(20))
   }
 }

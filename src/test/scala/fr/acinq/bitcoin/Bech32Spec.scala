@@ -32,7 +32,7 @@ class Bech32Spec extends FunSuite {
     )
     inputs.map {
       case (address, bin) =>
-        val (_, bin1) = Bech32.decodeWitnessAddress(address)
+        val (_, _, bin1) = Bech32.decodeWitnessAddress(address)
         assert(toHexString(bin1) == bin.substring(4))
     }
   }

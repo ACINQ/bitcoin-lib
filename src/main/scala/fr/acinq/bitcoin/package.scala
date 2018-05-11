@@ -2,6 +2,7 @@ package fr.acinq
 
 import java.math.BigInteger
 
+import fr.acinq.bitcoin.Crypto.PublicKey
 import org.spongycastle.util.encoders.Hex
 
 /**
@@ -126,4 +127,52 @@ package object bitcoin {
   def isHashSingle(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_SINGLE
 
   def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_NONE
+
+  def computeP2PkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+    val hash = pub.hash160
+    chainHash match {
+      case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash)
+      case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)
+    }
+  }
+
+  def computeBIP44Address(pub: PublicKey, chainHash: BinaryData) = computeP2PkhAddress(pub, chainHash)
+
+  /**
+    *
+    * @param pub public key
+    * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
+    * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
+    */
+  def computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+    val script = Script.pay2wpkh(pub)
+    val hash = Crypto.hash160(Script.write(script))
+    chainHash match {
+      case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
+      case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddress, hash)
+      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
+    }
+  }
+
+  def computeBIP49Address(pub: PublicKey, chainHash: BinaryData) = computeP2ShOfP2WpkhAddress(pub, chainHash)
+
+    /**
+    *
+    * @param pub public key
+    * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
+    * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
+    *         understood only by native sewgit wallets
+    */
+  def computeP2WpkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+    val hash = pub.hash160
+    val hrp = chainHash match {
+      case Block.LivenetGenesisBlock.hash => "bc"
+      case Block.TestnetGenesisBlock.hash => "tb"
+      case Block.RegtestGenesisBlock.hash => "bcrt"
+      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
+    }
+    Bech32.encodeWitnessAddress(hrp, 0, hash)
+  }
+
+  def computeBIP84Address(pub: PublicKey, chainHash: BinaryData) = computeP2WpkhAddress(pub, chainHash)
 }

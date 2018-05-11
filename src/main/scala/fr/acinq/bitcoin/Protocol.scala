@@ -1,10 +1,8 @@
 package fr.acinq.bitcoin
 
 import java.io._
-import java.math.BigInteger
 import java.net.{Inet4Address, Inet6Address, InetAddress}
 import java.nio.{ByteBuffer, ByteOrder}
-import java.util
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -174,9 +172,9 @@ object Protocol {
 
   def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, maxElement: Option[Int], protocolVersion: Long): Seq[T] = {
     val count = varint(input)
-    maxElement.map(max => require(count <= max, "invalid length"))
+    maxElement.foreach(max => require(count <= max, "invalid length"))
     val items = ArrayBuffer.empty[T]
-    for (i <- 1L to count) {
+    for (_ <- 1L to count) {
       items += reader(input, protocolVersion)
     }
     items
@@ -186,12 +184,12 @@ object Protocol {
 
   def writeCollection[T](seq: Seq[T], out: OutputStream, protocolVersion: Long)(implicit ser: BtcSerializer[T]): Unit = {
     writeVarint(seq.length, out)
-    seq.map(t => ser.write(t, out, protocolVersion))
+    seq.foreach(t => ser.write(t, out, protocolVersion))
   }
 
   def writeCollection[T](seq: Seq[T], writer: (T, OutputStream, Long) => Unit, out: OutputStream, protocolVersion: Long): Unit = {
     writeVarint(seq.length, out)
-    seq.map(t => writer(t, out, protocolVersion))
+    seq.foreach(t => writer(t, out, protocolVersion))
   }
 }
 
@@ -459,7 +457,7 @@ object Getheaders extends BtcSerializer[Getheaders] {
 }
 
 case class Getheaders(version: Long, locatorHashes: Seq[BinaryData], stopHash: BinaryData) extends BtcSerializable[Getheaders] {
-  locatorHashes.map(h => require(h.length == 32))
+  locatorHashes.foreach(h => require(h.length == 32))
   require(stopHash.length == 32)
 
   override def serializer: BtcSerializer[Getheaders] = Getheaders
@@ -500,7 +498,7 @@ object Getblocks extends BtcSerializer[Getblocks] {
 }
 
 case class Getblocks(version: Long, locatorHashes: Seq[BinaryData], stopHash: BinaryData) extends BtcSerializable[Getblocks] {
-  locatorHashes.map(h => require(h.length == 32))
+  locatorHashes.foreach(h => require(h.length == 32))
   require(stopHash.length == 32)
 
   override def serializer: BtcSerializer[Getblocks] = Getblocks
