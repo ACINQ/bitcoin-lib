@@ -26,7 +26,7 @@ object DeterministicWallet {
     /**
       *
       * @param path key path. A list of integers separated by a `/`. May start with "/" or "m/". A single quote appended
-      *             at the end means use the hardened version of the ley index (example: m/44'/0'/0'/0)
+      *             at the end means use the hardened version of the key index (example: m/44'/0'/0'/0)
       * @return a KeyPath instance
       */
     def apply(path: String) : KeyPath = {
