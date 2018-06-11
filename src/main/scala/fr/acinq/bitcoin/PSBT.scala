@@ -98,9 +98,7 @@ object PSBT {
       case None        => throw new IllegalArgumentException("PSBT requires one key-value entry for type Transaction")
     }
 
-    tx.txIn.foreach { txIn =>
-      assert(txIn.isFinal, "The inputs of the PSBT's transaction must be finalized or empty")
-    }
+    assert(tx.txIn.size == inputMaps.size, "The number of inputs provided does not match the inputs in the transaction")
 
     val redeemScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == RedeemScript).map { redeemScriptsEntry =>
       assert(redeemScriptsEntry.key.size == 21, s"Redeem script key has invalid size: ${redeemScriptsEntry.key.size}")
@@ -114,6 +112,7 @@ object PSBT {
 
     val keyPaths = globalMap.find(el => keyType(el.key, GlobalTypes) == Bip32Data).map { mapEntry =>
       val pubKey = PublicKey(mapEntry.key.drop(1))
+      assert(Crypto.isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
       val derivationPaths = mapEntry.value.sliding(4).map(bytes => uint32(BinaryData(bytes), ByteOrder.LITTLE_ENDIAN))
       (pubKey, KeyPath(derivationPaths.toSeq))
     }
