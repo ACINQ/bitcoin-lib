@@ -15,7 +15,7 @@ object PSBT {
     nonWitnessOutput: Option[Transaction],
     partialSigs: Map[PublicKey, BinaryData],
     sighashType: Option[Int],
-    inputIndex: Option[Long]
+    inputIndex: Option[Int]
   )
 
   case class PartiallySignedTransaction(
@@ -128,7 +128,7 @@ object PSBT {
       case None                        => 0
     }
 
-    val psbis = inputMaps.map { inputMap =>
+    val psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
       val partiallySignedInput = PartiallySignedInput(
         inputMap.find(el => keyType(el.key, InputTypes) == WitnessUTXO).map { witnessUtxoEntry =>
           TxOut.read(witnessUtxoEntry.value)
@@ -143,7 +143,7 @@ object PSBT {
           uint32(sigHashEntry.value, ByteOrder.LITTLE_ENDIAN).toInt
         },
         inputMap.find(el => keyType(el.key, InputTypes) == InputIndex).map { inputIndexEntry =>
-          varint(inputIndexEntry.value.data.toArray)
+          varint(inputIndexEntry.value.data.toArray).toInt
         }
       )
 
@@ -155,7 +155,14 @@ object PSBT {
         useInIndex = true
       }
 
-      partiallySignedInput
+      partiallySignedInput.nonWitnessOutput.map { prevTx =>
+        assert(tx.txIn(partiallySignedInput.inputIndex.getOrElse(index)).outPoint.hash == prevTx.hash, "Provided non witness utxo does not match the required utxo for input")
+      }
+
+      partiallySignedInput.inputIndex match {
+        case None => partiallySignedInput.copy(inputIndex = Some(index))
+        case _    => partiallySignedInput
+      }
     }
 
     PartiallySignedTransaction(
