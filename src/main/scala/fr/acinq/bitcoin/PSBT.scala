@@ -64,8 +64,9 @@ object PSBT {
   }
 
   private def keyType[T <: Enumeration](key: BinaryData, enumType: T): enumType.Value = {
-    if(key.length == 0)
+    if(key.length == 0) {
       throw new IllegalArgumentException("zero length PSBT key encountered")
+    }
 
     enumType(key.head)
   }
@@ -97,8 +98,6 @@ object PSBT {
       case Some(entry) => Transaction.read(entry.value)
       case None        => throw new IllegalArgumentException("PSBT requires one key-value entry for type Transaction")
     }
-
-    assert(tx.txIn.size == inputMaps.size, "The number of inputs provided does not match the inputs in the transaction")
 
     val redeemScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == RedeemScript).map { redeemScriptsEntry =>
       assert(redeemScriptsEntry.key.size == 21, s"Redeem script key has invalid size: ${redeemScriptsEntry.key.size}")
@@ -165,14 +164,10 @@ object PSBT {
       }
     }
 
-    PartiallySignedTransaction(
-      tx,
-      redeemScripts,
-      witnessScripts,
-      psbis,
-      keyPaths
-    )
+    //FIXME this check should keep in account already finalized (signed) inputs
+    assert(tx.txIn.filterNot(txIn => !txIn.hasSigScript || !txIn.hasWitness).size == psbis.size, s"The number of inputs provided (${psbis.size}) does not match the inputs in the transaction (${tx.txIn.size})")
 
+    PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths)
   }
 
   def write(psbt: PartiallySignedTransaction, out: OutputStream)= ???
