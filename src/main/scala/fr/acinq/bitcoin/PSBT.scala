@@ -15,8 +15,7 @@ object PSBT {
     nonWitnessOutput: Option[Transaction],
     partialSigs: Map[PublicKey, BinaryData],
     sighashType: Option[Int],
-    inputIndex: Option[Long],
-    useInIndex: Boolean = false
+    inputIndex: Option[Long]
   )
 
   case class PartiallySignedTransaction(
@@ -24,8 +23,7 @@ object PSBT {
     redeemScripts: Seq[Seq[ScriptElt]],
     witnessScripts: Seq[Seq[ScriptElt]],
     inputs: Seq[PartiallySignedInput],
-    bip32Data: Option[(PublicKey, KeyPath)],
-    useInIndex: Boolean = false
+    bip32Data: Option[(PublicKey, KeyPath)]
   )
 
   final val PSBD_MAGIC = 0x70736274
@@ -62,7 +60,7 @@ object PSBT {
     val data = BinaryData(new Array[Byte](dataLength.toInt))
     input.read(data)
 
-     readKeyValueMap(input) :+ MapEntry(key, data)
+    readKeyValueMap(input) :+ MapEntry(key, data)
   }
 
   private def keyType[T <: Enumeration](key: BinaryData, enumType: T): enumType.Value = {
@@ -80,6 +78,8 @@ object PSBT {
   def read(input: InputStream): PartiallySignedTransaction = {
     import GlobalTypes._
     import InputTypes._
+
+    var useInIndex = false
 
     val psbtMagic = uint32(input, ByteOrder.BIG_ENDIAN)
     val separator = uint8(input)
@@ -102,12 +102,18 @@ object PSBT {
 
     val redeemScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == RedeemScript).map { redeemScriptsEntry =>
       assert(redeemScriptsEntry.key.size == 21, s"Redeem script key has invalid size: ${redeemScriptsEntry.key.size}")
-      Script.parse(redeemScriptsEntry.value)
+      val scriptHash = redeemScriptsEntry.key.drop(1)
+      val redeemScript = Script.parse(redeemScriptsEntry.value)
+      assert(BinaryData(scriptHash) == Crypto.hash160(redeemScriptsEntry.value), "Provided hash160 does not match the redeemscript's hash160")
+      redeemScript
     }
 
     val witnessScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == WitnessScript).map { witnessScriptsEntry =>
       assert(witnessScriptsEntry.key.size == 33, s"Witness script key has invalid size: ${witnessScriptsEntry.key.size}")
-      Script.parse(witnessScriptsEntry.value)
+      val scriptHash = witnessScriptsEntry.key.drop(1)
+      val witnessScript = Script.parse(witnessScriptsEntry.value)
+      assert(BinaryData(scriptHash) == Crypto.hash256(witnessScriptsEntry.value), "Provided sha256 does not match the witnessscript's sha256")
+      witnessScript
     }
 
     val keyPaths = globalMap.find(el => keyType(el.key, GlobalTypes) == Bip32Data).map { mapEntry =>
@@ -123,7 +129,7 @@ object PSBT {
     }
 
     val psbis = inputMaps.map { inputMap =>
-      PartiallySignedInput(
+      val partiallySignedInput = PartiallySignedInput(
         inputMap.find(el => keyType(el.key, InputTypes) == WitnessUTXO).map { witnessUtxoEntry =>
           TxOut.read(witnessUtxoEntry.value)
         },
@@ -140,6 +146,16 @@ object PSBT {
           varint(inputIndexEntry.value.data.toArray)
         }
       )
+
+      if(useInIndex && partiallySignedInput.inputIndex.isEmpty){
+        throw new IllegalArgumentException("Input indexes being used but an input was provided without an index")
+      }
+
+      if(partiallySignedInput.inputIndex.isDefined){
+        useInIndex = true
+      }
+
+      partiallySignedInput
     }
 
     PartiallySignedTransaction(

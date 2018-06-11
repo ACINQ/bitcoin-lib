@@ -20,6 +20,11 @@ case class BinaryData(data: Seq[Byte]) {
   def length = data.length
 
   override def toString = toHexString(data)
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case BinaryData(someData) => data.toArray.deep == someData.data.toArray.deep
+    case _                    => false
+  }
 }
 
 object Protocol {
