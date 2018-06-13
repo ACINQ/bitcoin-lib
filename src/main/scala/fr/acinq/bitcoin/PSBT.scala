@@ -11,11 +11,11 @@ object PSBT {
   case class MapEntry(key: BinaryData, value: BinaryData)
 
   case class PartiallySignedInput(
-    witnessOutput:Option[TxOut],
-    nonWitnessOutput: Option[Transaction],
-    partialSigs: Map[PublicKey, BinaryData],
-    sighashType: Option[Int],
-    inputIndex: Option[Int]
+    witnessOutput:Option[TxOut] = None,
+    nonWitnessOutput: Option[Transaction] = None,
+    partialSigs: Map[PublicKey, BinaryData] = Map.empty,
+    sighashType: Option[Int] = None,
+    inputIndex: Option[Int] = None
   )
 
   case class PartiallySignedTransaction(
@@ -80,7 +80,7 @@ object PSBT {
     import GlobalTypes._
     import InputTypes._
 
-    var useInIndex = false
+    var useInputIndex = false
 
     val psbtMagic = uint32(input, ByteOrder.BIG_ENDIAN)
     val separator = uint8(input)
@@ -124,10 +124,10 @@ object PSBT {
 
     val numberOfInputs = globalMap.find(el => keyType(el.key, GlobalTypes) == PSBTInputsNumber) match {
       case Some(psbtInputsNumberEntry) => varint(psbtInputsNumberEntry.value)
-      case None                        => 0
+      case None                        => -1
     }
 
-    val psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
+    var psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
       val partiallySignedInput = PartiallySignedInput(
         inputMap.find(el => keyType(el.key, InputTypes) == WitnessUTXO).map { witnessUtxoEntry =>
           TxOut.read(witnessUtxoEntry.value)
@@ -146,26 +146,43 @@ object PSBT {
         }
       )
 
-      if(useInIndex && partiallySignedInput.inputIndex.isEmpty){
+      //If indexes are being used, make sure this input has one
+      if(useInputIndex && partiallySignedInput.inputIndex.isEmpty){
         throw new IllegalArgumentException("Input indexes being used but an input was provided without an index")
       }
 
       if(partiallySignedInput.inputIndex.isDefined){
-        useInIndex = true
+        useInputIndex = true
       }
 
+      //If the P2PKH UTXO is defined it must match the input's outpoint
       partiallySignedInput.nonWitnessOutput.map { prevTx =>
         assert(tx.txIn(partiallySignedInput.inputIndex.getOrElse(index)).outPoint.hash == prevTx.hash, "Provided non witness utxo does not match the required utxo for input")
       }
 
+      //If no index is provided we use the parsing order
       partiallySignedInput.inputIndex match {
         case None => partiallySignedInput.copy(inputIndex = Some(index))
         case _    => partiallySignedInput
       }
     }
 
-    //FIXME this check should keep in account already finalized (signed) inputs
-    assert(tx.txIn.filterNot(txIn => !txIn.hasSigScript || !txIn.hasWitness).size == psbis.size, s"The number of inputs provided (${psbis.size}) does not match the inputs in the transaction (${tx.txIn.size})")
+    // Make sure that the number of separators - 1 matches the number of inputs
+    // 'psbis' is the result of the parsing, separator-delimited
+    if(useInputIndex){
+      assert(numberOfInputs == psbis.size,"Number of inputs specified in 'global' does not match actual number of inputs in the PSBT")
+    }
+
+    // If indexes are being used, add a bunch of empty inputs to the input vector so that it matches the number of inputs in the transaction
+    if(useInputIndex && tx.txIn.size > psbis.size){
+      val diff = tx.txIn.size - psbis.size
+      psbis = psbis ++ ( for(i <- 0 to (diff - 1)) yield PartiallySignedInput(inputIndex = Some(psbis.size + i)) )
+      val allHaveIndex = psbis.foldLeft(true)((acc, psbi) => acc && psbi.inputIndex.isDefined)
+      //TODO not in the spec?
+      assert(allHaveIndex, "If indexes are being used, all inputs must have index")
+    }
+
+    assert(tx.txIn.size == psbis.size, s"The inputs provided (${psbis.size}) does not match the inputs in the transaction (${tx.txIn.size})")
 
     PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths)
   }

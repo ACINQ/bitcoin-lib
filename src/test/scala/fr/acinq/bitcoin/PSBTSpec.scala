@@ -65,8 +65,8 @@ class PSBTSpec extends FlatSpec{
     // PSBT with one P2PKH input and one P2SH-P2WPKH input with only the first input signed, finalized, and skipped. Input indexes are used.
     val fifthPSBT = PSBT.read("70736274ff0100fd0a010200000002ab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be4000000006a47304402204759661797c01b036b25928948686218347d89864b719e1f7fcf57d1e511658702205309eabf56aa4d8891ffd111fdf1336f3a29da866d7f8486d75546ceedaf93190121035cdc61fc7ba971c0b501a646a2a83b102cb43881217ca682dc86e2d73fa88292feffffffab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be40100000000feffffff02603bea0b000000001976a914768a40bbd740cbe81d988e71de2a4d5c71396b1d88ac8e240000000000001976a9146f4620b553fa095e721b9ee0efe9fa039cca459788ac0000000015013545e6e33b832c47050f24d3eeb93c9c03948bc716001485d13537f2e265405a34dbafa9e3dda01fb82308010401010001012000e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc7870104010100")
 
-    assert(fifthPSBT.tx.txIn.size == 2) //TX has 2 inputs but the first one is skipped
-    assert(fifthPSBT.inputs.size == 1)  //because it's already finalized, so it isn't included in the PSBT inputs
+    assert(fifthPSBT.tx.txIn.size == 2) //TX has 2 inputs
+    assert(fifthPSBT.inputs.size == 2)  //Originally there is only one PSBT inputs but a new empty one must be added by the parser
 
   }
 
