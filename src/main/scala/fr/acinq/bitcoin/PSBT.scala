@@ -16,7 +16,8 @@ object PSBT {
     nonWitnessOutput: Option[Transaction] = None,
     partialSigs: Map[PublicKey, BinaryData] = Map.empty,
     sighashType: Option[Int] = None,
-    inputIndex: Option[Int] = None
+    inputIndex: Option[Int] = None,
+    unknowns: Seq[MapEntry] = Seq.empty
   )
 
   case class PartiallySignedTransaction(
@@ -24,7 +25,8 @@ object PSBT {
     redeemScripts: Seq[Seq[ScriptElt]],
     witnessScripts: Seq[Seq[ScriptElt]],
     inputs: Seq[PartiallySignedInput],
-    bip32Data: Option[(PublicKey, KeyPath)]
+    bip32Data: Option[(PublicKey, KeyPath)],
+    unknowns: Seq[MapEntry] = Seq.empty
   )
 
   final val PSBD_MAGIC = 0x70736274
@@ -73,11 +75,14 @@ object PSBT {
     enumType(key.head)
   }
 
+  private def isKeyUnknown[T <: Enumeration](key: BinaryData, enumType: T): Boolean = {
+    !enumType.values.map(_.id).contains(key.head) // { 0x00, 0x01, 0x02, 0x03, 0x04 }
+  }
+
   def read(input: String): PartiallySignedTransaction = {
     read(new ByteArrayInputStream(BinaryData(input)))
   }
 
-  //TODO add unknowns
   def read(input: InputStream): PartiallySignedTransaction = {
     import GlobalTypes._
     import InputTypes._
@@ -129,6 +134,8 @@ object PSBT {
       case None                        => -1
     }
 
+    val globalUnknowns = globalMap.filter(el => isKeyUnknown(el.key, GlobalTypes))
+
     var psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
       val partiallySignedInput = PartiallySignedInput(
         inputMap.find(el => keyType(el.key, InputTypes) == WitnessUTXO).map { witnessUtxoEntry =>
@@ -145,7 +152,8 @@ object PSBT {
         },
         inputMap.find(el => keyType(el.key, InputTypes) == InputIndex).map { inputIndexEntry =>
           varint(inputIndexEntry.value.data.toArray).toInt
-        }
+        },
+        inputMap.filter(el => isKeyUnknown(el.key, InputTypes))
       )
 
       //If indexes are being used, make sure this input has one
@@ -186,7 +194,7 @@ object PSBT {
 
     assert(tx.txIn.size == psbis.size, s"The inputs provided (${psbis.size}) does not match the inputs in the transaction (${tx.txIn.size})")
 
-    PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths)
+    PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths, globalUnknowns)
   }
 
   def write(psbt: PartiallySignedTransaction, out: OutputStream)= ???
