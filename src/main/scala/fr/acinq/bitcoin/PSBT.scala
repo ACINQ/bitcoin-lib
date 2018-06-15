@@ -6,6 +6,7 @@ import Protocol._
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
+import scala.annotation.tailrec
 
 object PSBT {
 
@@ -50,11 +51,11 @@ object PSBT {
   }
 
   //Reads a list of key values, terminated by 0x00
-  //TODO make it tail-recursive
-  private def readKeyValueMap(input: InputStream): Seq[MapEntry] = {
+  @tailrec
+  private def readKeyValueMap(input: InputStream, acc: Seq[MapEntry] = Seq.empty): Seq[MapEntry] = {
     val keyLength = varint(input)
     if(keyLength == SEPARATOR) {
-      return Nil
+      return acc
     }
 
     val key = BinaryData(new Array[Byte](keyLength.toInt))
@@ -64,7 +65,7 @@ object PSBT {
     val data = BinaryData(new Array[Byte](dataLength.toInt))
     input.read(data)
 
-    readKeyValueMap(input) :+ MapEntry(key, data)
+    readKeyValueMap(input, acc :+ MapEntry(key, data))
   }
 
   private def keyType[T <: Enumeration](key: BinaryData, enumType: T): enumType.Value = {
