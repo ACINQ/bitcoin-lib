@@ -67,6 +67,16 @@ class PSBTSpec extends FlatSpec{
 
     assert(fifthPSBT.tx.txIn.size == 2) //TX has 2 inputs
     assert(fifthPSBT.inputs.size == 2)  //Originally there is only one PSBT inputs but a new empty one must be added by the parser
+    //assert(fifthPSBT.inputs(0).inputIndex == Some(0)) // FAIL!! Shouldn't we ensure the specified index is unique?
+    //assert(fifthPSBT.inputs(1).inputIndex == Some(1)) // FAIL!!
+
+    // PSBT with one P2SH-P2WSH input of a 2-of-2 multisig, redeemScript, witnessScript, and keypaths are available. Contains one signature.
+    val sixthPSBT = PSBT.read("70736274ff0100550200000001279a2323a5dfb51fc45f220fa58b0fc13e1e3342792a85d7e36cd6333b5cbc390000000000ffffffff01a05aea0b000000001976a914ffe9c0061097cc3b636f2cb0460fa4fc427d2b4588ac0000000015016345200f68d189e1adc0df1c4d16ea8f14c0dbeb220020771fd18ad459666dd49f3d564e3dbc42f4c84774e360ada16816a8ed488d56812102771fd18ad459666dd49f3d564e3dbc42f4c84774e360ada16816a8ed488d568147522103b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd462103de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd52ae220303b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd4610b4a6ba67000000800000008004000080220303de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd10b4a6ba67000000800000008005000080000100fd51010200000002f1d8d4b1acab9217bcbd0a09e37876efd79cf753baa2b2362e7d429c0deafbf5000000006a47304402202f29ddfff387626cf43fcae483456fb9d12d7f50fb10b39c245bab238d960d6502200f32fa3197dc6aa1fc870e33d8c590378862ce0b9bf6be865d5aac0a7390ae3a012102ead596687ca806043edc3de116cdf29d5e9257c196cd055cf698c8d02bf24e99fefffffff1d8d4b1acab9217bcbd0a09e37876efd79cf753baa2b2362e7d429c0deafbf5010000006b483045022100dc3bc94086fd7d48102a8290c737e27841bc1ce587fd4d9efe96a37d88c03a6502206dea717b8225b4ae9e1624bfc02927edac222ee094bf009996d9d0305d7645f501210394f62be9df19952c5587768aeb7698061ad2c4a25c894f47d8c162b4d7213d05feffffff01955eea0b0000000017a9146345200f68d189e1adc0df1c4d16ea8f14c0dbeb87fb2e1300220203b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd4646304302200424b58effaaa694e1559ea5c93bbfd4a89064224055cdf070b6771469442d07021f5c8eb0fea6516d60b8acb33ad64ede60e8785bfb3aa94b99bdf86151db9a9a0100")
+
+    assert(sixthPSBT.bip32Data.isDefined)
+    assert(sixthPSBT.redeemScripts.nonEmpty)
+    assert(sixthPSBT.witnessScripts.nonEmpty)
+    assert(sixthPSBT.inputs.head.partialSigs.size == 1)
 
   }
 

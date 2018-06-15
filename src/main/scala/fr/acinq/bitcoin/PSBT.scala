@@ -4,6 +4,7 @@ import java.io.{ByteArrayInputStream, InputStream, OutputStream}
 import java.nio.ByteOrder
 import Protocol._
 import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
 
 object PSBT {
@@ -47,6 +48,7 @@ object PSBT {
   }
 
   //Reads a list of key values, terminated by 0x00
+  //TODO make it tail-recursive
   private def readKeyValueMap(input: InputStream): Seq[MapEntry] = {
     val keyLength = varint(input)
     if(keyLength == SEPARATOR) {
@@ -101,17 +103,17 @@ object PSBT {
 
     val redeemScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == RedeemScript).map { redeemScriptsEntry =>
       assert(redeemScriptsEntry.key.size == 21, s"Redeem script key has invalid size: ${redeemScriptsEntry.key.size}")
-      val scriptHash = redeemScriptsEntry.key.drop(1)
+      val scriptHash = BinaryData(redeemScriptsEntry.key.drop(1))
       val redeemScript = Script.parse(redeemScriptsEntry.value)
-      assert(BinaryData(scriptHash) == Crypto.hash160(redeemScriptsEntry.value), "Provided hash160 does not match the redeemscript's hash160")
+      assert(scriptHash == hash160(redeemScriptsEntry.value), "Provided hash160 does not match the redeemscript's hash160")
       redeemScript
     }
 
     val witnessScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == WitnessScript).map { witnessScriptsEntry =>
       assert(witnessScriptsEntry.key.size == 33, s"Witness script key has invalid size: ${witnessScriptsEntry.key.size}")
-      val scriptHash = witnessScriptsEntry.key.drop(1)
+      val scriptHash = BinaryData(witnessScriptsEntry.key.drop(1))
       val witnessScript = Script.parse(witnessScriptsEntry.value)
-      assert(BinaryData(scriptHash) == Crypto.hash256(witnessScriptsEntry.value), "Provided sha256 does not match the witnessscript's sha256")
+      assert(scriptHash == sha256(witnessScriptsEntry.value), "Provided sha256 does not match the witnessscript's sha256")
       witnessScript
     }
 
@@ -174,7 +176,7 @@ object PSBT {
     }
 
     // If indexes are being used, add a bunch of empty inputs to the input vector so that it matches the number of inputs in the transaction
-    if(useInputIndex && tx.txIn.size > psbis.size){
+    if(useInputIndex && tx.txIn.size > psbis.size) {
       val diff = tx.txIn.size - psbis.size
       psbis = psbis ++ ( for(i <- 0 to (diff - 1)) yield PartiallySignedInput(inputIndex = Some(psbis.size + i)) )
       val allHaveIndex = psbis.foldLeft(true)((acc, psbi) => acc && psbi.inputIndex.isDefined)
