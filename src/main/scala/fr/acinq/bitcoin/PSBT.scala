@@ -198,6 +198,70 @@ object PSBT {
     PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths, globalUnknowns)
   }
 
-  def write(psbt: PartiallySignedTransaction, out: OutputStream)= ???
+  def writeKeyValue(entry: MapEntry, out: OutputStream): Unit = {
+    val keyLength = entry.key.size
+    writeVarint(keyLength, out)
+    writeBytes(entry.key, out)
+
+    val valueLength = entry.value.size
+    writeVarint(valueLength, out)
+    writeBytes(entry.value, out)
+  }
+
+  def write(psbt: PartiallySignedTransaction, out: OutputStream): Unit = {
+    import GlobalTypes._
+    import InputTypes._
+
+    writeUInt32(PSBD_MAGIC, out, ByteOrder.BIG_ENDIAN)
+    writeUInt8(HEADER_SEPARATOR, out)
+
+    val txEntry = MapEntry(Seq(TransactionType.id.toByte), Transaction.write(psbt.tx))
+    val redeemScriptEntries = psbt.redeemScripts.map { redeemScript =>
+      MapEntry(Seq(RedeemScript.id.byteValue) ++ hash160(Script.write(redeemScript)), Script.write(redeemScript))
+    }
+
+    val witnessScriptEntries = psbt.witnessScripts.map { witScript =>
+      MapEntry(Seq(WitnessScript.id.byteValue) ++ sha256(Script.write(witScript)), Script.write(witScript))
+    }
+
+    val bip32Data = psbt.bip32Data.map { data =>
+      MapEntry(Seq(Bip32Data.id.byteValue) ++ data._1.data, data._2.map(writeUInt32).flatten)
+    }
+
+    //Write number of inputs?
+    val numberOfInputs = MapEntry(
+      key = Seq(PSBTInputsNumber.id.byteValue),
+      value = writeVarint(psbt.inputs.size)
+    )
+
+    writeKeyValue(txEntry, out)
+    redeemScriptEntries.foreach(writeKeyValue(_, out))
+    witnessScriptEntries.foreach(writeKeyValue(_, out))
+    bip32Data.foreach(writeKeyValue(_, out))
+    writeKeyValue(numberOfInputs, out)
+    psbt.unknowns.map(writeKeyValue(_, out))
+
+    writeUInt8(SEPARATOR, out)
+
+    psbt.inputs.foreach { input =>
+
+      val nonWitOut = input.nonWitnessOutput.map(tx => MapEntry(Seq(NonWitnessUTXO.id.byteValue), Transaction.write(tx)))
+      val witnessOut = input.witnessOutput.map(out => MapEntry(Seq(WitnessUTXO.id.byteValue), TxOut.write(out)))
+      val partialSig = input.partialSigs.map { case (pk, sig) => MapEntry(Seq(PartialSignature.id.byteValue) ++ pk.data, sig) }
+      val sigHashType = input.sighashType.map( sigHash => MapEntry(Seq(SighashType.id.byteValue), writeUInt32(sigHash, ByteOrder.LITTLE_ENDIAN)))
+      val inputIndex = input.inputIndex.map( idx => MapEntry(Seq(InputIndex.id.byteValue), writeVarint(idx)) )
+
+      nonWitOut.map(writeKeyValue(_, out))
+      witnessOut.map(writeKeyValue(_, out))
+      partialSig.map(writeKeyValue(_, out))
+      sigHashType.map(writeKeyValue(_, out))
+      inputIndex.map(writeKeyValue(_, out))
+      input.unknowns.map(writeKeyValue(_, out))
+
+      writeUInt8(SEPARATOR, out)
+
+    }
+
+  }
 
 }
