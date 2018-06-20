@@ -158,6 +158,11 @@ object PSBT {
         inputMap.filter(el => isKeyUnknown(el.key, InputTypes))
       )
 
+      //If this is not the first input and it has an input index, make sure all use inputs
+      if(!useInputIndex && index != 0 && partiallySignedInput.inputIndex.isDefined){
+        throw new IllegalArgumentException("Input indexes being used but an input was provided without an index")
+      }
+
       //If indexes are being used, make sure this input has one
       if(useInputIndex && partiallySignedInput.inputIndex.isEmpty){
         throw new IllegalArgumentException("Input indexes being used but an input was provided without an index")
@@ -189,9 +194,6 @@ object PSBT {
     if(useInputIndex && tx.txIn.size > psbis.size) {
       val diff = tx.txIn.size - psbis.size
       psbis = psbis ++ ( for(i <- 0 to (diff - 1)) yield PartiallySignedInput(inputIndex = Some(psbis.size + i)) )
-      val allHaveIndex = psbis.foldLeft(true)((acc, psbi) => acc && psbi.inputIndex.isDefined)
-      //TODO not in the spec?
-      assert(allHaveIndex, "If indexes are being used, all inputs must have index")
     }
 
     assert(tx.txIn.size == psbis.size, s"The inputs provided (${psbis.size}) does not match the inputs in the transaction (${tx.txIn.size})")
