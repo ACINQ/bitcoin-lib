@@ -27,6 +27,7 @@ object PSBT {
     witnessScripts: Seq[Seq[ScriptElt]],
     inputs: Seq[PartiallySignedInput],
     bip32Data: Option[(PublicKey, KeyPath)],
+    numberOfInputs: Long,
     unknowns: Seq[MapEntry] = Seq.empty
   )
 
@@ -132,7 +133,7 @@ object PSBT {
 
     val numberOfInputs = globalMap.find(el => keyType(el.key, GlobalTypes) == PSBTInputsNumber) match {
       case Some(psbtInputsNumberEntry) => varint(psbtInputsNumberEntry.value)
-      case None                        => -1
+      case None                        => 0
     }
 
     val globalUnknowns = globalMap.filter(el => isKeyUnknown(el.key, GlobalTypes))
@@ -181,7 +182,7 @@ object PSBT {
     // Make sure that the number of separators - 1 matches the number of inputs
     // 'psbis' is the result of the parsing, separator-delimited
     if(useInputIndex){
-      assert(numberOfInputs == psbis.size,"Number of inputs specified in 'global' does not match actual number of inputs in the PSBT")
+      assert(numberOfInputs == psbis.size,s"Number of inputs specified in 'global' ($numberOfInputs) does not match actual number of inputs in the PSBT (${psbis.size})")
     }
 
     // If indexes are being used, add a bunch of empty inputs to the input vector so that it matches the number of inputs in the transaction
@@ -195,10 +196,10 @@ object PSBT {
 
     assert(tx.txIn.size == psbis.size, s"The inputs provided (${psbis.size}) does not match the inputs in the transaction (${tx.txIn.size})")
 
-    PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths, globalUnknowns)
+    PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths, numberOfInputs, globalUnknowns)
   }
 
-  def writeKeyValue(entry: MapEntry, out: OutputStream): Unit = {
+  private def writeKeyValue(entry: MapEntry, out: OutputStream): Unit = {
     val keyLength = entry.key.size
     writeVarint(keyLength, out)
     writeBytes(entry.key, out)
@@ -216,6 +217,7 @@ object PSBT {
     writeUInt8(HEADER_SEPARATOR, out)
 
     val txEntry = MapEntry(Seq(TransactionType.id.toByte), Transaction.write(psbt.tx))
+
     val redeemScriptEntries = psbt.redeemScripts.map { redeemScript =>
       MapEntry(Seq(RedeemScript.id.byteValue) ++ hash160(Script.write(redeemScript)), Script.write(redeemScript))
     }
@@ -228,17 +230,16 @@ object PSBT {
       MapEntry(Seq(Bip32Data.id.byteValue) ++ data._1.data, data._2.map(writeUInt32).flatten)
     }
 
-    //Write number of inputs?
-    val numberOfInputs = MapEntry(
-      key = Seq(PSBTInputsNumber.id.byteValue),
-      value = writeVarint(psbt.inputs.size)
-    )
+    val numberOfInputs = psbt.numberOfInputs match {
+      case i if i > 0 => Some(MapEntry(Seq(PSBTInputsNumber.id.byteValue), writeVarint(psbt.inputs.size)))
+      case _          => None
+    }
 
     writeKeyValue(txEntry, out)
     redeemScriptEntries.foreach(writeKeyValue(_, out))
     witnessScriptEntries.foreach(writeKeyValue(_, out))
     bip32Data.foreach(writeKeyValue(_, out))
-    writeKeyValue(numberOfInputs, out)
+    numberOfInputs.map(writeKeyValue(_, out))
     psbt.unknowns.map(writeKeyValue(_, out))
 
     writeUInt8(SEPARATOR, out)
