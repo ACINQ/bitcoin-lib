@@ -69,12 +69,12 @@ object PSBT {
     readKeyValueMap(input, acc :+ MapEntry(key, data))
   }
 
-  private def keyType[T <: Enumeration](key: BinaryData, enumType: T): enumType.Value = {
-    if(key.length == 0) {
-      throw new IllegalArgumentException("zero length PSBT key encountered")
-    }
+  private def isGlobalKey(keyType: GlobalTypes.Value) = { entry: MapEntry =>
+    !isKeyUnknown(entry.key, GlobalTypes) && GlobalTypes(entry.key.head) == keyType
+  }
 
-    enumType(key.head)
+  private def isInputKey(keyType: InputTypes.Value) = { entry: MapEntry =>
+    !isKeyUnknown(entry.key, InputTypes) && InputTypes(entry.key.head) == keyType
   }
 
   private def isKeyUnknown[T <: Enumeration](key: BinaryData, enumType: T): Boolean = {
@@ -103,12 +103,12 @@ object PSBT {
       inputMaps = inputMaps :+ readKeyValueMap(input)
     }
 
-    val tx = globalMap.find(el => keyType(el.key, GlobalTypes) == TransactionType) match {
+    val tx = globalMap.find(isGlobalKey(TransactionType)) match {
       case Some(entry) => Transaction.read(entry.value)
       case None        => throw new IllegalArgumentException("PSBT requires one key-value entry for type Transaction")
     }
 
-    val redeemScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == RedeemScript).map { redeemScriptsEntry =>
+    val redeemScripts = globalMap.filter(isGlobalKey(RedeemScript)).map { redeemScriptsEntry =>
       assert(redeemScriptsEntry.key.size == 21, s"Redeem script key has invalid size: ${redeemScriptsEntry.key.size}")
       val scriptHash = BinaryData(redeemScriptsEntry.key.drop(1))
       val redeemScript = Script.parse(redeemScriptsEntry.value)
@@ -116,7 +116,7 @@ object PSBT {
       redeemScript
     }
 
-    val witnessScripts = globalMap.filter(el => keyType(el.key, GlobalTypes) == WitnessScript).map { witnessScriptsEntry =>
+    val witnessScripts = globalMap.filter(isGlobalKey(WitnessScript)).map { witnessScriptsEntry =>
       assert(witnessScriptsEntry.key.size == 33, s"Witness script key has invalid size: ${witnessScriptsEntry.key.size}")
       val scriptHash = BinaryData(witnessScriptsEntry.key.drop(1))
       val witnessScript = Script.parse(witnessScriptsEntry.value)
@@ -124,14 +124,14 @@ object PSBT {
       witnessScript
     }
 
-    val keyPaths = globalMap.find(el => keyType(el.key, GlobalTypes) == Bip32Data).map { mapEntry =>
+    val keyPaths = globalMap.find(isGlobalKey(Bip32Data)).map { mapEntry =>
       val pubKey = PublicKey(mapEntry.key.drop(1))
       assert(Crypto.isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
       val derivationPaths = mapEntry.value.sliding(4).map(bytes => uint32(BinaryData(bytes), ByteOrder.LITTLE_ENDIAN))
       (pubKey, KeyPath(derivationPaths.toSeq))
     }
 
-    val numberOfInputs = globalMap.find(el => keyType(el.key, GlobalTypes) == PSBTInputsNumber) match {
+    val numberOfInputs = globalMap.find(isGlobalKey(PSBTInputsNumber)) match {
       case Some(psbtInputsNumberEntry) => varint(psbtInputsNumberEntry.value)
       case None                        => 0
     }
@@ -140,19 +140,19 @@ object PSBT {
 
     var psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
       val partiallySignedInput = PartiallySignedInput(
-        inputMap.find(el => keyType(el.key, InputTypes) == WitnessUTXO).map { witnessUtxoEntry =>
+        inputMap.find(isInputKey(WitnessUTXO)).map { witnessUtxoEntry =>
           TxOut.read(witnessUtxoEntry.value)
         },
-        inputMap.find(el => keyType(el.key, InputTypes) == NonWitnessUTXO).map { nonWitnessUtxoEntry =>
+        inputMap.find(isInputKey(NonWitnessUTXO)).map { nonWitnessUtxoEntry =>
           Transaction.read(nonWitnessUtxoEntry.value)
         },
-        inputMap.filter(el => keyType(el.key, InputTypes) == PartialSignature).map { partSigEntry =>
+        inputMap.filter(isInputKey(PartialSignature)).map { partSigEntry =>
           PublicKey(partSigEntry.key.drop(1)) -> partSigEntry.value
         }.toMap,
-        inputMap.find(el => keyType(el.key, InputTypes) == SighashType).map { sigHashEntry =>
+        inputMap.find(isInputKey(SighashType)).map { sigHashEntry =>
           uint32(sigHashEntry.value, ByteOrder.LITTLE_ENDIAN).toInt
         },
-        inputMap.find(el => keyType(el.key, InputTypes) == InputIndex).map { inputIndexEntry =>
+        inputMap.find(isInputKey(InputIndex)).map { inputIndexEntry =>
           varint(inputIndexEntry.value.data.toArray).toInt
         },
         inputMap.filter(el => isKeyUnknown(el.key, InputTypes))
