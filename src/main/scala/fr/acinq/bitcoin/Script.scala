@@ -299,16 +299,12 @@ object Script {
 
   def isPayToScript(script: Array[Byte]): Boolean = script.length == 23 && script(0) == elt2code(OP_HASH160).toByte && script(1) == 0x14 && script(22) == elt2code(OP_EQUAL).toByte
 
-  def removeSignature(script: List[ScriptElt], signature: BinaryData): (List[ScriptElt], Boolean) = {
+  def removeSignature(script: List[ScriptElt], signature: BinaryData): List[ScriptElt] = {
     val toRemove = OP_PUSHDATA(signature)
-    (script.filterNot(_ == toRemove), script.contains(toRemove))
+    script.filterNot(_ == toRemove)
   }
 
-  def removeSignatures(script: List[ScriptElt], sigs: List[BinaryData]): (List[ScriptElt], Int) = sigs.foldLeft((script, 0)) {
-    case (acc, sig) =>
-      val (updated, found) = removeSignature(acc._1, sig)
-      (updated, if (found) acc._2 + 1 else acc._2)
-  }
+  def removeSignatures(script: List[ScriptElt], sigs: List[BinaryData]): List[ScriptElt] = sigs.foldLeft(script)(removeSignature)
 
   def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int): Boolean = {
     // There are two kinds of nLockTime: lock-by-blockheight
@@ -633,9 +629,12 @@ object Script {
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
             // remove signature from script
-            val (scriptCode1, removed) = if (signatureVersion == SigVersion.SIGVERSION_BASE) removeSignature(scriptCode, sigBytes) else (scriptCode, false)
-            if (removed && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0)
-              throw new RuntimeException("Signature is found in scriptCode")
+            val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
+              val scriptCode1 = removeSignature(scriptCode, sigBytes)
+              if (scriptCode1.length != scriptCode.length && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0)
+                throw new RuntimeException("Signature is found in scriptCode")
+              scriptCode1
+            } else scriptCode
             val success = checkSignature(pubKey, sigBytes, Script.write(scriptCode1), signatureVersion)
             if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
               require(sigBytes.isEmpty, "Signature must be zero for failed CHECKSIG operation")
@@ -666,13 +665,12 @@ object Script {
           val stack4 = stack3.drop(n + 1)
 
           // Drop the signature in pre-segwit scripts but not segwit scripts
-          val (scriptCode1, removed) = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
-            removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
-          } else {
-            (scriptCode, 0)
-          }
-          if (removed > 0 && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0)
-            throw new RuntimeException("Signature is found in scriptCode")
+          val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
+            val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+            if (scriptCode1.length != scriptCode.length && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0)
+              throw new RuntimeException("Signature is found in scriptCode")
+            scriptCode1
+          } else scriptCode
           val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode1), signatureVersion)
           if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
             sigs.foreach(sig => require(sig.isEmpty, "Signature must be zero for failed CHECKMULTISIG operation"))
