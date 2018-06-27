@@ -15,14 +15,14 @@ class KeyEncodingSpec extends FunSuite {
   implicit val format = DefaultFormats
 
   test("valid keys") {
-    val stream = classOf[KeyEncodingSpec].getResourceAsStream("/data/key_io_valid.json")
+    val stream = classOf[KeyEncodingSpec].getResourceAsStream("/data/base58_keys_valid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
 
     json.extract[List[List[JValue]]].map(KeyEncodingSpec.check)
   }
 
   test("invalid keys") {
-    val stream = classOf[KeyEncodingSpec].getResourceAsStream("/data/key_io_invalid.json")
+    val stream = classOf[KeyEncodingSpec].getResourceAsStream("/data/base58_keys_invalid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
 
     json.extract[List[List[JValue]]].foreach {
