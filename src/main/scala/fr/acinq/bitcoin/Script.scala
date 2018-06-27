@@ -90,6 +90,10 @@ object ScriptFlags {
   //
   val SCRIPT_VERIFY_WITNESS_PUBKEYTYPE = (1 << 15)
 
+  // Making OP_CODESEPARATOR and FindAndDelete fail any non-segwit scripts
+  //
+  val SCRIPT_VERIFY_CONST_SCRIPTCODE = (1 << 16)
+
   /**
     * Mandatory script verification flags that all new blocks must comply with for
     * them to be valid. (but old blocks may not comply with) Currently just P2SH,
@@ -120,7 +124,8 @@ object ScriptFlags {
     SCRIPT_VERIFY_LOW_S |
     SCRIPT_VERIFY_WITNESS |
     SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM |
-    SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
+    SCRIPT_VERIFY_WITNESS_PUBKEYTYPE |
+    SCRIPT_VERIFY_CONST_SCRIPTCODE
 
   /** For convenience, standard but not mandatory verify flags. */
   val STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS
@@ -509,6 +514,8 @@ object Script {
         case Nil if conditions.nonEmpty => throw new RuntimeException("IF/ENDIF imbalance")
         case Nil => stack
         case op :: _ if isDisabled(op) => throw new RuntimeException(s"$op isdisabled")
+        case OP_CODESEPARATOR :: _ if signatureVersion == SigVersion.SIGVERSION_BASE && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0 =>
+          throw new RuntimeException("Using OP_CODESEPARATOR in non-witness script")
         case OP_VERIF :: _ => throw new RuntimeException("OP_VERIF is always invalid")
         case OP_VERNOTIF :: _ => throw new RuntimeException("OP_VERNOTIF is always invalid")
         case OP_PUSHDATA(data, _) :: _ if data.size > MaxScriptElementSize => throw new RuntimeException("Push value size limit exceeded")
@@ -622,7 +629,12 @@ object Script {
         case OP_CHECKSIG :: tail => stack match {
           case pubKey :: sigBytes :: stacktail => {
             // remove signature from script
-            val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) removeSignature(scriptCode, sigBytes) else scriptCode
+            val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
+              val scriptCode1 = removeSignature(scriptCode, sigBytes)
+              if (scriptCode1.length != scriptCode.length && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0)
+                throw new RuntimeException("Signature is found in scriptCode")
+              scriptCode1
+            } else scriptCode
             val success = checkSignature(pubKey, sigBytes, Script.write(scriptCode1), signatureVersion)
             if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
               require(sigBytes.isEmpty, "Signature must be zero for failed CHECKSIG operation")
@@ -654,10 +666,11 @@ object Script {
 
           // Drop the signature in pre-segwit scripts but not segwit scripts
           val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
-            removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
-          } else {
-            scriptCode
-          }
+            val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+            if (scriptCode1.length != scriptCode.length && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0)
+              throw new RuntimeException("Signature is found in scriptCode")
+            scriptCode1
+          } else scriptCode
           val success = checkSignatures(pubKeys, sigs, Script.write(scriptCode1), signatureVersion)
           if (!success && (scriptFlag & SCRIPT_VERIFY_NULLFAIL) != 0) {
             sigs.foreach(sig => require(sig.isEmpty, "Signature must be zero for failed CHECKMULTISIG operation"))
