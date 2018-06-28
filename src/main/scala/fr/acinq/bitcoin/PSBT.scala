@@ -98,7 +98,7 @@ object PSBT {
   }
 
   def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
-    assert(psbtMap.map(_.key.head).distinct.size != psbtMap.size, "Duplicate keys not allowed") //TODO add the key
+    assert(psbtMap.size < 2 || psbtMap.size == psbtMap.map(_.key.head).distinct.size, "Duplicate keys not allowed") //TODO add the key
   }
 
   private def isGlobalKey(keyType: GlobalTypes.Value) = { entry: MapEntry =>
