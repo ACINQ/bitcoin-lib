@@ -66,21 +66,21 @@ class PSBTSpec extends FlatSpec{
     val fourthPSBT = PSBT.read64("cHNidP8BAKACAAAAAqsJSaCMWvfEm4IS9Bfi8Vqz9cM9zxU4IagTn4d6W3vkAAAAAAD+////qwlJoIxa98SbghL0F+LxWrP1wz3PFTghqBOfh3pbe+QBAAAAAP7///8CYDvqCwAAAAAZdqkUdopAu9dAy+gdmI5x3ipNXHE5ax2IrI4kAAAAAAAAGXapFG9GILVT+glechue4O/p+gOcykWXiKwAAAAAAAEA3wIAAAABJoFxNx7f8oXpN63upLN7eAAMBWbLs61kZBcTykIXG/YAAAAAakcwRAIgcLIkUSPmv0dNYMW1DAQ9TGkaXSQ18Jo0p2YqncJReQoCIAEynKnazygL3zB0DsA5BCJCLIHLRYOUV663b8Eu3ZWzASECZX0RjTNXuOD0ws1G23s59tnDjZpwq8ubLeXcjb/kzjH+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQEgAOH1BQAAAAAXqRQ1RebjO4MsRwUPJNPuuTycA5SLx4cBBBYAFIXRNTfy4mVAWjTbr6nj3aAfuCMIACICAurVlmh8qAYEPtw94RbN8p1eklfBls0FXPaYyNAr8k6ZELSmumcAAACAAAAAgAIAAIAAIgIDlPYr6d8ZlSxVh3aK63aYBhrSxKJciU9H2MFitNchPQUQtKa6ZwAAAIABAACAAgAAgAA=")
 
     assert(fourthPSBT.inputs.size == 2)
-    assert(fourthPSBT.tx.txIn(0).hasSigScript)  //first input is a signed P2PKH
-    assert(!fourthPSBT.tx.txIn(0).hasWitness)   //no witness data in here
-    assert(!fourthPSBT.tx.txIn(1).hasSigScript) //second input is not signed/finalized
-    assert(!fourthPSBT.tx.txIn(1).hasWitness)
+    assert(fourthPSBT.inputs(0).nonWitnessOutput.isDefined) //first input is P2PKH
+    assert(fourthPSBT.inputs(1).redeemScript.isDefined)     //second input is P2SH
+    assert(fourthPSBT.outputs.size == 2)
+    assert(fourthPSBT.outputs.head.bip32Data.nonEmpty)
+
+
 
     //PSBT with one P2SH-P2WSH input of a 2-of-2 multisig, redeemScript, witnessScript, and keypaths are available. Contains one signature.
     val fifthPSBT = PSBT.read64("cHNidP8BAFUCAAAAASeaIyOl37UfxF8iD6WLD8E+HjNCeSqF1+Ns1jM7XLw5AAAAAAD/////AaBa6gsAAAAAGXapFP/pwAYQl8w7Y28ssEYPpPxCfStFiKwAAAAAAAEA/VEBAgAAAALx2NSxrKuSF7y9CgnjeHbv15z3U7qisjYufUKcDer79QAAAABqRzBEAiAvKd3/84dibPQ/yuSDRW+50S1/UPsQs5wkW6sjjZYNZQIgDzL6MZfcaqH8hw4z2MWQN4hizgub9r6GXVqsCnOQrjoBIQLq1ZZofKgGBD7cPeEWzfKdXpJXwZbNBVz2mMjQK/JOmf7////x2NSxrKuSF7y9CgnjeHbv15z3U7qisjYufUKcDer79QEAAABrSDBFAiEA3DvJQIb9fUgQKoKQxzfieEG8HOWH/U2e/pajfYjAOmUCIG3qcXuCJbSunhYkv8ApJ+2sIi7glL8AmZbZ0DBddkX1ASEDlPYr6d8ZlSxVh3aK63aYBhrSxKJciU9H2MFitNchPQX+////AZVe6gsAAAAAF6kUY0UgD2jRieGtwN8cTRbqjxTA2+uH+y4TACICA7E0HMunaDtq9PEjjNbpfnFn1Wn6xH8eSNR1QYRDVb1GRjBDAiAEJLWO/6qmlOFVnqXJO7/UqJBkIkBVzfBwtncUaUQtBwIfXI6w/qZRbWC4rLM61k7eYOh4W/s6qUuZvfhhUduamgEBBCIAIHcf0YrUWWZt1J89Vk49vEL0yEd042CtoWgWqO1IjVaBAQVHUiEDsTQcy6doO2r08SOM1ul+cWfVafrEfx5I1HVBhENVvUYhA95V0eHayAXj+KWMH7+blMAvPbqv4Sf+/KSZXyb4IIO9Uq4iBgOxNBzLp2g7avTxI4zW6X5xZ9Vp+sR/HkjUdUGEQ1W9RhC0prpnAAAAgAAAAIAEAACAIgYD3lXR4drIBeP4pYwfv5uUwC89uq/hJ/78pJlfJvggg70QtKa6ZwAAAIAAAACABQAAgAAA")
 
-    assert(fifthPSBT.tx.txIn.size == 2) //TX has 2 inputs
-    assert(fifthPSBT.inputs.size == 2)  //Originally there is only one PSBT inputs but a new empty one must be added by the parser
-
-    // PSBT with one P2SH-P2WSH input of a 2-of-2 multisig, redeemScript, witnessScript, and keypaths are available. Contains one signature.
-//    val sixthPSBT = PSBT.read64("70736274ff0100550200000001279a2323a5dfb51fc45f220fa58b0fc13e1e3342792a85d7e36cd6333b5cbc390000000000ffffffff01a05aea0b000000001976a914ffe9c0061097cc3b636f2cb0460fa4fc427d2b4588ac0000000015016345200f68d189e1adc0df1c4d16ea8f14c0dbeb220020771fd18ad459666dd49f3d564e3dbc42f4c84774e360ada16816a8ed488d56812102771fd18ad459666dd49f3d564e3dbc42f4c84774e360ada16816a8ed488d568147522103b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd462103de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd52ae220303b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd4610b4a6ba67000000800000008004000080220303de55d1e1dac805e3f8a58c1fbf9b94c02f3dbaafe127fefca4995f26f82083bd10b4a6ba67000000800000008005000080000100fd51010200000002f1d8d4b1acab9217bcbd0a09e37876efd79cf753baa2b2362e7d429c0deafbf5000000006a47304402202f29ddfff387626cf43fcae483456fb9d12d7f50fb10b39c245bab238d960d6502200f32fa3197dc6aa1fc870e33d8c590378862ce0b9bf6be865d5aac0a7390ae3a012102ead596687ca806043edc3de116cdf29d5e9257c196cd055cf698c8d02bf24e99fefffffff1d8d4b1acab9217bcbd0a09e37876efd79cf753baa2b2362e7d429c0deafbf5010000006b483045022100dc3bc94086fd7d48102a8290c737e27841bc1ce587fd4d9efe96a37d88c03a6502206dea717b8225b4ae9e1624bfc02927edac222ee094bf009996d9d0305d7645f501210394f62be9df19952c5587768aeb7698061ad2c4a25c894f47d8c162b4d7213d05feffffff01955eea0b0000000017a9146345200f68d189e1adc0df1c4d16ea8f14c0dbeb87fb2e1300220203b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd4646304302200424b58effaaa694e1559ea5c93bbfd4a89064224055cdf070b6771469442d07021f5c8eb0fea6516d60b8acb33ad64ede60e8785bfb3aa94b99bdf86151db9a9a0100")
-//
-//    assert(sixthPSBT.inputs.head.partialSigs.size == 1)
+    assert(fifthPSBT.inputs.size == 1)  //
+    assert(fifthPSBT.inputs.head.bip32Data.size == 2)
+    assert(fifthPSBT.inputs.head.redeemScript.isDefined)
+    assert(fifthPSBT.inputs.head.witnessScript.isDefined)
+    assert(fifthPSBT.inputs.head.partialSigs.size == 1)
 
   }
 

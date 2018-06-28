@@ -12,9 +12,7 @@ object PSBT {
 
   type Script = Seq[ScriptElt]
 
-  case class MapEntry(key: BinaryData, value: BinaryData){
-    override def hashCode(): Int = uint32(hash256(key), ByteOrder.BIG_ENDIAN).toInt
-  }
+  case class MapEntry(key: BinaryData, value: BinaryData)
 
   case class PartiallySignedInput(
     nonWitnessOutput: Option[Transaction] = None,
@@ -23,7 +21,7 @@ object PSBT {
     witnessScript: Option[Script] = None,
     finalScriptSig: Option[Script] = None,
     finalScriptWitness: Option[ScriptWitness] = None,
-    bip32Data: Option[(PublicKey, KeyPath)] = None,
+    bip32Data: Map[PublicKey, KeyPath] = Map.empty,
     partialSigs: Map[PublicKey, BinaryData] = Map.empty,
     sighashType: Option[Int] = None,
     unknowns: Seq[MapEntry] = Seq.empty
@@ -32,7 +30,7 @@ object PSBT {
   case class PartiallySignedOutput(
     redeemScript: Option[Script],
     witnessScript: Option[Script],
-    bip32Data: Option[(PublicKey, KeyPath)],
+    bip32Data: Map[PublicKey, KeyPath],
     unknowns: Seq[MapEntry] = Seq.empty
   )
 
@@ -98,7 +96,8 @@ object PSBT {
   }
 
   def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
-    assert(psbtMap.size < 2 || psbtMap.size == psbtMap.map(_.key.head).distinct.size, "Duplicate keys not allowed") //TODO add the key
+    val setSmallerThanList = psbtMap.map(_.key).distinct.size < psbtMap.size
+    assert(psbtMap.size < 2 || !setSmallerThanList, "Duplicate keys not allowed") //TODO add the key
   }
 
   private def isGlobalKey(keyType: GlobalTypes.Value) = { entry: MapEntry =>
@@ -119,8 +118,8 @@ object PSBT {
 
   private def mapEntryToKeyPaths(entry: MapEntry):(PublicKey, KeyPath) = {
     val pubKey = PublicKey(entry.key.drop(1))
-    assert(Crypto.isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
-    val derivationPaths = entry.value.sliding(4).map(bytes => uint32(BinaryData(bytes), ByteOrder.LITTLE_ENDIAN))
+    assert(isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
+    val derivationPaths = entry.value.sliding(4).map(uint32(_, ByteOrder.LITTLE_ENDIAN))
     (pubKey, KeyPath(derivationPaths.toSeq))
   }
 
@@ -178,7 +177,7 @@ object PSBT {
         ScriptWitness.read(finScriptWitnessEntry.value)
       }
 
-      val hdKeyPath = inputMap.find(isInputKey(Bip32Data)).map(mapEntryToKeyPaths)
+      val hdKeyPath = inputMap.filter(isInputKey(Bip32Data)).map(mapEntryToKeyPaths).toMap
 
       val sigHash = inputMap.find(isInputKey(SighashType)).map { sigHashEntry =>
         uint32(sigHashEntry.value, ByteOrder.LITTLE_ENDIAN).toInt
@@ -197,7 +196,7 @@ object PSBT {
 
       val redeemScript = outputMap.find(isOutputKey(OutputTypes.RedeemScript)).map(mapEntryToScript)
       val witScript = outputMap.find(isOutputKey(OutputTypes.WitnessScript)).map(mapEntryToScript)
-      val hdKeyPaths = outputMap.find(isOutputKey(OutputTypes.Bip32Data)).map(mapEntryToKeyPaths)
+      val hdKeyPaths = outputMap.filter(isOutputKey(OutputTypes.Bip32Data)).map(mapEntryToKeyPaths).toMap
 
       PartiallySignedOutput(redeemScript, witScript, hdKeyPaths)
     }
