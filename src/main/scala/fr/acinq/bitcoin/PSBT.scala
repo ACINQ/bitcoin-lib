@@ -95,21 +95,9 @@ object PSBT {
     }
   }
 
-  def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
+  private def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
     val setSmallerThanList = psbtMap.map(_.key).distinct.size < psbtMap.size
     assert(psbtMap.size < 2 || !setSmallerThanList, "Duplicate keys not allowed") //TODO add the key
-  }
-
-  private def isGlobalKey(keyType: GlobalTypes.Value) = { entry: MapEntry =>
-    !isKeyUnknown(entry.key, GlobalTypes) && GlobalTypes(entry.key.head) == keyType
-  }
-
-  private def isInputKey(keyType: InputTypes.Value) = { entry: MapEntry =>
-    !isKeyUnknown(entry.key, InputTypes) && InputTypes(entry.key.head) == keyType
-  }
-
-  private def isOutputKey(keyType: OutputTypes.Value) = { entry: MapEntry =>
-    !isKeyUnknown(entry.key, OutputTypes) && OutputTypes(entry.key.head) == keyType
   }
 
   private def isKeyUnknown[T <: Enumeration](key: BinaryData, enumType: T): Boolean = {
@@ -140,7 +128,7 @@ object PSBT {
     //Read exactly one map for globals
     val globalMap = readKeyValueMap(input)
 
-    val tx = globalMap.find(isGlobalKey(TransactionType)) match {
+    val tx = globalMap.find(_.key.head == TransactionType.id) match {
       case Some(entry) => Transaction.read(entry.value)
       case None        => throw new IllegalArgumentException("PSBT requires one key-value entry for type Transaction")
     }
@@ -155,35 +143,35 @@ object PSBT {
     val inputMaps = readMaps(tx.txIn.size, input)
     val outputMaps = readMaps(tx.txOut.size, input)
 
-    //Assert there are no repeated entries within each maps's scope
+    //Assert there are no repeated keys within each maps's scope
     assertNoDuplicates(globalMap)
     inputMaps.foreach(assertNoDuplicates)
     outputMaps.foreach(assertNoDuplicates)
 
     val psbis = inputMaps.map { inputMap =>
 
-      val redeemOut = inputMap.find(isInputKey(NonWitnessUTXO)).map { nonWitnessUtxoEntry =>
+      val redeemOut = inputMap.find(_.key.head == NonWitnessUTXO.id).map { nonWitnessUtxoEntry =>
         Transaction.read(nonWitnessUtxoEntry.value)
       }
 
-      val witOut =  inputMap.find(isInputKey(WitnessUTXO)).map { witnessUtxoEntry =>
+      val witOut =  inputMap.find(_.key.head == WitnessUTXO.id).map { witnessUtxoEntry =>
         TxOut.read(witnessUtxoEntry.value)
       }
 
-      val redeemScript = inputMap.find(isInputKey(RedeemScript)).map(mapEntryToScript)
-      val witScript = inputMap.find(isInputKey(WitnessScript)).map(mapEntryToScript)
-      val finRedeemScript = inputMap.find(isInputKey(FinalScriptSig)).map(mapEntryToScript)
-      val finWitScript = inputMap.find(isInputKey(FinalScriptWitness)).map { finScriptWitnessEntry =>
+      val redeemScript = inputMap.find(_.key.head == RedeemScript.id).map(mapEntryToScript)
+      val witScript = inputMap.find(_.key.head == WitnessScript.id).map(mapEntryToScript)
+      val finRedeemScript = inputMap.find(_.key.head == FinalScriptSig.id).map(mapEntryToScript)
+      val finWitScript = inputMap.find(_.key.head == FinalScriptWitness.id).map { finScriptWitnessEntry =>
         ScriptWitness.read(finScriptWitnessEntry.value)
       }
 
-      val hdKeyPath = inputMap.filter(isInputKey(Bip32Data)).map(mapEntryToKeyPaths).toMap
+      val hdKeyPath = inputMap.filter(_.key.head == Bip32Data.id).map(mapEntryToKeyPaths).toMap
 
-      val sigHash = inputMap.find(isInputKey(SighashType)).map { sigHashEntry =>
+      val sigHash = inputMap.find(_.key.head == SighashType.id).map { sigHashEntry =>
         uint32(sigHashEntry.value, ByteOrder.LITTLE_ENDIAN).toInt
       }
 
-      val partialSig = inputMap.filter(isInputKey(PartialSignature)).map { partSigEntry =>
+      val partialSig = inputMap.filter(_.key.head == PartialSignature.id).map { partSigEntry =>
         PublicKey(partSigEntry.key.drop(1)) -> partSigEntry.value
       }.toMap
 
@@ -194,9 +182,9 @@ object PSBT {
 
     val psbtOuts = outputMaps.map { outputMap =>
 
-      val redeemScript = outputMap.find(isOutputKey(OutputTypes.RedeemScript)).map(mapEntryToScript)
-      val witScript = outputMap.find(isOutputKey(OutputTypes.WitnessScript)).map(mapEntryToScript)
-      val hdKeyPaths = outputMap.filter(isOutputKey(OutputTypes.Bip32Data)).map(mapEntryToKeyPaths).toMap
+      val redeemScript = outputMap.find(_.key.head == OutputTypes.RedeemScript.id).map(mapEntryToScript)
+      val witScript = outputMap.find(_.key.head == OutputTypes.WitnessScript.id).map(mapEntryToScript)
+      val hdKeyPaths = outputMap.filter(_.key.head == OutputTypes.Bip32Data.id).map(mapEntryToKeyPaths).toMap
 
       PartiallySignedOutput(redeemScript, witScript, hdKeyPaths)
     }
