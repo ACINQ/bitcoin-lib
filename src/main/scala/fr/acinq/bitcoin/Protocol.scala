@@ -20,6 +20,11 @@ case class BinaryData(data: Seq[Byte]) {
   def length = data.length
 
   override def toString = toHexString(data)
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case BinaryData(someData) => data.toArray.deep == someData.data.toArray.deep
+    case _                    => false
+  }
 }
 
 object Protocol {
@@ -32,6 +37,7 @@ object Protocol {
   def uint8(input: InputStream): Int = input.read()
 
   def writeUInt8(input: Int, out: OutputStream): Unit = out.write(input & 0xff)
+  def writeUInt8(input: Int): BinaryData = Array( (input & 0xff).toByte )
 
   def uint16(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Int = {
     val bin = new Array[Byte](2)
@@ -104,23 +110,24 @@ object Protocol {
     case 0xff => uint64(input)
   }
 
-  def writeVarint(input: Int, out: OutputStream): Unit = writeVarint(input.toLong, out)
-
-  def writeVarint(input: Long, out: OutputStream): Unit = {
-    if (input < 0xfdL) writeUInt8(input.toInt, out)
+  def writeVarint(input: Long): BinaryData = {
+    if (input < 0xfdL) {
+      writeUInt8(input.toInt)
+    }
     else if (input < 65535L) {
-      writeUInt8(0xfd, out)
-      writeUInt16(input.toInt, out)
+      writeUInt8(0xfd) ++ writeUInt16(input.toInt, ByteOrder.LITTLE_ENDIAN)
     }
     else if (input < 1048576L) {
-      writeUInt8(0xfe, out)
-      writeUInt32(input.toInt, out)
+      writeUInt8(0xfe) ++ writeUInt32(input.toInt)
     }
     else {
-      writeUInt8(0xff, out)
-      writeUInt64(input, out)
+      writeUInt8(0xff) ++ writeUInt64(input, ByteOrder.LITTLE_ENDIAN)
     }
   }
+
+  def writeVarint(input: Int, out: OutputStream): Unit = writeVarint(input.toLong, out)
+
+  def writeVarint(input: Long, out: OutputStream): Unit = out.write(writeVarint(input))
 
   def bytes(input: InputStream, size: Long): BinaryData = bytes(input, size.toInt)
 

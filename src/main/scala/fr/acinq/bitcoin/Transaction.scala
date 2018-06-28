@@ -105,6 +105,8 @@ case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long,
 
   def hasWitness: Boolean = witness.isNotNull
 
+  def hasSigScript: Boolean = !signatureScript.isEmpty
+
   override def serializer: BtcSerializer[TxIn] = TxIn
 }
 
