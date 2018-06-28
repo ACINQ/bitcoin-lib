@@ -10,24 +10,36 @@ import scala.annotation.tailrec
 
 object PSBT {
 
-  case class MapEntry(key: BinaryData, value: BinaryData)
+  type Script = Seq[ScriptElt]
+
+  case class MapEntry(key: BinaryData, value: BinaryData){
+    override def hashCode(): Int = uint32(hash256(key), ByteOrder.BIG_ENDIAN).toInt
+  }
 
   case class PartiallySignedInput(
-    witnessOutput:Option[TxOut] = None,
     nonWitnessOutput: Option[Transaction] = None,
+    witnessOutput:Option[TxOut] = None,
+    redeemScript: Option[Script] = None,
+    witnessScript: Option[Script] = None,
+    finalScriptSig: Option[Script] = None,
+    finalScriptWitness: Option[ScriptWitness] = None,
+    bip32Data: Option[(PublicKey, KeyPath)] = None,
     partialSigs: Map[PublicKey, BinaryData] = Map.empty,
     sighashType: Option[Int] = None,
-    inputIndex: Option[Int] = None,
+    unknowns: Seq[MapEntry] = Seq.empty
+  )
+
+  case class PartiallySignedOutput(
+    redeemScript: Option[Script],
+    witnessScript: Option[Script],
+    bip32Data: Option[(PublicKey, KeyPath)],
     unknowns: Seq[MapEntry] = Seq.empty
   )
 
   case class PartiallySignedTransaction(
     tx: Transaction,
-    redeemScripts: Seq[Seq[ScriptElt]],
-    witnessScripts: Seq[Seq[ScriptElt]],
     inputs: Seq[PartiallySignedInput],
-    bip32Data: Option[(PublicKey, KeyPath)],
-    numberOfInputs: Long,
+    outputs: Seq[PartiallySignedOutput],
     unknowns: Seq[MapEntry] = Seq.empty
   )
 
@@ -36,20 +48,27 @@ object PSBT {
   final val SEPARATOR = 0x00
 
   object GlobalTypes extends Enumeration {
-    val TransactionType = Value(0x00, "Transaction type")
-    val RedeemScript = Value(0x01, "Redeem script type")
-    val WitnessScript = Value(0x02, "Witness script type")
-    val Bip32Data = Value(0x03, "BIP32 data type")
-    val PSBTInputsNumber = Value(0x04, "Number of inputs of the PSBT type")
+    val TransactionType = Value(0x00, "Transaction")
   }
 
   object InputTypes extends Enumeration {
-    val NonWitnessUTXO = Value(0x00, "Non witness UTXO type")
-    val WitnessUTXO = Value(0x01, "Witness UTXO type")
-    val PartialSignature = Value(0x02, "Partial signature type")
-    val SighashType = Value(0x03, "Sighash type")
-    val InputIndex = Value(0x04, "Input index type")
+    val NonWitnessUTXO = Value(0x00, "Non witness UTXO")
+    val WitnessUTXO = Value(0x01, "Witness UTXO")
+    val PartialSignature = Value(0x02, "Partial signature")
+    val SighashType = Value(0x03, "Sighash")
+    val RedeemScript = Value(0x04, "Redeem script")
+    val WitnessScript = Value(0x05, "Witness script")
+    val Bip32Data = Value(0x06, "Keypath for HD keys")
+    val FinalScriptSig = Value(0x07, "Finalized scriptSig")
+    val FinalScriptWitness = Value(0x08, "Finalized witness script")
   }
+
+  object OutputTypes extends Enumeration {
+    val RedeemScript = Value(0x00, "Redeem script")
+    val WitnessScript = Value(0x01, "Witness script")
+    val Bip32Data = Value(0x02, "Keypath for HD keys")
+  }
+
 
   //Reads a list of key values, terminated by 0x00
   @tailrec
@@ -69,6 +88,19 @@ object PSBT {
     readKeyValueMap(input, acc :+ MapEntry(key, data))
   }
 
+  @tailrec
+  private def readMaps(counter: Int = 0, input: InputStream, acc: Seq[Seq[MapEntry]] = Seq.empty): Seq[Seq[MapEntry]] = {
+    if(counter > 0) {
+      readMaps(counter - 1, input, acc :+ readKeyValueMap(input))
+    } else {
+      acc
+    }
+  }
+
+  def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
+    assert(psbtMap.map(_.key.head).distinct.size != psbtMap.size, "Duplicate keys not allowed") //TODO add the key
+  }
+
   private def isGlobalKey(keyType: GlobalTypes.Value) = { entry: MapEntry =>
     !isKeyUnknown(entry.key, GlobalTypes) && GlobalTypes(entry.key.head) == keyType
   }
@@ -77,19 +109,30 @@ object PSBT {
     !isKeyUnknown(entry.key, InputTypes) && InputTypes(entry.key.head) == keyType
   }
 
+  private def isOutputKey(keyType: OutputTypes.Value) = { entry: MapEntry =>
+    !isKeyUnknown(entry.key, OutputTypes) && OutputTypes(entry.key.head) == keyType
+  }
+
   private def isKeyUnknown[T <: Enumeration](key: BinaryData, enumType: T): Boolean = {
     !enumType.values.map(_.id).contains(key.head) // { 0x00, 0x01, 0x02, 0x03, 0x04 }
   }
 
-  def read(input: String): PartiallySignedTransaction = {
-    read(new ByteArrayInputStream(BinaryData(input)))
+  private def mapEntryToKeyPaths(entry: MapEntry):(PublicKey, KeyPath) = {
+    val pubKey = PublicKey(entry.key.drop(1))
+    assert(Crypto.isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
+    val derivationPaths = entry.value.sliding(4).map(bytes => uint32(BinaryData(bytes), ByteOrder.LITTLE_ENDIAN))
+    (pubKey, KeyPath(derivationPaths.toSeq))
+  }
+
+  private def mapEntryToScript(entry: MapEntry): Script = Script.parse(entry.value)
+
+  def read64(input: String): PartiallySignedTransaction = {
+    read(new ByteArrayInputStream(fromBase64String(input)))
   }
 
   def read(input: InputStream): PartiallySignedTransaction = {
     import GlobalTypes._
     import InputTypes._
-
-    var useInputIndex = false
 
     val psbtMagic = uint32(input, ByteOrder.BIG_ENDIAN)
     val separator = uint8(input)
@@ -98,107 +141,68 @@ object PSBT {
     //Read exactly one map for globals
     val globalMap = readKeyValueMap(input)
 
-    var inputMaps:Seq[Seq[MapEntry]] = Seq.empty
-    while(input.available() > 0){
-      inputMaps = inputMaps :+ readKeyValueMap(input)
-    }
-
     val tx = globalMap.find(isGlobalKey(TransactionType)) match {
       case Some(entry) => Transaction.read(entry.value)
       case None        => throw new IllegalArgumentException("PSBT requires one key-value entry for type Transaction")
     }
 
-    val redeemScripts = globalMap.filter(isGlobalKey(RedeemScript)).map { redeemScriptsEntry =>
-      assert(redeemScriptsEntry.key.size == 21, s"Redeem script key has invalid size: ${redeemScriptsEntry.key.size}")
-      val scriptHash = BinaryData(redeemScriptsEntry.key.drop(1))
-      val redeemScript = Script.parse(redeemScriptsEntry.value)
-      assert(scriptHash == hash160(redeemScriptsEntry.value), "Provided hash160 does not match the redeemscript's hash160")
-      redeemScript
-    }
-
-    val witnessScripts = globalMap.filter(isGlobalKey(WitnessScript)).map { witnessScriptsEntry =>
-      assert(witnessScriptsEntry.key.size == 33, s"Witness script key has invalid size: ${witnessScriptsEntry.key.size}")
-      val scriptHash = BinaryData(witnessScriptsEntry.key.drop(1))
-      val witnessScript = Script.parse(witnessScriptsEntry.value)
-      assert(scriptHash == sha256(witnessScriptsEntry.value), "Provided sha256 does not match the witnessscript's sha256")
-      witnessScript
-    }
-
-    val keyPaths = globalMap.find(isGlobalKey(Bip32Data)).map { mapEntry =>
-      val pubKey = PublicKey(mapEntry.key.drop(1))
-      assert(Crypto.isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
-      val derivationPaths = mapEntry.value.sliding(4).map(bytes => uint32(BinaryData(bytes), ByteOrder.LITTLE_ENDIAN))
-      (pubKey, KeyPath(derivationPaths.toSeq))
-    }
-
-    val numberOfInputs = globalMap.find(isGlobalKey(PSBTInputsNumber)) match {
-      case Some(psbtInputsNumberEntry) => varint(psbtInputsNumberEntry.value)
-      case None                        => 0
+    tx.txIn.foreach { in =>
+      assert(!in.hasSigScript && !in.hasWitness, s"Non empty input(${TxIn.write(in).toString}) found in the transaction")
     }
 
     val globalUnknowns = globalMap.filter(el => isKeyUnknown(el.key, GlobalTypes))
 
-    var psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
-      val partiallySignedInput = PartiallySignedInput(
-        inputMap.find(isInputKey(WitnessUTXO)).map { witnessUtxoEntry =>
-          TxOut.read(witnessUtxoEntry.value)
-        },
-        inputMap.find(isInputKey(NonWitnessUTXO)).map { nonWitnessUtxoEntry =>
-          Transaction.read(nonWitnessUtxoEntry.value)
-        },
-        inputMap.filter(isInputKey(PartialSignature)).map { partSigEntry =>
-          PublicKey(partSigEntry.key.drop(1)) -> partSigEntry.value
-        }.toMap,
-        inputMap.find(isInputKey(SighashType)).map { sigHashEntry =>
-          uint32(sigHashEntry.value, ByteOrder.LITTLE_ENDIAN).toInt
-        },
-        inputMap.find(isInputKey(InputIndex)).map { inputIndexEntry =>
-          varint(inputIndexEntry.value.data.toArray).toInt
-        },
-        inputMap.filter(el => isKeyUnknown(el.key, InputTypes))
-      )
+    //Read as many maps as the inputs/outpus found on the unsigned transaction
+    val inputMaps = readMaps(tx.txIn.size, input)
+    val outputMaps = readMaps(tx.txOut.size, input)
 
-      //If this is not the first input and it has an input index, make sure all use inputs
-      if(!useInputIndex && index != 0 && partiallySignedInput.inputIndex.isDefined){
-        throw new IllegalArgumentException("Input indexes being used but an input was provided without an index")
+    //Assert there are no repeated entries within each maps's scope
+    assertNoDuplicates(globalMap)
+    inputMaps.foreach(assertNoDuplicates)
+    outputMaps.foreach(assertNoDuplicates)
+
+    val psbis = inputMaps.map { inputMap =>
+
+      val redeemOut = inputMap.find(isInputKey(NonWitnessUTXO)).map { nonWitnessUtxoEntry =>
+        Transaction.read(nonWitnessUtxoEntry.value)
       }
 
-      //If indexes are being used, make sure this input has one
-      if(useInputIndex && partiallySignedInput.inputIndex.isEmpty){
-        throw new IllegalArgumentException("Input indexes being used but an input was provided without an index")
+      val witOut =  inputMap.find(isInputKey(WitnessUTXO)).map { witnessUtxoEntry =>
+        TxOut.read(witnessUtxoEntry.value)
       }
 
-      if(partiallySignedInput.inputIndex.isDefined){
-        useInputIndex = true
+      val redeemScript = inputMap.find(isInputKey(RedeemScript)).map(mapEntryToScript)
+      val witScript = inputMap.find(isInputKey(WitnessScript)).map(mapEntryToScript)
+      val finRedeemScript = inputMap.find(isInputKey(FinalScriptSig)).map(mapEntryToScript)
+      val finWitScript = inputMap.find(isInputKey(FinalScriptWitness)).map { finScriptWitnessEntry =>
+        ScriptWitness.read(finScriptWitnessEntry.value)
       }
 
-      //If the P2PKH UTXO is defined it must match the input's outpoint
-      partiallySignedInput.nonWitnessOutput.map { prevTx =>
-        assert(tx.txIn(partiallySignedInput.inputIndex.getOrElse(index)).outPoint.hash == prevTx.hash, "Provided non witness utxo does not match the required utxo for input")
+      val hdKeyPath = inputMap.find(isInputKey(Bip32Data)).map(mapEntryToKeyPaths)
+
+      val sigHash = inputMap.find(isInputKey(SighashType)).map { sigHashEntry =>
+        uint32(sigHashEntry.value, ByteOrder.LITTLE_ENDIAN).toInt
       }
 
-      //If no index is provided we use the parsing order
-      partiallySignedInput.inputIndex match {
-        case None => partiallySignedInput.copy(inputIndex = Some(index))
-        case _    => partiallySignedInput
-      }
+      val partialSig = inputMap.filter(isInputKey(PartialSignature)).map { partSigEntry =>
+        PublicKey(partSigEntry.key.drop(1)) -> partSigEntry.value
+      }.toMap
+
+      val unknowns = inputMap.filter(el => isKeyUnknown(el.key, InputTypes))
+
+      PartiallySignedInput(redeemOut, witOut, redeemScript, witScript, finRedeemScript, finWitScript, hdKeyPath, partialSig, sigHash, unknowns)
     }
 
-    // Make sure that the number of separators - 1 matches the number of inputs
-    // 'psbis' is the result of the parsing, separator-delimited
-    if(useInputIndex){
-      assert(numberOfInputs == psbis.size,s"Number of inputs specified in 'global' ($numberOfInputs) does not match actual number of inputs in the PSBT (${psbis.size})")
+    val psbtOuts = outputMaps.map { outputMap =>
+
+      val redeemScript = outputMap.find(isOutputKey(OutputTypes.RedeemScript)).map(mapEntryToScript)
+      val witScript = outputMap.find(isOutputKey(OutputTypes.WitnessScript)).map(mapEntryToScript)
+      val hdKeyPaths = outputMap.find(isOutputKey(OutputTypes.Bip32Data)).map(mapEntryToKeyPaths)
+
+      PartiallySignedOutput(redeemScript, witScript, hdKeyPaths)
     }
 
-    // If indexes are being used, add a bunch of empty inputs to the input vector so that it matches the number of inputs in the transaction
-    if(useInputIndex && tx.txIn.size > psbis.size) {
-      val diff = tx.txIn.size - psbis.size
-      psbis = psbis ++ ( for(i <- 0 to (diff - 1)) yield PartiallySignedInput(inputIndex = Some(psbis.size + i)) )
-    }
-
-    assert(tx.txIn.size == psbis.size, s"The inputs provided (${psbis.size}) does not match the inputs in the transaction (${tx.txIn.size})")
-
-    PartiallySignedTransaction(tx, redeemScripts, witnessScripts, psbis, keyPaths, numberOfInputs, globalUnknowns)
+    PartiallySignedTransaction(tx, psbis, psbtOuts, globalUnknowns)
   }
 
   private def writeKeyValue(entry: MapEntry, out: OutputStream): Unit = {
@@ -218,52 +222,52 @@ object PSBT {
     writeUInt32(PSBD_MAGIC, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(HEADER_SEPARATOR, out)
 
-    val txEntry = MapEntry(Seq(TransactionType.id.toByte), Transaction.write(psbt.tx))
-
-    val redeemScriptEntries = psbt.redeemScripts.map { redeemScript =>
-      MapEntry(Seq(RedeemScript.id.byteValue) ++ hash160(Script.write(redeemScript)), Script.write(redeemScript))
-    }
-
-    val witnessScriptEntries = psbt.witnessScripts.map { witScript =>
-      MapEntry(Seq(WitnessScript.id.byteValue) ++ sha256(Script.write(witScript)), Script.write(witScript))
-    }
-
-    val bip32Data = psbt.bip32Data.map { data =>
-      MapEntry(Seq(Bip32Data.id.byteValue) ++ data._1.data, data._2.map(writeUInt32).flatten)
-    }
-
-    val numberOfInputs = psbt.numberOfInputs match {
-      case i if i > 0 => Some(MapEntry(Seq(PSBTInputsNumber.id.byteValue), writeVarint(psbt.inputs.size)))
-      case _          => None
-    }
-
-    writeKeyValue(txEntry, out)
-    redeemScriptEntries.foreach(writeKeyValue(_, out))
-    witnessScriptEntries.foreach(writeKeyValue(_, out))
-    bip32Data.foreach(writeKeyValue(_, out))
-    numberOfInputs.map(writeKeyValue(_, out))
-    psbt.unknowns.map(writeKeyValue(_, out))
-
-    writeUInt8(SEPARATOR, out)
-
-    psbt.inputs.foreach { input =>
-
-      val nonWitOut = input.nonWitnessOutput.map(tx => MapEntry(Seq(NonWitnessUTXO.id.byteValue), Transaction.write(tx)))
-      val witnessOut = input.witnessOutput.map(out => MapEntry(Seq(WitnessUTXO.id.byteValue), TxOut.write(out)))
-      val partialSig = input.partialSigs.map { case (pk, sig) => MapEntry(Seq(PartialSignature.id.byteValue) ++ pk.data, sig) }
-      val sigHashType = input.sighashType.map( sigHash => MapEntry(Seq(SighashType.id.byteValue), writeUInt32(sigHash, ByteOrder.LITTLE_ENDIAN)))
-      val inputIndex = input.inputIndex.map( idx => MapEntry(Seq(InputIndex.id.byteValue), writeVarint(idx)) )
-
-      nonWitOut.map(writeKeyValue(_, out))
-      witnessOut.map(writeKeyValue(_, out))
-      partialSig.map(writeKeyValue(_, out))
-      sigHashType.map(writeKeyValue(_, out))
-      inputIndex.map(writeKeyValue(_, out))
-      input.unknowns.map(writeKeyValue(_, out))
-
-      writeUInt8(SEPARATOR, out)
-
-    }
+//    val txEntry = MapEntry(Seq(TransactionType.id.toByte), Transaction.write(psbt.tx))
+//
+//    val redeemScriptEntries = psbt.redeemScripts.map { redeemScript =>
+//      MapEntry(Seq(RedeemScript.id.byteValue) ++ hash160(Script.write(redeemScript)), Script.write(redeemScript))
+//    }
+//
+//    val witnessScriptEntries = psbt.witnessScripts.map { witScript =>
+//      MapEntry(Seq(WitnessScript.id.byteValue) ++ sha256(Script.write(witScript)), Script.write(witScript))
+//    }
+//
+//    val bip32Data = psbt.bip32Data.map { data =>
+//      MapEntry(Seq(Bip32Data.id.byteValue) ++ data._1.data, data._2.map(writeUInt32).flatten)
+//    }
+//
+//    val numberOfInputs = psbt.numberOfInputs match {
+//      case i if i > 0 => Some(MapEntry(Seq(PSBTInputsNumber.id.byteValue), writeVarint(psbt.inputs.size)))
+//      case _          => None
+//    }
+//
+//    writeKeyValue(txEntry, out)
+//    redeemScriptEntries.foreach(writeKeyValue(_, out))
+//    witnessScriptEntries.foreach(writeKeyValue(_, out))
+//    bip32Data.foreach(writeKeyValue(_, out))
+//    numberOfInputs.map(writeKeyValue(_, out))
+//    psbt.unknowns.map(writeKeyValue(_, out))
+//
+//    writeUInt8(SEPARATOR, out)
+//
+//    psbt.inputs.foreach { input =>
+//
+//      val nonWitOut = input.nonWitnessOutput.map(tx => MapEntry(Seq(NonWitnessUTXO.id.byteValue), Transaction.write(tx)))
+//      val witnessOut = input.witnessOutput.map(out => MapEntry(Seq(WitnessUTXO.id.byteValue), TxOut.write(out)))
+//      val partialSig = input.partialSigs.map { case (pk, sig) => MapEntry(Seq(PartialSignature.id.byteValue) ++ pk.data, sig) }
+//      val sigHashType = input.sighashType.map( sigHash => MapEntry(Seq(SighashType.id.byteValue), writeUInt32(sigHash, ByteOrder.LITTLE_ENDIAN)))
+//      val inputIndex = input.inputIndex.map( idx => MapEntry(Seq(InputIndex.id.byteValue), writeVarint(idx)) )
+//
+//      nonWitOut.map(writeKeyValue(_, out))
+//      witnessOut.map(writeKeyValue(_, out))
+//      partialSig.map(writeKeyValue(_, out))
+//      sigHashType.map(writeKeyValue(_, out))
+//      inputIndex.map(writeKeyValue(_, out))
+//      input.unknowns.map(writeKeyValue(_, out))
+//
+//      writeUInt8(SEPARATOR, out)
+//
+//    }
 
   }
 
