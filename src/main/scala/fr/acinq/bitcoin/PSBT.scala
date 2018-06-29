@@ -86,6 +86,7 @@ object PSBT {
     readKeyValueMap(input, acc :+ MapEntry(key, data))
   }
 
+  //Reads a predetermined number of maps (as list of key/value records)
   @tailrec
   private def readMaps(counter: Int = 0, input: InputStream, acc: Seq[Seq[MapEntry]] = Seq.empty): Seq[Seq[MapEntry]] = {
     if(counter > 0) {
@@ -108,7 +109,7 @@ object PSBT {
     val pubKey = PublicKey(entry.key.drop(1))
     assert(isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
     val derivationPaths = entry.value.sliding(4).map(uint32(_, ByteOrder.LITTLE_ENDIAN))
-    (pubKey, KeyPath(derivationPaths.toSeq))
+    pubKey -> KeyPath(derivationPaths.toSeq)
   }
 
   private def mapEntryToScript(entry: MapEntry): Script = Script.parse(entry.value)
@@ -209,52 +210,64 @@ object PSBT {
     writeUInt32(PSBD_MAGIC, out, ByteOrder.BIG_ENDIAN)
     writeUInt8(HEADER_SEPARATOR, out)
 
-//    val txEntry = MapEntry(Seq(TransactionType.id.toByte), Transaction.write(psbt.tx))
-//
-//    val redeemScriptEntries = psbt.redeemScripts.map { redeemScript =>
-//      MapEntry(Seq(RedeemScript.id.byteValue) ++ hash160(Script.write(redeemScript)), Script.write(redeemScript))
-//    }
-//
-//    val witnessScriptEntries = psbt.witnessScripts.map { witScript =>
-//      MapEntry(Seq(WitnessScript.id.byteValue) ++ sha256(Script.write(witScript)), Script.write(witScript))
-//    }
-//
-//    val bip32Data = psbt.bip32Data.map { data =>
-//      MapEntry(Seq(Bip32Data.id.byteValue) ++ data._1.data, data._2.map(writeUInt32).flatten)
-//    }
-//
-//    val numberOfInputs = psbt.numberOfInputs match {
-//      case i if i > 0 => Some(MapEntry(Seq(PSBTInputsNumber.id.byteValue), writeVarint(psbt.inputs.size)))
-//      case _          => None
-//    }
-//
-//    writeKeyValue(txEntry, out)
-//    redeemScriptEntries.foreach(writeKeyValue(_, out))
-//    witnessScriptEntries.foreach(writeKeyValue(_, out))
-//    bip32Data.foreach(writeKeyValue(_, out))
-//    numberOfInputs.map(writeKeyValue(_, out))
-//    psbt.unknowns.map(writeKeyValue(_, out))
-//
-//    writeUInt8(SEPARATOR, out)
-//
-//    psbt.inputs.foreach { input =>
-//
-//      val nonWitOut = input.nonWitnessOutput.map(tx => MapEntry(Seq(NonWitnessUTXO.id.byteValue), Transaction.write(tx)))
-//      val witnessOut = input.witnessOutput.map(out => MapEntry(Seq(WitnessUTXO.id.byteValue), TxOut.write(out)))
-//      val partialSig = input.partialSigs.map { case (pk, sig) => MapEntry(Seq(PartialSignature.id.byteValue) ++ pk.data, sig) }
-//      val sigHashType = input.sighashType.map( sigHash => MapEntry(Seq(SighashType.id.byteValue), writeUInt32(sigHash, ByteOrder.LITTLE_ENDIAN)))
-//      val inputIndex = input.inputIndex.map( idx => MapEntry(Seq(InputIndex.id.byteValue), writeVarint(idx)) )
-//
-//      nonWitOut.map(writeKeyValue(_, out))
-//      witnessOut.map(writeKeyValue(_, out))
-//      partialSig.map(writeKeyValue(_, out))
-//      sigHashType.map(writeKeyValue(_, out))
-//      inputIndex.map(writeKeyValue(_, out))
-//      input.unknowns.map(writeKeyValue(_, out))
-//
-//      writeUInt8(SEPARATOR, out)
-//
-//    }
+    val txEntry = MapEntry(Seq(TransactionType.id.toByte), Transaction.write(psbt.tx))
+
+    //write global map
+    writeKeyValue(txEntry, out)
+    psbt.unknowns.foreach(writeKeyValue(_, out))
+    writeUInt8(SEPARATOR, out)
+
+    psbt.inputs.foreach { input =>
+
+      val redeemOut = input.nonWitnessOutput.map(tx => MapEntry(Seq(NonWitnessUTXO.id.byteValue), Transaction.write(tx)))
+      val witOut = input.witnessOutput.map(txOut => MapEntry(Seq(WitnessUTXO.id.byteValue), TxOut.write(txOut)))
+      val redeemScript = input.redeemScript.map(script => MapEntry(Seq(RedeemScript.id.byteValue), Script.write(script)))
+      val witscript = input.witnessScript.map(wscript => MapEntry(Seq(WitnessScript.id.byteValue), Script.write(wscript)))
+      val finScriptSig = input.finalScriptSig.map(script => MapEntry(Seq(FinalScriptSig.id.byteValue), Script.write(script)))
+      val finScriptWit = input.finalScriptWitness.map{ wscript =>
+        MapEntry(Seq(FinalScriptWitness.id.byteValue), ScriptWitness.write(wscript))
+      }
+      val bip32Data = input.bip32Data.map { case (pubKey, keyPath) =>
+        MapEntry(Seq(Bip32Data.id.byteValue) ++ pubKey.data, keyPath.map(writeUInt32).flatten)
+      }
+
+      val partialSigs = input.partialSigs.map { case (pubKey, sig) =>
+        MapEntry(Seq(PartialSignature.id.byteValue) ++ pubKey.data, sig)
+      }
+
+      val sigHash = input.sighashType.map { value =>
+        MapEntry(Seq(SighashType.id.byteValue), writeUInt32(value))
+      }
+
+      //Write to stream
+      redeemOut.foreach(writeKeyValue(_, out))
+      witOut.foreach(writeKeyValue(_, out))
+      redeemScript.foreach(writeKeyValue(_, out))
+      witscript.foreach(writeKeyValue(_, out))
+      finScriptSig.foreach(writeKeyValue(_, out))
+      finScriptWit.foreach(writeKeyValue(_, out))
+      bip32Data.foreach(writeKeyValue(_, out))
+      partialSigs.foreach(writeKeyValue(_, out))
+      sigHash.foreach(writeKeyValue(_, out))
+      input.unknowns.foreach(writeKeyValue(_, out))
+      writeUInt8(SEPARATOR, out)
+    }
+
+    psbt.outputs.foreach { output =>
+
+      val redeemScript = output.redeemScript.map(script => MapEntry(Seq(OutputTypes.RedeemScript.id.byteValue), Script.write(script)))
+      val witnessScript = output.witnessScript.map(wscript => MapEntry(Seq(OutputTypes.WitnessScript.id.byteValue), Script.write(wscript)))
+      val bip32Data = output.bip32Data.map { case (pubKey, keyPath) =>
+        MapEntry(Seq(OutputTypes.Bip32Data.id.byteValue) ++ pubKey.data, keyPath.map(writeUInt32).flatten)
+      }
+
+      redeemScript.foreach(writeKeyValue(_, out))
+      witnessScript.foreach(writeKeyValue(_, out))
+      bip32Data.foreach(writeKeyValue(_, out))
+      output.unknowns.foreach(writeKeyValue(_, out))
+      writeUInt8(SEPARATOR, out)
+
+    }
 
   }
 
