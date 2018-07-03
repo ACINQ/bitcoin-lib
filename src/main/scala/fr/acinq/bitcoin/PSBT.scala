@@ -34,9 +34,9 @@ object PSBT {
   }
 
   case class PartiallySignedOutput(
-    redeemScript: Option[Script],
-    witnessScript: Option[Script],
-    bip32Data: Map[PublicKey, KeyPath],
+    redeemScript: Option[Script] = None,
+    witnessScript: Option[Script] = None,
+    bip32Data: Map[PublicKey, KeyPath] = Map.empty,
     unknowns: Seq[MapEntry] = Seq.empty
   )
 
@@ -276,6 +276,16 @@ object PSBT {
 
     }
 
+  }
+
+  def createPSBT(inputs: Seq[TxIn], outputs: Seq[TxOut], lockTime: Long = 0): PartiallySignedTransaction = {
+    val tx = Transaction.apply(1, inputs, outputs, lockTime)
+
+    PartiallySignedTransaction(
+      tx = tx,
+      inputs = tx.txIn.map(_ => PartiallySignedInput()),
+      outputs = tx.txOut.map(_ => PartiallySignedOutput())
+    )
   }
 
 }
