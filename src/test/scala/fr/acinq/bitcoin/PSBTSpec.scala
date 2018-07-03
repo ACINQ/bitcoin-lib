@@ -1,6 +1,8 @@
 package fr.acinq.bitcoin
 
 import java.io.ByteArrayOutputStream
+
+import fr.acinq.bitcoin.PSBT.MapEntry
 import org.scalatest.FlatSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -84,7 +86,7 @@ class PSBTSpec extends FlatSpec{
 
   it should "serialize into PSBT format" in {
 
-    val rawPSBT = "cHNidP8BAKACAAAAAqsJSaCMWvfEm4IS9Bfi8Vqz9cM9zxU4IagTn4d6W3vkAAAAAAD+////qwlJoIxa98SbghL0F+LxWrP1wz3PFTghqBOfh3pbe+QBAAAAAP7///8CYDvqCwAAAAAZdqkUdopAu9dAy+gdmI5x3ipNXHE5ax2IrI4kAAAAAAAAGXapFG9GILVT+glechue4O/p+gOcykWXiKwAAAAAAAEHakcwRAIgR1lmF5fAGwNrJZKJSGhiGDR9iYZLcZ4ff89X0eURZYcCIFMJ6r9Wqk2Ikf/REf3xM286KdqGbX+EhtdVRs7tr5MZASEDXNxh/HupccC1AaZGoqg7ECy0OIEhfKaC3Ibi1z+ogpIAAQEgAOH1BQAAAAAXqRQ1RebjO4MsRwUPJNPuuTycA5SLx4cBBBYAFIXRNTfy4mVAWjTbr6nj3aAfuCMIAAAA"
+    val rawPSBT = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAQMEAQAAAAAAAA=="
     val psbt = PSBT.read64(rawPSBT)
 
     val out = new ByteArrayOutputStream()
@@ -94,6 +96,24 @@ class PSBTSpec extends FlatSpec{
 
     assert(Try(PSBT.read64(serializedPsbt)).isSuccess)
     assert(serializedPsbt == rawPSBT)
+
+    val unknownData = MapEntry(Seq(0xfa.byteValue), BinaryData("426974636f696e20726f636b7321"))
+
+    val psbtWithUnknowns = psbt.copy(
+      inputs = psbt.inputs.map(_.copy(unknowns = Seq(unknownData))),
+      outputs = psbt.outputs.map(_.copy(unknowns = Seq(unknownData))),
+      unknowns = Seq(unknownData)
+    )
+
+    val outStream = new ByteArrayOutputStream()
+    PSBT.write(psbtWithUnknowns, outStream)
+    val rawWithUnknowns = toBase64String(outStream.toByteArray)
+
+    val serializedWithUnknowns = PSBT.read64(rawWithUnknowns)
+
+    assert(serializedWithUnknowns.unknowns.nonEmpty)
+    assert(serializedWithUnknowns.inputs.head.unknowns.nonEmpty)
+    assert(serializedWithUnknowns.outputs.head.unknowns.nonEmpty)
 
   }
 

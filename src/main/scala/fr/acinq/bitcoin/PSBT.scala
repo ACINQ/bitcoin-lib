@@ -186,8 +186,9 @@ object PSBT {
       val redeemScript = outputMap.find(_.key.head == OutputTypes.RedeemScript.id).map(mapEntryToScript)
       val witScript = outputMap.find(_.key.head == OutputTypes.WitnessScript.id).map(mapEntryToScript)
       val hdKeyPaths = outputMap.filter(_.key.head == OutputTypes.Bip32Data.id).map(mapEntryToKeyPaths).toMap
+      val unknowns = outputMap.filter(el => isKeyUnknown(el.key, InputTypes))
 
-      PartiallySignedOutput(redeemScript, witScript, hdKeyPaths)
+      PartiallySignedOutput(redeemScript, witScript, hdKeyPaths, unknowns)
     }
 
     PartiallySignedTransaction(tx, psbis, psbtOuts, globalUnknowns)
