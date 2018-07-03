@@ -25,7 +25,13 @@ object PSBT {
     partialSigs: Map[PublicKey, BinaryData] = Map.empty,
     sighashType: Option[Int] = None,
     unknowns: Seq[MapEntry] = Seq.empty
-  )
+  ) {
+
+    require( !(witnessOutput.isDefined && nonWitnessOutput.isDefined), "PSBT Input can't have both witness and non withness UTXO")
+    require( !(witnessScript.isDefined && witnessOutput.isEmpty), "PSBT Input with witness script must have witness output")
+    require( !(finalScriptWitness.isDefined && witnessOutput.isEmpty), "PSBT Input with final script witness must have witness output")
+
+  }
 
   case class PartiallySignedOutput(
     redeemScript: Option[Script],

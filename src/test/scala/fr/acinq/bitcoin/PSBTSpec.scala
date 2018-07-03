@@ -74,11 +74,12 @@ class PSBTSpec extends FlatSpec{
     assert(fourthPSBT.outputs.head.bip32Data.nonEmpty)
 
     //PSBT with one P2SH-P2WSH input of a 2-of-2 multisig, redeemScript, witnessScript, and keypaths are available. Contains one signature.
-    val fifthPSBT = PSBT.read64("cHNidP8BAFUCAAAAASeaIyOl37UfxF8iD6WLD8E+HjNCeSqF1+Ns1jM7XLw5AAAAAAD/////AaBa6gsAAAAAGXapFP/pwAYQl8w7Y28ssEYPpPxCfStFiKwAAAAAAAEA/VEBAgAAAALx2NSxrKuSF7y9CgnjeHbv15z3U7qisjYufUKcDer79QAAAABqRzBEAiAvKd3/84dibPQ/yuSDRW+50S1/UPsQs5wkW6sjjZYNZQIgDzL6MZfcaqH8hw4z2MWQN4hizgub9r6GXVqsCnOQrjoBIQLq1ZZofKgGBD7cPeEWzfKdXpJXwZbNBVz2mMjQK/JOmf7////x2NSxrKuSF7y9CgnjeHbv15z3U7qisjYufUKcDer79QEAAABrSDBFAiEA3DvJQIb9fUgQKoKQxzfieEG8HOWH/U2e/pajfYjAOmUCIG3qcXuCJbSunhYkv8ApJ+2sIi7glL8AmZbZ0DBddkX1ASEDlPYr6d8ZlSxVh3aK63aYBhrSxKJciU9H2MFitNchPQX+////AZVe6gsAAAAAF6kUY0UgD2jRieGtwN8cTRbqjxTA2+uH+y4TACICA7E0HMunaDtq9PEjjNbpfnFn1Wn6xH8eSNR1QYRDVb1GRjBDAiAEJLWO/6qmlOFVnqXJO7/UqJBkIkBVzfBwtncUaUQtBwIfXI6w/qZRbWC4rLM61k7eYOh4W/s6qUuZvfhhUduamgEBBCIAIHcf0YrUWWZt1J89Vk49vEL0yEd042CtoWgWqO1IjVaBAQVHUiEDsTQcy6doO2r08SOM1ul+cWfVafrEfx5I1HVBhENVvUYhA95V0eHayAXj+KWMH7+blMAvPbqv4Sf+/KSZXyb4IIO9Uq4iBgOxNBzLp2g7avTxI4zW6X5xZ9Vp+sR/HkjUdUGEQ1W9RhC0prpnAAAAgAAAAIAEAACAIgYD3lXR4drIBeP4pYwfv5uUwC89uq/hJ/78pJlfJvggg70QtKa6ZwAAAIAAAACABQAAgAAA")
+    val fifthPSBT = PSBT.read64("cHNidP8BAFUCAAAAASeaIyOl37UfxF8iD6WLD8E+HjNCeSqF1+Ns1jM7XLw5AAAAAAD/////AaBa6gsAAAAAGXapFP/pwAYQl8w7Y28ssEYPpPxCfStFiKwAAAAAAAEBIJVe6gsAAAAAF6kUY0UgD2jRieGtwN8cTRbqjxTA2+uHIgIDsTQcy6doO2r08SOM1ul+cWfVafrEfx5I1HVBhENVvUZGMEMCIAQktY7/qqaU4VWepck7v9SokGQiQFXN8HC2dxRpRC0HAh9cjrD+plFtYLisszrWTt5g6Hhb+zqpS5m9+GFR25qaAQEEIgAgdx/RitRZZm3Unz1WTj28QvTIR3TjYK2haBao7UiNVoEBBUdSIQOxNBzLp2g7avTxI4zW6X5xZ9Vp+sR/HkjUdUGEQ1W9RiED3lXR4drIBeP4pYwfv5uUwC89uq/hJ/78pJlfJvggg71SriIGA7E0HMunaDtq9PEjjNbpfnFn1Wn6xH8eSNR1QYRDVb1GELSmumcAAACAAAAAgAQAAIAiBgPeVdHh2sgF4/iljB+/m5TALz26r+En/vykmV8m+CCDvRC0prpnAAAAgAAAAIAFAACAAAA=")
 
-    assert(fifthPSBT.inputs.size == 1)  //
+    assert(fifthPSBT.inputs.size == 1)
     assert(fifthPSBT.inputs.head.bip32Data.size == 2)
     assert(fifthPSBT.inputs.head.redeemScript.isDefined)
+    assert(fifthPSBT.inputs.head.witnessOutput.isDefined)
     assert(fifthPSBT.inputs.head.witnessScript.isDefined)
     assert(fifthPSBT.inputs.head.partialSigs.size == 1)
 
