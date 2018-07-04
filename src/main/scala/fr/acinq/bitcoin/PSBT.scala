@@ -279,7 +279,7 @@ object PSBT {
   }
 
   def createPSBT(inputs: Seq[TxIn], outputs: Seq[TxOut], lockTime: Long = 0): PartiallySignedTransaction = {
-    val tx = Transaction.apply(1, inputs, outputs, lockTime)
+    val tx = Transaction(version = 2, inputs, outputs, lockTime)
 
     PartiallySignedTransaction(
       tx = tx,

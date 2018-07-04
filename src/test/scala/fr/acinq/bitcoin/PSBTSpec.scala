@@ -125,24 +125,28 @@ class PSBTSpec extends FlatSpec{
 
 
     val inputs = Seq(
-      TxIn(OutPoint(BinaryData("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858"), 0), Nil, 0xffffffffl),
-      TxIn(OutPoint(BinaryData("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83"), 1), Nil, 0xffffffffl)
+      TxIn(OutPoint(BinaryData("75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858").reverse, 0), Nil, 0xffffffffL),
+      TxIn(OutPoint(BinaryData("1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83").reverse, 1), Nil, 0xffffffffL)
     )
 
-    val program = Bech32.decodeWitnessAddress("bcrt1qmpwzkuwsqc9snjvgdt4czhjsnywa5yjdqpxskv")._3
-    val programSec = Bech32.decodeWitnessAddress("bcrt1qqzh2ngh97ru8dfvgma25d6r595wcwqy0cee4cc")._3
+    val toAddress = Bech32.decodeWitnessAddress("bcrt1qmpwzkuwsqc9snjvgdt4czhjsnywa5yjdqpxskv")._3
+    val toAddress2 = Bech32.decodeWitnessAddress("bcrt1qqzh2ngh97ru8dfvgma25d6r595wcwqy0cee4cc")._3
 
     val outputs = Seq(
-      TxOut(BtcDouble(1.49990000).btc, OP_0 :: OP_PUSHDATA(program) :: Nil),
-      TxOut(Btc(1), OP_0 :: OP_PUSHDATA(programSec) :: Nil)
+      TxOut(149990000 satoshi, OP_0 :: OP_PUSHDATA(toAddress) :: Nil),
+      TxOut(100000000 satoshi, OP_0 :: OP_PUSHDATA(toAddress2) :: Nil)
     )
 
     val psbt = PSBT.createPSBT(inputs, outputs)
 
     assert(expectedPsbt.tx.txIn.head == psbt.tx.txIn.head)
+    assert(expectedPsbt.tx.txIn.tail.head == psbt.tx.txIn.tail.head)
 
     assert(expectedPsbt.tx.txOut.head == psbt.tx.txOut.head)
     assert(expectedPsbt.tx.txOut.tail.head == psbt.tx.txOut.tail.head)
+
+    //Compare TXs in network serialization format
+    assert(expectedPsbt.tx.toString == psbt.tx.toString)
 
     val out = new ByteArrayOutputStream()
     PSBT.write(psbt, out)
