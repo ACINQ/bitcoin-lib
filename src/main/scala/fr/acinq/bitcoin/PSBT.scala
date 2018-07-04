@@ -12,6 +12,20 @@ object PSBT {
 
   type Script = Seq[ScriptElt]
 
+
+  case class SigData(
+    sigScript: Option[Script],
+    redeemScript: Option[Script],
+    witnessScript: Option[Script],
+    scriptWitness: Option[ScriptWitness],
+    signatures: Map[PublicKey, BinaryData],
+    pubKeys: Map[PublicKey, KeyPath]
+  ) {
+
+    def isComplete():Boolean = sigScript.isDefined || scriptWitness.isDefined
+
+  }
+
   case class MapEntry(key: BinaryData, value: BinaryData)
 
   case class PartiallySignedInput(
@@ -287,5 +301,95 @@ object PSBT {
       outputs = tx.txOut.map(_ => PartiallySignedOutput())
     )
   }
+
+
+  /**
+    * Fills the given PSBT inputs with data from @param walletTx, then signs the inputs it can given the @param privKey
+    *
+    * @param psbt
+    * @param privKey
+    * @param walletTx a transaction owned by the wallet account, might be spent py an input of the @param psbt
+    * @param sighHash
+    * @return a PSBT with filled inputs and partial signatures
+    */
+  def fillAndSignPSBT(psbt: PartiallySignedTransaction, privKey: PrivateKey, walletTx: Transaction, sighHash: Int = SIGHASH_ALL): PartiallySignedTransaction = {
+    var mutablePsbt = psbt
+
+    for(i <- 0 to psbt.tx.txIn.size){
+
+      val txIn = psbt.tx.txIn(i)
+      val psbtInput = psbt.inputs(i)
+      val txHash = txIn.outPoint.hash
+
+      //If we know about this input then fill the PSBT's input
+      if(txHash == walletTx.hash){
+
+        val filledInput = if(walletTx.txOut.isDefinedAt(txIn.outPoint.index.toInt)){
+          psbtInput.copy(witnessOutput = Some(walletTx.txOut(txIn.outPoint.index)))
+        } else {
+          psbtInput.copy(nonWitnessOutput = Some(walletTx))
+        }
+
+        //Update the PSBT and its input
+        mutablePsbt = mutablePsbt.copy(inputs = mutablePsbt.inputs.updated(i, filledInput))
+
+      }
+
+      if(psbtInput.sighashType.isDefined && psbtInput.sighashType.get != sighHash){
+        throw new IllegalArgumentException("Specified Sighash and sighash in PSBT do not match")
+      }
+
+      //Sign
+      var signedInput = signPSBTInput(privKey, psbtInput, walletTx, i, sighHash)
+      val sigData = fillSigData(signedInput)
+
+      //Drop unnecessary UTXOs
+      if(sigData.witnessScript.isDefined){
+        signedInput = signedInput.copy(witnessOutput = None)
+      } else {
+        signedInput = signedInput.copy(nonWitnessOutput = None)
+      }
+
+      //Get HD keypaths
+
+
+    }
+
+
+    //Fill PSBT outputs
+
+
+
+    mutablePsbt
+  }
+
+  //Adds a partial signature to the given input
+  private def signPSBTInput(privateKey: PrivateKey, input: PartiallySignedInput, tx: Transaction, index: Int, sigHash: Int): PartiallySignedInput = {
+
+    //If it's already signed, return
+    if(input.finalScriptSig.isDefined || input.finalScriptWitness.isDefined) {
+      return input
+    }
+
+    val sigData = fillSigData(input)
+
+    if(sigData.isComplete) {
+      return input
+    }
+
+    ???
+  }
+
+  // Extracts an aggregate of the signature data from a partially signed input
+  private def fillSigData(input: PartiallySignedInput) = SigData(
+    sigScript = input.finalScriptSig,
+    scriptWitness = input.finalScriptWitness,
+    redeemScript = input.redeemScript,
+    witnessScript = input.witnessScript,
+    signatures = input.partialSigs,
+    pubKeys = input.bip32Data
+  )
+
+
 
 }

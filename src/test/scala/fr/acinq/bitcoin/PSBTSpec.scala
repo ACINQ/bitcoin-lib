@@ -1,12 +1,12 @@
 package fr.acinq.bitcoin
 
 import java.io.ByteArrayOutputStream
-
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import fr.acinq.bitcoin.PSBT.MapEntry
 import org.scalatest.FlatSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-
+import Base58.Prefix._
 import scala.util.Try
 
 @RunWith(classOf[JUnitRunner])
@@ -152,6 +152,25 @@ class PSBTSpec extends FlatSpec{
     PSBT.write(psbt, out)
 
     assert(toBase64String(out.toByteArray) == expectedRawPsbt)
+
+  }
+
+  //TODO wallet preparation as in rpc_psbt.py
+  //TODO discuss for desired implementaion of the rolez (bitcoin-lib is not a wallet)
+  it should "sign the PSBT inputs that it can with the given privKey and wallet transactions" in {
+
+    val unsignedRawPsbt = "cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAQMEAQAAAAABASAAwusLAAAAABepFLf1+vQOPUClpFmx2zU18rcvqSHohwEEIgAgjCNTFzdDtZXftKB7crqOQuN5fadOh/59nXSX47ICiQMBBUdSIQMIncEMesbbVPkTKa9hczPbOIzq0MIx9yM3nRuZAwsC3CECOt2QTz1tz1nduQaw3uI1Kbf/ue1Q5ehhUZJoYCIfDnNSriIGAjrdkE89bc9Z3bkGsN7iNSm3/7ntUOXoYVGSaGAiHw5zENkMak8AAACAAAAAgAMAAIAiBgMIncEMesbbVPkTKa9hczPbOIzq0MIx9yM3nRuZAwsC3BDZDGpPAAAAgAAAAIACAACAAQMEAQAAAAAiAgOppMN/WZbTqiXbrGtXCvBlA5RJKUJGCzVHU+2e7KWHcRDZDGpPAAAAgAAAAIAEAACAACICAn9jmXV9Lv9VoTatAsaEsYOLZVbl8bazQoKpS2tQBRCWENkMak8AAACAAAAAgAUAAIAA"
+    val unsignedPsbt = PSBT.read64(unsignedRawPsbt)
+
+    val privKey1 = PrivateKey.fromBase58("cP53pDbR5WtAD8dYAW9hhTjuvvTVaEiQBdrz9XPrgLBeRFiyCbQr", SecretKeyTestnet)
+    val privKey2 = PrivateKey.fromBase58("cR6SXDoyfQrcp4piaiHE97Rsgta9mNhGTen9XeonVgwsh4iSgw6d", SecretKeyTestnet)
+
+    assert(unsignedPsbt.inputs.head.partialSigs.isEmpty)
+
+    val updated = PSBT.fillAndSignPSBT(unsignedPsbt, privKey1, ???)
+    val updated2 = PSBT.fillAndSignPSBT(updated, privKey2, ???)
+
+    assert(updated2.inputs.head.partialSigs.nonEmpty)
 
   }
 
