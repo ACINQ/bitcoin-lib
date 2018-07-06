@@ -6,6 +6,7 @@ import Protocol._
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
+import fr.acinq.bitcoin.DeterministicWallet._
 import scala.annotation.tailrec
 
 object PSBT {
@@ -51,7 +52,7 @@ object PSBT {
         partialSigs = partialSigs ++ psbtIn.partialSigs,
         sighashType = sighashType.orElse(psbtIn.sighashType),
         bip32Data = bip32Data ++ psbtIn.bip32Data,
-        unknowns = unknowns ++ psbtIn.unknowns
+        unknowns = removeDuplicatesFromPsbtMap(unknowns ++ psbtIn.unknowns)
       )
     }
 
@@ -68,7 +69,7 @@ object PSBT {
       redeemScript = if(redeemScript.isEmpty) psbtOut.redeemScript else redeemScript,
       witnessScript = if(witnessScript.isEmpty) psbtOut.witnessScript else witnessScript,
       bip32Data = bip32Data ++ psbtOut.bip32Data,
-      unknowns = unknowns ++ psbtOut.unknowns
+      unknowns = removeDuplicatesFromPsbtMap(unknowns ++ psbtOut.unknowns)
     )
 
   }
@@ -134,6 +135,14 @@ object PSBT {
       acc
     }
   }
+
+  private def removeDuplicatesFromPsbtMap(psbtMap: Seq[MapEntry]): Seq[MapEntry] = {
+    //this converts the list of entries to a scala map and back to list of entries, scala maps enforce uniqueness on the key
+    psbtMap.map( el => el.key -> el.value ).toMap.map{ case (k,v) => MapEntry(k, v) }.toSeq
+  }
+
+  private def psbtMapAsScalaMap(psbtMap: Seq[MapEntry]) = psbtMap.map( el => el.key -> el.value ).toMap
+  private def scalaMapAsPsbtMap(someMap: Map[BinaryData, BinaryData]) = someMap.map{ case (k,v) => MapEntry(k, v) }.toSeq
 
   private def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
     val setSmallerThanList = psbtMap.map(_.key).distinct.size < psbtMap.size
@@ -274,7 +283,7 @@ object PSBT {
         MapEntry(Seq(FinalScriptWitness.id.byteValue), ScriptWitness.write(wscript))
       }
       val bip32Data = input.bip32Data.map { case (pubKey, keyPath) =>
-        MapEntry(Seq(Bip32Data.id.byteValue) ++ pubKey.data, keyPath.map(writeUInt32).flatten)
+        MapEntry(Seq(Bip32Data.id.byteValue) ++ pubKey.data, fingerprint(pubKey) ++ keyPath.map(writeUInt32).flatten)
       }
 
       val partialSigs = input.partialSigs.map { case (pubKey, sig) =>
@@ -304,7 +313,7 @@ object PSBT {
       val redeemScript = output.redeemScript.map(script => MapEntry(Seq(OutputTypes.RedeemScript.id.byteValue), Script.write(script)))
       val witnessScript = output.witnessScript.map(wscript => MapEntry(Seq(OutputTypes.WitnessScript.id.byteValue), Script.write(wscript)))
       val bip32Data = output.bip32Data.map { case (pubKey, keyPath) =>
-        MapEntry(Seq(OutputTypes.Bip32Data.id.byteValue) ++ pubKey.data, keyPath.map(writeUInt32).flatten)
+        MapEntry(Seq(OutputTypes.Bip32Data.id.byteValue) ++ pubKey.data, fingerprint(pubKey) ++ keyPath.map(writeUInt32).flatten)
       }
 
       redeemScript.foreach(writeKeyValue(_, out))
@@ -329,7 +338,7 @@ object PSBT {
 
   def mergePSBT(firstPSBT: PartiallySignedTransaction, secondPSBT: PartiallySignedTransaction): PartiallySignedTransaction = {
     //check if they refer to the same transaction
-    assert(firstPSBT.tx.hash == secondPSBT.tx.hash, "Unable to merge PSBTs, they don't refer the same transction")
+    assert(firstPSBT.tx.hash == secondPSBT.tx.hash, "Unable to merge PSBTs, they don't refer to the same transction")
 
     //merged inputs
     val combinedInputs= firstPSBT.inputs.zipWithIndex.map{ case (in, idx) => in.merge(secondPSBT.inputs(idx)) }
@@ -338,7 +347,7 @@ object PSBT {
     val combinedOutputs = firstPSBT.outputs.zipWithIndex.map{ case (out, idx) => out.merge(secondPSBT.outputs(idx)) }
 
     //merged unknowns
-    val combinedUnknowns = firstPSBT.unknowns ++ secondPSBT.unknowns
+    val combinedUnknowns = removeDuplicatesFromPsbtMap(firstPSBT.unknowns ++ secondPSBT.unknowns)
 
     PartiallySignedTransaction(firstPSBT.tx, combinedInputs, combinedOutputs, combinedUnknowns)
   }

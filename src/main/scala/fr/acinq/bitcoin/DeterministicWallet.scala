@@ -148,6 +148,8 @@ object DeterministicWallet {
     */
   def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes).take(4).reverse.toArray))
 
+  def fingerprint(key: PublicKey): BinaryData = Crypto.hash160(key.data).take(4).reverse
+
   /**
     *
     * @param input extended private key

@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+
 import fr.acinq.bitcoin.PSBT.MapEntry
 import org.scalatest.FlatSpec
 import org.junit.runner.RunWith
@@ -152,18 +153,20 @@ class PSBTSpec extends FlatSpec{
 
     val merged = PSBT.mergePSBT(firstPSBT, secondPSBT)
 
+    assert(merged.inputs.size == 2)
+    assert(merged.inputs.size == expectedPSBT.inputs.size)
+
     assert(merged.inputs.head == expectedPSBT.inputs.head)
     assert(merged.inputs.tail.head == expectedPSBT.inputs.tail.head)
+
+    assert(merged.outputs.size == 2)
+    assert(merged.outputs.size == expectedPSBT.outputs.size)
 
     assert(merged.outputs.head == expectedPSBT.outputs.head)
     assert(merged.outputs.tail.head == expectedPSBT.outputs.tail.head)
 
     assert(merged.tx == expectedPSBT.tx)
-
-    val out = new ByteArrayOutputStream()
-    PSBT.write(expectedPSBT, out)
-
-    assert(toBase64String(out.toByteArray) == expectedRawMerged)
+    assert(merged.unknowns.size == 0)
 
   }
 
