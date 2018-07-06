@@ -31,6 +31,30 @@ object PSBT {
     require( !(witnessScript.isDefined && witnessOutput.isEmpty), "PSBT Input with witness script must have witness output")
     require( !(finalScriptWitness.isDefined && witnessOutput.isEmpty), "PSBT Input with final script witness must have witness output")
 
+    def merge(psbtIn: PartiallySignedInput): PartiallySignedInput = {
+
+      //see logic in sign.cpp#L533
+      val (nonWitnessUtxo, witnessUtxo) = (nonWitnessOutput, witnessOutput) match {
+        case (Some(_), Some(_)) => (None, witnessOutput)
+        case (Some(_), None)    => if(psbtIn.witnessOutput.isDefined) (None, psbtIn.witnessOutput) else (nonWitnessOutput, None)
+        case (None, Some(_))    => (None, witnessOutput)
+        case (None, None)       => if(psbtIn.witnessOutput.isDefined) (None, psbtIn.witnessOutput) else (None, None)
+      }
+
+      PartiallySignedInput(
+        nonWitnessOutput = nonWitnessUtxo,
+        witnessOutput = witnessUtxo,
+        redeemScript = if(redeemScript.isEmpty) psbtIn.redeemScript else redeemScript,
+        witnessScript = if(witnessScript.isEmpty) psbtIn.witnessScript else witnessScript,
+        finalScriptSig = if(finalScriptSig.isEmpty) psbtIn.finalScriptSig else finalScriptSig,
+        finalScriptWitness = if(finalScriptWitness.isEmpty) psbtIn.finalScriptWitness else finalScriptWitness,
+        partialSigs = partialSigs ++ psbtIn.partialSigs,
+        sighashType = sighashType.orElse(psbtIn.sighashType),
+        bip32Data = bip32Data ++ psbtIn.bip32Data,
+        unknowns = unknowns ++ psbtIn.unknowns
+      )
+    }
+
   }
 
   case class PartiallySignedOutput(
@@ -38,7 +62,16 @@ object PSBT {
     witnessScript: Option[Script] = None,
     bip32Data: Map[PublicKey, KeyPath] = Map.empty,
     unknowns: Seq[MapEntry] = Seq.empty
-  )
+  ) {
+
+    def merge(psbtOut: PartiallySignedOutput): PartiallySignedOutput = PartiallySignedOutput(
+      redeemScript = if(redeemScript.isEmpty) psbtOut.redeemScript else redeemScript,
+      witnessScript = if(witnessScript.isEmpty) psbtOut.witnessScript else witnessScript,
+      bip32Data = bip32Data ++ psbtOut.bip32Data,
+      unknowns = unknowns ++ psbtOut.unknowns
+    )
+
+  }
 
   case class PartiallySignedTransaction(
     tx: Transaction,
@@ -114,7 +147,13 @@ object PSBT {
   private def mapEntryToKeyPaths(entry: MapEntry):(PublicKey, KeyPath) = {
     val pubKey = PublicKey(entry.key.drop(1))
     assert(isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
-    val derivationPaths = entry.value.sliding(4).map(uint32(_, ByteOrder.LITTLE_ENDIAN))
+
+    val derivationPaths = entry
+      .value
+      .drop(4)    //drop the fingerprint
+      .grouped(4) //groups of 4 bytes (32 bit uint)
+      .map(uint32(_, ByteOrder.LITTLE_ENDIAN))
+
     pubKey -> KeyPath(derivationPaths.toSeq)
   }
 
@@ -286,6 +325,22 @@ object PSBT {
       inputs = tx.txIn.map(_ => PartiallySignedInput()),
       outputs = tx.txOut.map(_ => PartiallySignedOutput())
     )
+  }
+
+  def mergePSBT(firstPSBT: PartiallySignedTransaction, secondPSBT: PartiallySignedTransaction): PartiallySignedTransaction = {
+    //check if they refer to the same transaction
+    assert(firstPSBT.tx.hash == secondPSBT.tx.hash, "Unable to merge PSBTs, they don't refer the same transction")
+
+    //merged inputs
+    val combinedInputs= firstPSBT.inputs.zipWithIndex.map{ case (in, idx) => in.merge(secondPSBT.inputs(idx)) }
+
+    //merged outputs
+    val combinedOutputs = firstPSBT.outputs.zipWithIndex.map{ case (out, idx) => out.merge(secondPSBT.outputs(idx)) }
+
+    //merged unknowns
+    val combinedUnknowns = firstPSBT.unknowns ++ secondPSBT.unknowns
+
+    PartiallySignedTransaction(firstPSBT.tx, combinedInputs, combinedOutputs, combinedUnknowns)
   }
 
 }
