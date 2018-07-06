@@ -12,6 +12,9 @@ import scala.util.Try
 @RunWith(classOf[JUnitRunner])
 class PSBTSpec extends FlatSpec{
 
+  val dummyData = MapEntry(Seq(0xfa.byteValue), BinaryData("426974636f696e20726f636b7321"))
+  val dummyData2 = MapEntry(Seq(0xfb.byteValue), BinaryData("436974636f696e20726f636b7322"))
+
   it should "fail to deserialize invalid PSBTs" in {
 
     // Not in PSBT format
@@ -98,12 +101,10 @@ class PSBTSpec extends FlatSpec{
     assert(Try(PSBT.read64(serializedPsbt)).isSuccess)
     assert(serializedPsbt == rawPSBT)
 
-    val unknownData = MapEntry(Seq(0xfa.byteValue), BinaryData("426974636f696e20726f636b7321"))
-
     val psbtWithUnknowns = psbt.copy(
-      inputs = psbt.inputs.map(_.copy(unknowns = Seq(unknownData))),
-      outputs = psbt.outputs.map(_.copy(unknowns = Seq(unknownData))),
-      unknowns = Seq(unknownData)
+      inputs = psbt.inputs.map(_.copy(unknowns = Seq(dummyData))),
+      outputs = psbt.outputs.map(_.copy(unknowns = Seq(dummyData))),
+      unknowns = Seq(dummyData)
     )
 
     val outStream = new ByteArrayOutputStream()
@@ -167,6 +168,23 @@ class PSBTSpec extends FlatSpec{
 
     assert(merged.tx == expectedPSBT.tx)
     assert(merged.unknowns.size == 0)
+
+    //
+    //  Test field merging
+    //
+
+    println(s"$firstPSBT")
+    println(s"$secondPSBT")
+
+    val firstWithDummy = firstPSBT.copy(unknowns = Seq(dummyData2, dummyData))
+    val secondWithDummy = secondPSBT.copy(unknowns = Seq(dummyData))
+
+    val combined = PSBT.mergePSBT(firstWithDummy, secondWithDummy)
+
+    //Unknowns must be merged dropping duplicate records
+    assert(combined.unknowns.size == 2)
+    assert(combined.unknowns.exists(_.key == dummyData.key))
+    assert(combined.unknowns.exists(_.key == dummyData2.key))
 
   }
 

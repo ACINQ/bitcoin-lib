@@ -9,6 +9,9 @@ import fr.acinq.bitcoin.DeterministicWallet.KeyPath
 import fr.acinq.bitcoin.DeterministicWallet._
 import scala.annotation.tailrec
 
+/**
+  * see https://github.com/achow101/bips/blob/bip174-rev/bip-0174.mediawiki
+  */
 object PSBT {
 
   type Script = Seq[ScriptElt]
@@ -32,13 +35,18 @@ object PSBT {
     require( !(witnessScript.isDefined && witnessOutput.isEmpty), "PSBT Input with witness script must have witness output")
     require( !(finalScriptWitness.isDefined && witnessOutput.isEmpty), "PSBT Input with final script witness must have witness output")
 
+    /**
+      * Merges together 2 PSBT inputs, if a witness output is found the non witness is cleared.
+      *
+      * @param psbtIn
+      * @return
+      */
     def merge(psbtIn: PartiallySignedInput): PartiallySignedInput = {
 
-      //see logic in sign.cpp#L533
+      //see logic in sign.cpp#PSBTInput::Merge
       val (nonWitnessUtxo, witnessUtxo) = (nonWitnessOutput, witnessOutput) match {
-        case (Some(_), Some(_)) => (None, witnessOutput)
+        case (_, Some(_))       => (None, witnessOutput)
         case (Some(_), None)    => if(psbtIn.witnessOutput.isDefined) (None, psbtIn.witnessOutput) else (nonWitnessOutput, None)
-        case (None, Some(_))    => (None, witnessOutput)
         case (None, None)       => if(psbtIn.witnessOutput.isDefined) (None, psbtIn.witnessOutput) else (None, None)
       }
 
