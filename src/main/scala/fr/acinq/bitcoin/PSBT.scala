@@ -149,9 +149,6 @@ object PSBT {
     psbtMap.map( el => el.key -> el.value ).toMap.map{ case (k,v) => MapEntry(k, v) }.toSeq
   }
 
-  private def psbtMapAsScalaMap(psbtMap: Seq[MapEntry]) = psbtMap.map( el => el.key -> el.value ).toMap
-  private def scalaMapAsPsbtMap(someMap: Map[BinaryData, BinaryData]) = someMap.map{ case (k,v) => MapEntry(k, v) }.toSeq
-
   private def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
     val setSmallerThanList = psbtMap.map(_.key).distinct.size < psbtMap.size
     assert(psbtMap.size < 2 || !setSmallerThanList, "Duplicate keys not allowed") //TODO add the key

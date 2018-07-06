@@ -173,9 +173,6 @@ class PSBTSpec extends FlatSpec{
     //  Test field merging
     //
 
-    println(s"$firstPSBT")
-    println(s"$secondPSBT")
-
     val firstWithDummy = firstPSBT.copy(unknowns = Seq(dummyData2, dummyData))
     val secondWithDummy = secondPSBT.copy(unknowns = Seq(dummyData))
 
