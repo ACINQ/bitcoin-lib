@@ -22,6 +22,10 @@ object PSBT {
 
   case class MapEntry(key: BinaryData, value: BinaryData)
 
+  object MapEntry {
+    def apply(key: Int, value: BinaryData): MapEntry = new MapEntry(Seq(key.byteValue), value)
+  }
+
   case class PartiallySignedInput(
     nonWitnessOutput: Option[Transaction] = None,
     witnessOutput:Option[TxOut] = None,
@@ -284,24 +288,24 @@ object PSBT {
 
     psbt.inputs.foreach { input =>
 
-      val redeemOut = input.nonWitnessOutput.map(tx => MapEntry(Seq(NonWitnessUTXO.id.byteValue), Transaction.write(tx)))
-      val witOut = input.witnessOutput.map(txOut => MapEntry(Seq(WitnessUTXO.id.byteValue), TxOut.write(txOut)))
-      val redeemScript = input.redeemScript.map(script => MapEntry(Seq(RedeemScript.id.byteValue), Script.write(script)))
-      val witscript = input.witnessScript.map(wscript => MapEntry(Seq(WitnessScript.id.byteValue), Script.write(wscript)))
-      val finScriptSig = input.finalScriptSig.map(script => MapEntry(Seq(FinalScriptSig.id.byteValue), Script.write(script)))
+      val redeemOut = input.nonWitnessOutput.map(tx => MapEntry(NonWitnessUTXO.id, Transaction.write(tx)))
+      val witOut = input.witnessOutput.map(txOut => MapEntry(WitnessUTXO.id, TxOut.write(txOut)))
+      val redeemScript = input.redeemScript.map(script => MapEntry(RedeemScript.id, Script.write(script)))
+      val witscript = input.witnessScript.map(wscript => MapEntry(WitnessScript.id, Script.write(wscript)))
+      val finScriptSig = input.finalScriptSig.map(script => MapEntry(FinalScriptSig.id, Script.write(script)))
       val finScriptWit = input.finalScriptWitness.map{ wscript =>
-        MapEntry(Seq(FinalScriptWitness.id.byteValue), ScriptWitness.write(wscript))
+        MapEntry(FinalScriptWitness.id, ScriptWitness.write(wscript))
       }
       val bip32Data = input.bip32Data.map { case (pubKey, keyPath) =>
-        MapEntry(Seq(Bip32Data.id.byteValue) ++ pubKey.data, writeUInt32(keyPath.fingerprint) ++ keyPath.hdKeyPath.map(writeUInt32).flatten)
+        MapEntry(Bip32Data.id.byteValue +: pubKey.data, writeUInt32(keyPath.fingerprint) ++ keyPath.hdKeyPath.map(writeUInt32).flatten)
       }
 
       val partialSigs = input.partialSigs.map { case (pubKey, sig) =>
-        MapEntry(Seq(PartialSignature.id.byteValue) ++ pubKey.data, sig)
+        MapEntry(PartialSignature.id.byteValue +: pubKey.data, sig)
       }
 
       val sigHash = input.sighashType.map { value =>
-        MapEntry(Seq(SighashType.id.byteValue), writeUInt32(value))
+        MapEntry(SighashType.id, writeUInt32(value))
       }
 
       //Write to stream
@@ -316,14 +320,15 @@ object PSBT {
       sigHash.foreach(writeKeyValue(_, out))
       input.unknowns.foreach(writeKeyValue(_, out))
       writeUInt8(SEPARATOR, out)
+
     }
 
     psbt.outputs.foreach { output =>
 
-      val redeemScript = output.redeemScript.map(script => MapEntry(Seq(OutputTypes.RedeemScript.id.byteValue), Script.write(script)))
-      val witnessScript = output.witnessScript.map(wscript => MapEntry(Seq(OutputTypes.WitnessScript.id.byteValue), Script.write(wscript)))
+      val redeemScript = output.redeemScript.map(script => MapEntry(OutputTypes.RedeemScript.id, Script.write(script)))
+      val witnessScript = output.witnessScript.map(wscript => MapEntry(OutputTypes.WitnessScript.id, Script.write(wscript)))
       val bip32Data = output.bip32Data.map { case (pubKey, keyPath) =>
-        MapEntry(Seq(OutputTypes.Bip32Data.id.byteValue) ++ pubKey.data, writeUInt32(keyPath.fingerprint) ++ keyPath.hdKeyPath.map(writeUInt32).flatten)
+        MapEntry(OutputTypes.Bip32Data.id.byteValue +: pubKey.data, writeUInt32(keyPath.fingerprint) ++ keyPath.hdKeyPath.map(writeUInt32).flatten)
       }
 
       redeemScript.foreach(writeKeyValue(_, out))
