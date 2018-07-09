@@ -89,11 +89,10 @@ class PSBTSpec extends FlatSpec{
   }
 
   it should "serialize into PSBT format" in {
+    val out = new ByteArrayOutputStream()
 
     val rawPSBT = "cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAQMEAQAAAAAAAA=="
     val psbt = PSBT.read64(rawPSBT)
-
-    val out = new ByteArrayOutputStream()
     PSBT.write(psbt, out)
 
     val serializedPsbt = toBase64String(out.toByteArray)
@@ -107,9 +106,9 @@ class PSBTSpec extends FlatSpec{
       unknowns = Seq(dummyData)
     )
 
-    val outStream = new ByteArrayOutputStream()
-    PSBT.write(psbtWithUnknowns, outStream)
-    val rawWithUnknowns = toBase64String(outStream.toByteArray)
+    out.reset()
+    PSBT.write(psbtWithUnknowns, out)
+    val rawWithUnknowns = toBase64String(out.toByteArray)
 
     val serializedWithUnknowns = PSBT.read64(rawWithUnknowns)
 
@@ -117,6 +116,27 @@ class PSBTSpec extends FlatSpec{
     assert(serializedWithUnknowns.inputs.head.unknowns.nonEmpty)
     assert(serializedWithUnknowns.outputs.head.unknowns.nonEmpty)
 
+    //PSBT with an input with bip32 data, witness script and redeem script
+    val rawRichPsbt = "cHNidP8BAFUCAAAAASeaIyOl37UfxF8iD6WLD8E+HjNCeSqF1+Ns1jM7XLw5AAAAAAD/////AaBa6gsAAAAAGXapFP/pwAYQl8w7Y28ssEYPpPxCfStFiKwAAAAAAAEBIJVe6gsAAAAAF6kUY0UgD2jRieGtwN8cTRbqjxTA2+uHAQQiACB3H9GK1FlmbdSfPVZOPbxC9MhHdONgraFoFqjtSI1WgQEFR1IhA7E0HMunaDtq9PEjjNbpfnFn1Wn6xH8eSNR1QYRDVb1GIQPeVdHh2sgF4/iljB+/m5TALz26r+En/vykmV8m+CCDvVKuIgYDsTQcy6doO2r08SOM1ul+cWfVafrEfx5I1HVBhENVvUYQtKa6ZwAAAIAAAACABAAAgCIGA95V0eHayAXj+KWMH7+blMAvPbqv4Sf+/KSZXyb4IIO9ELSmumcAAACAAAAAgAUAAIAiAgOxNBzLp2g7avTxI4zW6X5xZ9Vp+sR/HkjUdUGEQ1W9RkYwQwIgBCS1jv+qppThVZ6lyTu/1KiQZCJAVc3wcLZ3FGlELQcCH1yOsP6mUW1guKyzOtZO3mDoeFv7OqlLmb34YVHbmpoBAAA="
+    val richPsbt = PSBT.read64(rawRichPsbt)
+
+    out.reset()
+    //now serialize it
+    PSBT.write(richPsbt, out)
+
+    val serializedRich = toBase64String(out.toByteArray)
+    //de serialize it again and check its properties
+    val deserializedRich = PSBT.read64(serializedRich)
+
+    assert(deserializedRich.inputs.size == 1)
+    assert(deserializedRich.inputs.head.bip32Data.size == 2)
+    assert(deserializedRich.inputs.head.bip32Data.head._1.toString == "03b1341ccba7683b6af4f1238cd6e97e7167d569fac47f1e48d47541844355bd46")
+
+    val fingerprint = BinaryData(Protocol.writeUInt32(deserializedRich.inputs.head.bip32Data.head._2.fingerprint))
+    assert(fingerprint.toString == "b4a6ba67")
+    assert(deserializedRich.inputs.head.bip32Data.head._2.hdKeyPath.toString == "m/0'/0'/4'")
+
+    assert(serializedRich == rawRichPsbt)
   }
 
   //[{"txid":"75ddabb27b8845f5247975c8a5ba7c6f336c4570708ebe230caf6db5217ae858","vout":0},{"txid":"1dea7cd05979072a3578cab271c02244ea8a090bbb46aa680a65ecd027048d83", "vout":1}], [{"bcrt1qmpwzkuwsqc9snjvgdt4czhjsnywa5yjdqpxskv":1.49990000}, {"bcrt1qqzh2ngh97ru8dfvgma25d6r595wcwqy0cee4cc": 1}]

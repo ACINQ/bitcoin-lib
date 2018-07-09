@@ -16,6 +16,10 @@ object PSBT {
 
   type Script = Seq[ScriptElt]
 
+  case class KeyPathWithFingerprint(fingerprint: Long, hdKeyPath: KeyPath){
+    override def toString: String = s"Fingerprint: ${BinaryData(writeUInt32(fingerprint)).toString} KeyPath: $hdKeyPath"
+  }
+
   case class MapEntry(key: BinaryData, value: BinaryData)
 
   case class PartiallySignedInput(
@@ -25,7 +29,7 @@ object PSBT {
     witnessScript: Option[Script] = None,
     finalScriptSig: Option[Script] = None,
     finalScriptWitness: Option[ScriptWitness] = None,
-    bip32Data: Map[PublicKey, KeyPath] = Map.empty,
+    bip32Data: Map[PublicKey, KeyPathWithFingerprint] = Map.empty,
     partialSigs: Map[PublicKey, BinaryData] = Map.empty,
     sighashType: Option[Int] = None,
     unknowns: Seq[MapEntry] = Seq.empty
@@ -69,7 +73,7 @@ object PSBT {
   case class PartiallySignedOutput(
     redeemScript: Option[Script] = None,
     witnessScript: Option[Script] = None,
-    bip32Data: Map[PublicKey, KeyPath] = Map.empty,
+    bip32Data: Map[PublicKey, KeyPathWithFingerprint] = Map.empty,
     unknowns: Seq[MapEntry] = Seq.empty
   ) {
 
@@ -158,17 +162,18 @@ object PSBT {
     !enumType.values.map(_.id).contains(key.head) // { 0x00, 0x01, 0x02, 0x03, 0x04 }
   }
 
-  private def mapEntryToKeyPaths(entry: MapEntry):(PublicKey, KeyPath) = {
+  private def mapEntryToKeyPaths(entry: MapEntry):(PublicKey, KeyPathWithFingerprint) = {
     val pubKey = PublicKey(entry.key.drop(1))
     assert(isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
 
     val derivationPaths = entry
       .value
-      .drop(4)    //drop the fingerprint
       .grouped(4) //groups of 4 bytes (32 bit uint)
       .map(uint32(_, ByteOrder.LITTLE_ENDIAN))
+      .toSeq
 
-    pubKey -> KeyPath(derivationPaths.toSeq)
+    //Store the first integer separately as fingerprint
+    pubKey -> KeyPathWithFingerprint(derivationPaths.head, KeyPath(derivationPaths.tail))
   }
 
   private def mapEntryToScript(entry: MapEntry): Script = Script.parse(entry.value)
@@ -288,7 +293,7 @@ object PSBT {
         MapEntry(Seq(FinalScriptWitness.id.byteValue), ScriptWitness.write(wscript))
       }
       val bip32Data = input.bip32Data.map { case (pubKey, keyPath) =>
-        MapEntry(Seq(Bip32Data.id.byteValue) ++ pubKey.data, fingerprint(pubKey) ++ keyPath.map(writeUInt32).flatten)
+        MapEntry(Seq(Bip32Data.id.byteValue) ++ pubKey.data, writeUInt32(keyPath.fingerprint) ++ keyPath.hdKeyPath.map(writeUInt32).flatten)
       }
 
       val partialSigs = input.partialSigs.map { case (pubKey, sig) =>
@@ -318,7 +323,7 @@ object PSBT {
       val redeemScript = output.redeemScript.map(script => MapEntry(Seq(OutputTypes.RedeemScript.id.byteValue), Script.write(script)))
       val witnessScript = output.witnessScript.map(wscript => MapEntry(Seq(OutputTypes.WitnessScript.id.byteValue), Script.write(wscript)))
       val bip32Data = output.bip32Data.map { case (pubKey, keyPath) =>
-        MapEntry(Seq(OutputTypes.Bip32Data.id.byteValue) ++ pubKey.data, fingerprint(pubKey) ++ keyPath.map(writeUInt32).flatten)
+        MapEntry(Seq(OutputTypes.Bip32Data.id.byteValue) ++ pubKey.data, writeUInt32(keyPath.fingerprint) ++ keyPath.hdKeyPath.map(writeUInt32).flatten)
       }
 
       redeemScript.foreach(writeKeyValue(_, out))
