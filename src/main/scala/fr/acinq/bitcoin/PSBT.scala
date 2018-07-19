@@ -26,6 +26,17 @@ object PSBT {
     def apply(key: Int, value: BinaryData): MapEntry = new MapEntry(Seq(key.byteValue), value)
   }
 
+  case class SigData(
+    scriptSig: Option[Script] = None,                                 //input script for P2PKH
+    scriptWitness: Option[ScriptWitness] = None,                      //input script for segwit txs
+    redeemScript: Option[Script] = None,                              //a possible redeem script for an output
+    witnessScript: Option[Script] = None,                             //a possible output script for P2WPKH outputs
+    signatures: Map[PublicKey, BinaryData] = Map.empty,               //<Key,Sig>
+    keyPaths: Map[BinaryData, PublicKey] = Map.empty                  //<KeyHash, Key>
+  ) {
+    def isComplete = scriptSig.isDefined || scriptWitness.isDefined
+  }
+
   case class PartiallySignedInput(
     nonWitnessOutput: Option[Transaction] = None,
     witnessOutput:Option[TxOut] = None,
@@ -72,7 +83,38 @@ object PSBT {
       )
     }
 
+    def hasFinalSigs: Boolean = finalScriptSig.isDefined || finalScriptWitness.isDefined
+
+    def getSigData: SigData = {
+
+      val finalSigData = SigData(
+        scriptSig = finalScriptSig,
+        scriptWitness = finalScriptWitness
+      )
+
+      if(finalSigData.isComplete){
+        return finalSigData
+      }
+
+      finalSigData.copy(
+        redeemScript = this.redeemScript,
+        witnessScript = this.witnessScript,
+        signatures = this.partialSigs,
+        keyPaths = this.bip32Data.map { case (pubKey,_) =>
+          (pubKey.hash160, pubKey)
+        }
+      )
+
+    }
+
+
+    def sign(signatureData: SigData, index: Int, sigHash: Int): (Boolean, PartiallySignedInput) = {
+      ???
+    }
+
   }
+
+
 
   case class PartiallySignedOutput(
     redeemScript: Option[Script] = None,
@@ -366,5 +408,15 @@ object PSBT {
 
     PartiallySignedTransaction(firstPSBT.tx, combinedInputs, combinedOutputs, combinedUnknowns)
   }
+
+  def finalizePSBT(psbt: PartiallySignedTransaction): PartiallySignedTransaction = {
+
+    //check if all signatures are complete (for the inputs)
+    val isComplete = psbt.inputs.forall( _.hasFinalSigs )
+
+    psbt
+
+  }
+
 
 }
