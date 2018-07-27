@@ -2,11 +2,14 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, InputStream, OutputStream}
 import java.nio.ByteOrder
+import fr.acinq.bitcoin._
 import Protocol._
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
 import fr.acinq.bitcoin.DeterministicWallet._
+import fr.acinq.bitcoin.Script.Runner
+
 import scala.annotation.tailrec
 
 /**
@@ -107,10 +110,52 @@ object PSBT {
 
     }
 
+    def finalizeIfComplete(index: Int): PartiallySignedInput = {
+      //this input has already been signed and its outputs scripts are complete
+      if(hasFinalSigs)
+        return this
 
-    def sign(signatureData: SigData, index: Int, sigHash: Int): (Boolean, PartiallySignedInput) = {
-      ???
+      //Try to create finalized script
+      (redeemScript, witnessScript) match {
+        //Case1: the input references a non witness UTXO (either P2PKH or P2SH)
+        case (Some(redeem), None) =>
+          val prevTx = nonWitnessOutput.getOrElse(throw new RuntimeException("Non witness output not found"))
+          val utxo   = prevTx.txOut(prevTx.txIn(index).outPoint.index.toInt)
+          val scriptPubKey = Script.parse(utxo.publicKeyScript)
+          val tx = Transaction(1, TxIn(prevTx.txIn(index).outPoint, utxo.publicKeyScript, 0) +: Nil, TxOut(utxo.amount, scriptPubKey) +: Nil, 0)
+          val multiSigPubKeys = Script.publicKeysFromRedeemScript(redeem.toList)
+          val sigs = multiSigPubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
+
+          //The PSBT does not contain all the signatures necessary to redeem the script
+          if(sigs.size < multiSigPubKeys.size){
+            return this
+          }
+
+          //first step check the redeemScript hash
+          val expectedHash = BinaryData(Script.publicKeyHash(scriptPubKey))
+          assert(Crypto.hash160(Script.write(redeemScript.get)) == expectedHash, "P2SH redeem script does not match expected hash")
+
+          val unlockingScript = (OP_0 +: sigs.map(OP_PUSHDATA(_))) ++ (OP_PUSHDATA(Script.write(redeemScript.get)) :: Nil)
+
+          //Execute the unlocking script
+          val runner = new Runner(Script.Context(tx, index, utxo.amount))
+          Script.castToBoolean(runner.run(unlockingScript).head) match {
+            case true   => this.copy(
+              redeemScript = None,
+              partialSigs = Map.empty,
+              bip32Data = Map.empty,
+              sighashType =  None,
+              finalScriptSig = Some(unlockingScript))
+            case false  => this
+          }
+
+        case (None, Some(witnessScriptCode)) => this
+        case (_, _) => this //throw new  RuntimeException(s"PSBT input $index can't have both redeem and witness script")
+      }
+
+
     }
+
 
   }
 
@@ -411,10 +456,10 @@ object PSBT {
 
   def finalizePSBT(psbt: PartiallySignedTransaction): PartiallySignedTransaction = {
 
-    //check if all signatures are complete (for the inputs)
-    val isComplete = psbt.inputs.forall( _.hasFinalSigs )
+    //try to finalize the inputs if they've already been signed (partial sigs are exaustive)
+    val finalized = psbt.copy(inputs = psbt.inputs.zipWithIndex.map{ case (input, idx) => input.finalizeIfComplete(idx) } )
 
-    psbt
+    finalized
 
   }
 
