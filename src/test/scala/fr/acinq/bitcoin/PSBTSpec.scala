@@ -220,6 +220,8 @@ class PSBTSpec extends FlatSpec{
     val out = new ByteArrayOutputStream()
     PSBT.write(finalized, out)
 
+    assert(toBase64String(out.toByteArray) == expectedRawFinalized)
+
     assert(finalized.tx == expectedFinalized.tx)
 
     //Props of the expected finalized psbt input
@@ -233,12 +235,21 @@ class PSBTSpec extends FlatSpec{
     assert(finalized.inputs(0).partialSigs == expectedFinalized.inputs(0).partialSigs)
     assert(finalized.inputs(0).bip32Data == expectedFinalized.inputs(0).bip32Data)
 
+    assert(finalized.inputs(1).finalScriptSig == expectedFinalized.inputs(1).finalScriptSig)
+    assert(finalized.inputs(1).finalScriptWitness.map(ScriptWitness.write) == expectedFinalized.inputs(1).finalScriptWitness.map(ScriptWitness.write))
+    assert(finalized.inputs(1).nonWitnessOutput == expectedFinalized.inputs(1).nonWitnessOutput)
+    assert(finalized.inputs(1).witnessOutput == expectedFinalized.inputs(1).witnessOutput)
+    assert(finalized.inputs(1).redeemScript == expectedFinalized.inputs(1).redeemScript)
+    assert(finalized.inputs(1).witnessScript  == expectedFinalized.inputs(1).witnessScript)
+    assert(finalized.inputs(1).sighashType == expectedFinalized.inputs(1).sighashType)
+    assert(finalized.inputs(1).partialSigs == expectedFinalized.inputs(1).partialSigs)
+    assert(finalized.inputs(1).bip32Data == expectedFinalized.inputs(1).bip32Data)
 
     assert(finalized.inputs.size == 2)
     assert(finalized.inputs.size == expectedFinalized.inputs.size)
 
     assert(finalized.inputs(0) == expectedFinalized.inputs(0))
-//    assert(finalized.inputs(1) == expectedFinalized.inputs(1))
+    assert(finalized.inputs(1) == expectedFinalized.inputs(1))
 
     assert(finalized.outputs.size == 2)
     assert(finalized.outputs.size == expectedFinalized.outputs.size)
