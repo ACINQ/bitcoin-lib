@@ -29,17 +29,6 @@ object PSBT {
     def apply(key: Int, value: BinaryData): MapEntry = new MapEntry(Seq(key.byteValue), value)
   }
 
-  case class SigData(
-    scriptSig: Option[Script] = None,                                 //input script for P2PKH
-    scriptWitness: Option[ScriptWitness] = None,                      //input script for segwit txs
-    redeemScript: Option[Script] = None,                              //a possible redeem script for an output
-    witnessScript: Option[Script] = None,                             //a possible output script for P2WPKH outputs
-    signatures: Map[PublicKey, BinaryData] = Map.empty,               //<Key,Sig>
-    keyPaths: Map[BinaryData, PublicKey] = Map.empty                  //<KeyHash, Key>
-  ) {
-    def isComplete = scriptSig.isDefined || scriptWitness.isDefined
-  }
-
   case class PartiallySignedInput(
     nonWitnessOutput: Option[Transaction] = None,
     witnessOutput:Option[TxOut] = None,
@@ -88,28 +77,6 @@ object PSBT {
 
     def hasFinalSigs: Boolean = finalScriptSig.isDefined || finalScriptWitness.isDefined
 
-    def getSigData: SigData = {
-
-      val finalSigData = SigData(
-        scriptSig = finalScriptSig,
-        scriptWitness = finalScriptWitness
-      )
-
-      if(finalSigData.isComplete){
-        return finalSigData
-      }
-
-      finalSigData.copy(
-        redeemScript = this.redeemScript,
-        witnessScript = this.witnessScript,
-        signatures = this.partialSigs,
-        keyPaths = this.bip32Data.map { case (pubKey,_) =>
-          (pubKey.hash160, pubKey)
-        }
-      )
-
-    }
-
     def finalizeIfComplete(index: Int): PartiallySignedInput = {
       //this input has already been signed and its outputs scripts are complete
       if(hasFinalSigs)
@@ -141,11 +108,12 @@ object PSBT {
           val runner = mkScriptRunner()
           Script.castToBoolean(runner.run(unlockingScript).head) match {
             case true   => this.copy(
+              finalScriptSig = Some(unlockingScript),
               redeemScript = None,
+              witnessScript = None,
               partialSigs = Map.empty,
               bip32Data = Map.empty,
-              sighashType =  None,
-              finalScriptSig = Some(unlockingScript))
+              sighashType =  None)
             case false  => this
           }
 
