@@ -2,7 +2,8 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, InputStream, OutputStream}
 import java.nio.ByteOrder
-import fr.acinq.bitcoin._
+
+
 import Protocol._
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.Crypto._
@@ -11,6 +12,7 @@ import fr.acinq.bitcoin.DeterministicWallet._
 import fr.acinq.bitcoin.Script.Runner
 
 import scala.annotation.tailrec
+import scala.util.{Failure, Success, Try}
 
 /**
   * see https://github.com/achow101/bips/blob/bip174-rev/bip-0174.mediawiki
@@ -20,7 +22,7 @@ object PSBT {
   type Script = List[ScriptElt]
 
   case class KeyPathWithFingerprint(fingerprint: Long, hdKeyPath: KeyPath){
-    override def toString: String = s"Fingerprint: ${BinaryData(writeUInt32(fingerprint)).toString} KeyPath: $hdKeyPath"
+    override def toString: String = s"Fingerprint: ${BinaryData(writeUInt32(fingerprint))} KeyPath: $hdKeyPath"
   }
 
   case class MapEntry(key: BinaryData, value: BinaryData)
@@ -77,49 +79,74 @@ object PSBT {
 
     def hasFinalSigs: Boolean = finalScriptSig.isDefined || finalScriptWitness.isDefined
 
-    def finalizeIfComplete(index: Int): PartiallySignedInput = {
+    def finalizeIfComplete(tx: Transaction, index: Int): PartiallySignedInput = {
       //this input has already been signed and its outputs scripts are complete
-      if(hasFinalSigs)
+      if(hasFinalSigs) {
         return this
+      }
 
       //Try to create finalized script
       (redeemScript, witnessScript) match {
         case (None, None) => this
         case (Some(redeem), None) =>
-          //TODO p2pkh?
           val prevTx = nonWitnessOutput.getOrElse(throw new RuntimeException("Non witness output not found"))
-          val utxo   = prevTx.txOut(prevTx.txIn(index).outPoint.index.toInt)
+          val utxo   = prevTx.txOut(index)
           val scriptPubKey = Script.parse(utxo.publicKeyScript)
-          val multiSigPubKeys = Script.publicKeysFromRedeemScript(redeem)
-          val sigs = multiSigPubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
+          val pubkeyHash = BinaryData(Script.publicKeyHash(scriptPubKey))
+          Script.isPayToScript(scriptPubKey) match {
+            //P2SH
+            case true => {
+              //first step check the redeemScript hash
+              assert(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
+              val multiSigPubKeys = Script.publicKeysFromRedeemScript(redeem)
+              val sigs = multiSigPubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
 
-          //The PSBT does not contain all the signatures necessary to redeem the script
-          if(sigs.size < multiSigPubKeys.size){
-            return this
+              //The PSBT does not contain all the signatures necessary to redeem the script
+              if (sigs.size < multiSigPubKeys.size) {
+                return this
+              }
+
+              val scriptSig = (OP_0 +: sigs.map(OP_PUSHDATA(_))) ++ (OP_PUSHDATA(Script.write(redeem)) :: Nil)
+
+              //Execute the unlocking script
+              val runner = mkScriptRunner(tx, index)
+              runner.verifyScripts(Script.write(scriptSig), Script.write(scriptPubKey)) match {
+                case true => this.copy(
+                  finalScriptSig = Some(scriptSig),
+                  redeemScript = None,
+                  witnessScript = None,
+                  partialSigs = Map.empty,
+                  bip32Data = Map.empty,
+                  sighashType = None)
+                case false => this
+              }
+            }
+            //P2PKH
+            case false => {
+              partialSigs.find(el => el._1.hash160 == pubkeyHash) match {
+                case None             =>  this //signatures were not found in the PSBT, unable to finalize this input
+                case Some((pub, sig)) =>
+
+                  val runner = mkScriptRunner(tx, index)
+                  val scriptSig = OP_PUSHDATA(sig) :: OP_PUSHDATA(pub) :: Nil
+                  Try(runner.verifyScripts(Script.write(scriptSig), Script.write(scriptPubKey))) match {
+                    case Failure(thr)     =>
+                      println(thr)
+                      this
+                    case Success(false)   => this
+                    case Success(true)    => this.copy(
+                      finalScriptSig = Some(scriptSig),
+                      redeemScript = None,
+                      partialSigs = Map.empty
+                    )
+                  }
+              }
+            }
           }
-
-          //first step check the redeemScript hash
-          val expectedHash = BinaryData(Script.publicKeyHash(scriptPubKey))
-          assert(Crypto.hash160(Script.write(redeemScript.get)) == expectedHash, "P2SH redeem script does not match expected hash")
-
-          val unlockingScript = (OP_0 +: sigs.map(OP_PUSHDATA(_))) ++ (OP_PUSHDATA(Script.write(redeem)) :: Nil)
-
-          //Execute the unlocking script
-          val runner = mkScriptRunner()
-          Script.castToBoolean(runner.run(unlockingScript).head) match {
-            case true   => this.copy(
-              finalScriptSig = Some(unlockingScript),
-              redeemScript = None,
-              witnessScript = None,
-              partialSigs = Map.empty,
-              bip32Data = Map.empty,
-              sighashType =  None)
-            case false  => this
-          }
-
+        // P2WPKH
         case (None, Some(witnessScriptCode)) =>
-          // P2WPKH
           throw new NotImplementedError("Pay-2-[Witness]-Public-Key-Hash not yet implemented")
+        // P2WSH
         case (Some(redeem), Some(witness)) =>
 
           val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
@@ -165,19 +192,24 @@ object PSBT {
 
   }
 
-  private def mkScriptRunner(flags: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS): Script.Runner = {
-    val tx = Transaction(
-      version = 1,
-      TxIn(
-        outPoint =  new OutPoint(BinaryData("0000000000000000000000000000000000000000000000000000000000000000"), 0),
-        signatureScript = BinaryData("0000000 000000000000000000000000000000000000000"),
-        sequence = 0,
-        witness = ScriptWitness.empty) +: Nil,
-      TxOut(Satoshi(0), BinaryData("0000000000000000000000000000000000000000000000")) +: Nil,
-      lockTime = 0
-    )
+  private lazy val dummyTx = Transaction(
+    version = 1,
+    TxIn(
+      outPoint =  new OutPoint(BinaryData("0000000000000000000000000000000000000000000000000000000000000000"), 0),
+      signatureScript = BinaryData("0000000000000000000000000000000000000000000000"),
+      sequence = 0,
+      witness = ScriptWitness.empty) +: Nil,
+    TxOut(Satoshi(0), BinaryData("0000000000000000000000000000000000000000000000")) +: Nil,
+    lockTime = 0
+  )
 
-    new Runner(Script.Context(tx, 0, Satoshi(0) ), flags)
+  private def mkScriptRunner(
+      tx: Transaction = dummyTx,
+      inputIndex:Int = 0,
+      amount: Satoshi = Satoshi(0),
+      flags: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS): Script.Runner = {
+
+    new Runner(Script.Context(tx, inputIndex, amount), flags)
   }
 
   case class PartiallySignedOutput(
@@ -476,10 +508,22 @@ object PSBT {
   def finalizePSBT(psbt: PartiallySignedTransaction): PartiallySignedTransaction = {
 
     //try to finalize the inputs if they've already been signed (partial sigs are exaustive)
-    val finalized = psbt.copy(inputs = psbt.inputs.zipWithIndex.map{ case (input, idx) => input.finalizeIfComplete(idx) } )
-
-    finalized
-
+    val updated = psbt.copy(inputs = psbt.inputs.zipWithIndex.map{ case (input, idx) => input.finalizeIfComplete(psbt.tx, idx) } )
+    updated
+//    var tx = updated.tx
+//    updated.inputs.zipWithIndex.map { case (input, idx) =>
+//      input match {
+//        case in if !in.hasFinalSigs => in
+//        case PartiallySignedInput(_,_,_,_,_,Some(scriptWitness),_,_,_,_) =>
+//          tx = tx.updateWitness(idx, scriptWitness)
+//        case PartiallySignedInput(_,_,_,_,Some(sigScript),None,_,_,_,_) =>
+//          tx = tx.updateSigScript(idx, sigScript)
+//        case PartiallySignedInput(_,_,_,_,Some(sigScript),Some(scriptWitness),_,_,_,_) =>
+//          tx = tx.updateSigScript(idx, sigScript)
+//          tx = tx.updateWitness(idx, scriptWitness)
+//      }
+//      ???
+//    }
   }
 
 
