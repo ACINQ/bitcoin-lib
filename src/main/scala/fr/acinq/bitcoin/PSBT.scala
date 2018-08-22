@@ -129,12 +129,9 @@ object PSBT {
 
                   val runner = mkScriptRunner(tx, index)
                   val scriptSig = OP_PUSHDATA(sig) :: OP_PUSHDATA(pub) :: Nil
-                  Try(runner.verifyScripts(Script.write(scriptSig), Script.write(scriptPubKey))) match {
-                    case Failure(thr)     =>
-                      println(thr)
-                      this
-                    case Success(false)   => this
-                    case Success(true)    => this.copy(
+                  runner.verifyScripts(Script.write(scriptSig), Script.write(scriptPubKey)) match {
+                    case false     => this
+                    case true      => this.copy(
                       finalScriptSig = Some(scriptSig),
                       redeemScript = None,
                       partialSigs = Map.empty
@@ -185,11 +182,7 @@ object PSBT {
           }
 
       }
-
-
     }
-
-
   }
 
   private lazy val dummyTx = Transaction(

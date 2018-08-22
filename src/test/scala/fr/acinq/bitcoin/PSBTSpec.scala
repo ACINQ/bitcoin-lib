@@ -2,7 +2,8 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
-import fr.acinq.bitcoin.PSBT.MapEntry
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoin.PSBT.{MapEntry, PartiallySignedInput}
 import org.scalatest.FlatSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -260,6 +261,40 @@ class PSBTSpec extends FlatSpec{
     assert(finalized.outputs.size == expectedFinalized.outputs.size)
     assert(finalized.outputs(0) == expectedFinalized.outputs(0))
     assert(finalized.outputs(1) == expectedFinalized.outputs(1))
+
+  }
+
+  it should "finalize P2PKH inputs" in {
+    val amount = Satoshi(50000000)
+    val sigHash = SIGHASH_SINGLE
+    val privKey = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pubKey = privKey.publicKey
+    //output script to be spent
+    val scriptPubKey = Script.pay2pkh(pubKey)
+
+    //transaction containing the UTXO
+    val prevTx = Transaction(version = 2, txIn = Nil, txOut = TxOut(amount, scriptPubKey) :: Nil, lockTime = 0)
+
+    //Create an input spending the UTXO and create a PSBT with it
+    val spendingInput = Seq(TxIn(OutPoint(prevTx, 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
+    val psbt = PSBT.createPSBT(inputs = spendingInput, outputs = Seq.empty)
+
+    //make signature for input 0 of the PSBT transaction
+    val sig = Transaction.signInput(psbt.tx, 0, scriptPubKey, sigHash, amount, SigVersion.SIGVERSION_BASE, privKey)
+
+    //add the signature and the related data to the psbt
+    val psbtWithSig = psbt.copy(inputs = Seq(PartiallySignedInput(
+      nonWitnessOutput = Some(prevTx),
+      redeemScript = Some(scriptPubKey.toList),
+      partialSigs = Map(pubKey -> sig),
+      sighashType = Some(sigHash)
+    )))
+
+    //finalize the psbt
+    val finalized = PSBT.finalizePSBT(psbtWithSig)
+
+    //check if final scriptSig is defined
+    assert(finalized.inputs.head.finalScriptSig.isDefined)
 
   }
 
