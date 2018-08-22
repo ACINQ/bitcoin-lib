@@ -277,7 +277,8 @@ class PSBTSpec extends FlatSpec{
 
     //Create an input spending the UTXO and create a PSBT with it
     val spendingInput = Seq(TxIn(OutPoint(prevTx, 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
-    val psbt = PSBT.createPSBT(inputs = spendingInput, outputs = Seq.empty)
+    val newlyCreatedOut = Seq(TxOut(amount, Script.pay2wpkh(pubKey)))
+    val psbt = PSBT.createPSBT(inputs = spendingInput, outputs = newlyCreatedOut)
 
     //make signature for input 0 of the PSBT transaction
     val sig = Transaction.signInput(psbt.tx, 0, scriptPubKey, sigHash, amount, SigVersion.SIGVERSION_BASE, privKey)
