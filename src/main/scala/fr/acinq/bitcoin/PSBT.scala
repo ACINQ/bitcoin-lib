@@ -97,7 +97,7 @@ object PSBT {
             //P2SH
             case true => {
               //first step check the redeemScript hash
-              assert(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
+              require(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
               val multiSigPubKeys = Script.publicKeysFromRedeemScript(redeem)
               val sigs = multiSigPubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
 
@@ -151,11 +151,11 @@ object PSBT {
 
           val expectedHash = BinaryData(Script.publicKeyHash(scriptPubKey))
           val serializedRedeem = Script.write(redeem)
-          assert(Crypto.hash160(serializedRedeem) == expectedHash, "P2SH redeem script does not match expected hash")
+          require(Crypto.hash160(serializedRedeem) == expectedHash, "P2SH redeem script does not match expected hash")
 
           val OP_PUSHDATA(data, dataLength) = redeem.last
-          assert(dataLength == 32) //P2WSH
-          assert(data == Crypto.sha256(Script.write(witness)), "SHA of the witness script must match the witness program")
+          require(dataLength == 32) //P2WSH
+          require(data == Crypto.sha256(Script.write(witness)), "SHA of the witness script must match the witness program")
 
           val pubKeys = Script.publicKeysFromRedeemScript(witness)
           val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
@@ -290,7 +290,7 @@ object PSBT {
 
   private def assertNoDuplicates(psbtMap: Seq[MapEntry]) = {
     val setSmallerThanList = psbtMap.map(_.key).distinct.size < psbtMap.size
-    assert(psbtMap.size < 2 || !setSmallerThanList, "Duplicate keys not allowed") //TODO add the key
+    require(psbtMap.size < 2 || !setSmallerThanList, "Duplicate keys not allowed") //TODO add the key
   }
 
   private def isKeyUnknown[T <: Enumeration](key: BinaryData, enumType: T): Boolean = {
@@ -299,7 +299,7 @@ object PSBT {
 
   private def mapEntryToKeyPaths(entry: MapEntry):(PublicKey, KeyPathWithFingerprint) = {
     val pubKey = PublicKey(entry.key.drop(1))
-    assert(isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
+    require(isPubKeyValid(pubKey.data), "Invalid pubKey parsed")
 
     val derivationPaths = entry
       .value
@@ -323,7 +323,7 @@ object PSBT {
 
     val psbtMagic = uint32(input, ByteOrder.BIG_ENDIAN)
     val separator = uint8(input)
-    assert(psbtMagic == PSBD_MAGIC && separator == HEADER_SEPARATOR, s"PSBT header not valid '$psbtMagic|$separator'")
+    require(psbtMagic == PSBD_MAGIC && separator == HEADER_SEPARATOR, s"PSBT header not valid '$psbtMagic|$separator'")
 
     //Read exactly one map for globals
     val globalMap = readKeyValueMap(input)
@@ -334,7 +334,7 @@ object PSBT {
     }
 
     tx.txIn.foreach { in =>
-      assert(!in.hasSigScript && !in.hasWitness, s"Non empty input(${TxIn.write(in).toString}) found in the transaction")
+      require(!in.hasSigScript && !in.hasWitness, s"Non empty input(${TxIn.write(in).toString}) found in the transaction")
     }
 
     val globalUnknowns = globalMap.filter(el => isKeyUnknown(el.key, GlobalTypes))
@@ -484,7 +484,7 @@ object PSBT {
 
   def mergePSBT(firstPSBT: PartiallySignedTransaction, secondPSBT: PartiallySignedTransaction): PartiallySignedTransaction = {
     //check if they refer to the same transaction
-    assert(firstPSBT.tx.hash == secondPSBT.tx.hash, "Unable to merge PSBTs, they don't refer to the same transction")
+    require(firstPSBT.tx.hash == secondPSBT.tx.hash, "Unable to merge PSBTs, they don't refer to the same transction")
 
     //merged inputs
     val combinedInputs= firstPSBT.inputs.zipWithIndex.map{ case (in, idx) => in.merge(secondPSBT.inputs(idx)) }
