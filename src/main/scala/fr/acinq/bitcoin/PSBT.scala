@@ -95,7 +95,7 @@ object PSBT {
           val pubkeyHash = BinaryData(Script.publicKeyHash(scriptPubKey))
           Script.isPayToScript(scriptPubKey) match {
             //P2SH
-            case true => {
+            case true =>
               //first step check the redeemScript hash
               require(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
               val multiSigPubKeys = Script.publicKeysFromRedeemScript(redeem)
@@ -120,9 +120,8 @@ object PSBT {
                   sighashType = None)
                 case false => this
               }
-            }
             //P2PKH
-            case false => {
+            case false =>
               partialSigs.find(el => el._1.hash160 == pubkeyHash) match {
                 case None             =>  this //signatures were not found in the PSBT, unable to finalize this input
                 case Some((pub, sig)) =>
@@ -138,12 +137,36 @@ object PSBT {
                     )
                   }
               }
-            }
           }
         // P2WPKH
-        case (None, Some(witnessScriptCode)) =>
-          throw new NotImplementedError("Pay-2-[Witness]-Public-Key-Hash not yet implemented")
-        // P2WSH
+        case (None, Some(witness)) =>
+
+          val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
+          val scriptPubKey = Script.parse(utxo.publicKeyScript)
+          val OP_PUSHDATA(pubkeyHash, size) = scriptPubKey.last // 0 <20-byte-key-hash>
+          require(size == 20, "P2WPKH witness program should be 20 byte")
+
+          //find a <pubKey, sig> pair for the given 'pubKeyHash'
+          partialSigs.find(el => el._1.hash160 == pubkeyHash) match {
+            case None             => this
+            case Some((pub, sig)) =>
+
+              val finalWitProg = ScriptWitness(sig :: pub.toBin :: Nil)
+
+              val runner = mkScriptRunner(tx, index, utxo.amount)
+              runner.verifyScripts(BinaryData.empty, Script.write(scriptPubKey), finalWitProg) match {
+                case false  => this
+                case true   => this.copy(
+                  finalScriptWitness = Some(finalWitProg),
+                  redeemScript = None,
+                  witnessScript = None,
+                  sighashType = None,
+                  partialSigs = Map.empty,
+                  bip32Data = Map.empty
+                )
+              }
+          }
+        // P2WSH-nested-P2SH
         case (Some(redeem), Some(witness)) =>
 
           val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
@@ -167,7 +190,7 @@ object PSBT {
           val finalScriptSignature = OP_PUSHDATA(serializedRedeem) :: Nil
           val finalScriptWit = ScriptWitness(BinaryData("") +: sigs :+ Script.write(witness) )
 
-          val runner = mkScriptRunner()
+          val runner = mkScriptRunner(tx, index, utxo.amount)
           runner.verifyScripts(Script.write(finalScriptSignature), scriptPubKey, finalScriptWit) match {
             case false  => this
             case true   => this.copy(
@@ -200,7 +223,7 @@ object PSBT {
       tx: Transaction = dummyTx,
       inputIndex:Int = 0,
       amount: Satoshi = Satoshi(0),
-      flags: Int = ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS): Script.Runner = {
+      flags: Int = ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS): Script.Runner = {
 
     new Runner(Script.Context(tx, inputIndex, amount), flags)
   }
@@ -472,8 +495,8 @@ object PSBT {
 
   }
 
-  def createPSBT(inputs: Seq[TxIn], outputs: Seq[TxOut], lockTime: Long = 0): PartiallySignedTransaction = {
-    val tx = Transaction(version = 2, inputs, outputs, lockTime)
+  def createPSBT(inputs: Seq[TxIn], outputs: Seq[TxOut], lockTime: Long = 0, txFormatVersion: Int = 1): PartiallySignedTransaction = {
+    val tx = Transaction(txFormatVersion, inputs, outputs, lockTime)
 
     PartiallySignedTransaction(
       tx = tx,

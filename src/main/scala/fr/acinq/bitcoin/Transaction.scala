@@ -435,7 +435,7 @@ object Transaction extends BtcSerializer[Transaction] {
     */
   def sign(input: Transaction, signData: Seq[SignData]): Transaction = {
 
-    require(signData.length == input.txIn.length, "There should be signing data for every transaction")
+    require(signData.length == input.txIn.length, "There should be signing data for every input")
 
     // sign each input
     val signedInputs = for (i <- input.txIn.indices) yield {

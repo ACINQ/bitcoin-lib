@@ -3,7 +3,9 @@ package fr.acinq.bitcoin
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoin.DeterministicWallet.generate
 import fr.acinq.bitcoin.PSBT.{MapEntry, PartiallySignedInput}
+import fr.acinq.bitcoin.Script.Runner
 import org.scalatest.FlatSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -159,7 +161,7 @@ class PSBTSpec extends FlatSpec{
       TxOut(100000000 satoshi, OP_0 :: OP_PUSHDATA(toAddress2) :: Nil)
     )
 
-    val psbt = PSBT.createPSBT(inputs, outputs)
+    val psbt = PSBT.createPSBT(inputs, outputs, txFormatVersion = 2) //reference test use version 2
 
     val out = new ByteArrayOutputStream()
     PSBT.write(psbt, out)
@@ -273,10 +275,10 @@ class PSBTSpec extends FlatSpec{
     val scriptPubKey = Script.pay2pkh(pubKey)
 
     //transaction containing the UTXO
-    val prevTx = Transaction(version = 2, txIn = Nil, txOut = TxOut(amount, scriptPubKey) :: Nil, lockTime = 0)
+    val prevTx = Transaction(version = 1, txIn = Nil, txOut = TxOut(amount, scriptPubKey) :: Nil, lockTime = 0)
 
     //Create an input spending the UTXO and create a PSBT with it
-    val spendingInput = Seq(TxIn(OutPoint(prevTx, 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
+    val spendingInput = Seq(TxIn(OutPoint(prevTx, 0), sequence = 0xFFFFFFFF, signatureScript = Nil))
     val newlyCreatedOut = Seq(TxOut(amount, Script.pay2wpkh(pubKey)))
     val psbt = PSBT.createPSBT(inputs = spendingInput, outputs = newlyCreatedOut)
 
@@ -296,6 +298,39 @@ class PSBTSpec extends FlatSpec{
 
     //check if final scriptSig is defined
     assert(finalized.inputs.head.finalScriptSig.isDefined)
+
+  }
+
+  it should "finalize native P2WPKH" in {
+    val sigHash = SIGHASH_ALL
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pub1 = priv1.publicKey
+    //output script to be spent
+    val scriptPubKey = Script.pay2wpkh(pub1)
+
+    //send 0.39 BTC to P2WPK output
+    val prevTx = Transaction(version = 1, txIn = Nil, txOut = TxOut(0.39 btc, scriptPubKey) :: Nil, lockTime = 0)
+
+    val utxo = prevTx.txOut.head
+    val spendingInput = TxIn(OutPoint(prevTx.hash, 0), sequence = 0xffffffffL, signatureScript = Nil, witness = ScriptWitness.empty)
+    val newlyCreatedOut = TxOut(0.38 btc, Script.pay2pkh(pub1))
+
+    val psbt = PSBT.createPSBT(inputs = Seq(spendingInput), outputs = Seq(newlyCreatedOut))
+
+    val signatureScriptPubKey = Script.pay2pkh(pub1)
+    val sig = Transaction.signInput(psbt.tx, 0, signatureScriptPubKey, sigHash, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
+
+    val updatedPSBT = psbt.copy(inputs = Seq(PartiallySignedInput(
+      witnessOutput = Some(utxo),
+      partialSigs = Map(pub1 -> sig),
+      witnessScript = Some(Script.parse(utxo.publicKeyScript)),
+      sighashType = Some(sigHash)
+    )))
+
+    val finalized = PSBT.finalizePSBT(updatedPSBT)
+
+    assert(finalized.inputs.head.finalScriptWitness.isDefined)
+    assert(finalized.inputs.head.finalScriptSig.isEmpty)
 
   }
 
