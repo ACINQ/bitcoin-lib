@@ -139,25 +139,51 @@ object PSBT {
               }
           }
         // P2WPKH
-        case (None, Some(witness)) =>
+        case (None, Some(witnessProg)) =>
 
           val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
-          val scriptPubKey = Script.parse(utxo.publicKeyScript)
-          val OP_PUSHDATA(pubkeyHash, size) = scriptPubKey.last // 0 <20-byte-key-hash>
-          require(size == 20, "P2WPKH witness program should be 20 byte")
+          Script.parse(utxo.publicKeyScript) match {
+            //P2WPKH
+            case OP_0 :: OP_PUSHDATA(pubkeyHash, size) :: Nil if size == 20 =>
+              //find a <pubKey, sig> pair for the given 'pubKeyHash'
+              partialSigs.find(el => el._1.hash160 == pubkeyHash) match {
+                case None             => this
+                case Some((pub, sig)) =>
 
-          //find a <pubKey, sig> pair for the given 'pubKeyHash'
-          partialSigs.find(el => el._1.hash160 == pubkeyHash) match {
-            case None             => this
-            case Some((pub, sig)) =>
+                  val finalWitProg = ScriptWitness(sig :: pub.toBin :: Nil)
 
-              val finalWitProg = ScriptWitness(sig :: pub.toBin :: Nil)
+                  val runner = mkScriptRunner(tx, index, utxo.amount)
+                  runner.verifyScripts(BinaryData.empty, utxo.publicKeyScript, finalWitProg) match {
+                    case false  => this
+                    case true   => this.copy(
+                      finalScriptWitness = Some(finalWitProg),
+                      redeemScript = None,
+                      witnessScript = None,
+                      sighashType = None,
+                      partialSigs = Map.empty,
+                      bip32Data = Map.empty
+                    )
+                  }
+              }
+
+            //P2WSH
+            case OP_0 :: OP_PUSHDATA(scriptHash, size) :: Nil if size == 32 =>
+
+              require(scriptHash == Crypto.sha256(Script.write(witnessProg)), "Script hash does not match witnessScript")
+              val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
+              val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
+
+              if(sigs.size < pubKeys.size){
+                return this
+              }
+
+              val finalScriptWit = ScriptWitness(BinaryData.empty +: sigs :+ Script.write(witnessProg))
 
               val runner = mkScriptRunner(tx, index, utxo.amount)
-              runner.verifyScripts(BinaryData.empty, Script.write(scriptPubKey), finalWitProg) match {
+              runner.verifyScripts(BinaryData.empty, utxo.publicKeyScript, finalScriptWit) match {
                 case false  => this
                 case true   => this.copy(
-                  finalScriptWitness = Some(finalWitProg),
+                  finalScriptWitness = Some(finalScriptWit),
                   redeemScript = None,
                   witnessScript = None,
                   sighashType = None,
@@ -165,6 +191,8 @@ object PSBT {
                   bip32Data = Map.empty
                 )
               }
+            //not recognized
+            case _ => throw new IllegalArgumentException(s"UTXO's scriptPubKey not recognized: '${utxo.publicKeyScript}'")
           }
         // P2WSH-nested-P2SH
         case (Some(redeem), Some(witness)) =>
@@ -188,7 +216,7 @@ object PSBT {
           }
 
           val finalScriptSignature = OP_PUSHDATA(serializedRedeem) :: Nil
-          val finalScriptWit = ScriptWitness(BinaryData("") +: sigs :+ Script.write(witness) )
+          val finalScriptWit = ScriptWitness(BinaryData.empty +: sigs :+ Script.write(witness))
 
           val runner = mkScriptRunner(tx, index, utxo.amount)
           runner.verifyScripts(Script.write(finalScriptSignature), scriptPubKey, finalScriptWit) match {
@@ -208,23 +236,7 @@ object PSBT {
     }
   }
 
-  private lazy val dummyTx = Transaction(
-    version = 1,
-    TxIn(
-      outPoint =  new OutPoint(BinaryData("0000000000000000000000000000000000000000000000000000000000000000"), 0),
-      signatureScript = BinaryData("0000000000000000000000000000000000000000000000"),
-      sequence = 0,
-      witness = ScriptWitness.empty) +: Nil,
-    TxOut(Satoshi(0), BinaryData("0000000000000000000000000000000000000000000000")) +: Nil,
-    lockTime = 0
-  )
-
-  private def mkScriptRunner(
-      tx: Transaction = dummyTx,
-      inputIndex:Int = 0,
-      amount: Satoshi = Satoshi(0),
-      flags: Int = ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS): Script.Runner = {
-
+  private def mkScriptRunner(tx: Transaction, inputIndex:Int = 0, amount: Satoshi = Satoshi(0), flags: Int = ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS): Script.Runner = {
     new Runner(Script.Context(tx, inputIndex, amount), flags)
   }
 
