@@ -476,22 +476,27 @@ object PSBT {
   def finalizePSBT(psbt: PartiallySignedTransaction): PartiallySignedTransaction = {
 
     //try to finalize the inputs if they've already been signed (partial sigs are exaustive)
-    val updated = psbt.copy(inputs = psbt.inputs.zipWithIndex.map{ case (input, idx) => input.finalizeIfComplete(psbt.tx, idx) } )
-    updated
-//    var tx = updated.tx
-//    updated.inputs.zipWithIndex.map { case (input, idx) =>
-//      input match {
-//        case in if !in.hasFinalSigs => in
-//        case PartiallySignedInput(_,_,_,_,_,Some(scriptWitness),_,_,_,_) =>
-//          tx = tx.updateWitness(idx, scriptWitness)
-//        case PartiallySignedInput(_,_,_,_,Some(sigScript),None,_,_,_,_) =>
-//          tx = tx.updateSigScript(idx, sigScript)
-//        case PartiallySignedInput(_,_,_,_,Some(sigScript),Some(scriptWitness),_,_,_,_) =>
-//          tx = tx.updateSigScript(idx, sigScript)
-//          tx = tx.updateWitness(idx, scriptWitness)
-//      }
-//      ???
-//    }
+    psbt.copy(inputs = psbt.inputs.zipWithIndex.map { case (input, idx) =>
+      input.finalizeIfComplete(psbt.tx, idx)
+    })
+
+  }
+
+  def extractPSBT(psbt: PartiallySignedTransaction): Transaction = {
+    if(!psbt.inputs.forall(_.hasFinalSigs)){
+      throw new IllegalArgumentException("PSBT inputs are not final")
+    }
+
+    //traverse the (indexed) input list carrying a transaction that is being updated with sigScript/witness
+    psbt.inputs.zipWithIndex.foldLeft(psbt.tx) {
+      case (tx, (PartiallySignedInput(_,_,_,_,Some(sigScript),None,_,_,_,_), index)) =>
+        tx.updateSigScript(index, sigScript)
+      case (tx, (PartiallySignedInput(_,_,_,_,None,Some(scriptWitness),_,_,_,_), index)) =>
+        tx.updateWitness(index, scriptWitness)
+      case (tx, (PartiallySignedInput(_,_,_,_,Some(sigScript),Some(scriptWitness),_,_,_,_), index)) =>
+        tx.updateSigScript(index, sigScript).updateWitness(index, scriptWitness)
+    }
+
   }
 
 
