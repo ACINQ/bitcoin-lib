@@ -372,4 +372,37 @@ class PSBTSpec extends FlatSpec{
 
   }
 
+  it should "finalize P2SH-P2WKH inputs" in {
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val pub1 = priv1.publicKey
+
+    // p2wpkh script
+    val script = Script.write(Script.pay2wpkh(pub1))
+    //Sends 0.5 btc to the above 'p2shAddress'
+    val prevTx = Transaction.read("010000000175dd435bf25e5d77567272f7d6eefcf37b7156b78bb233490140d6fa7545cfca010000006a47304402206e601a482b301141cb3a1712c18729fa1f1731fce5c4205ac9d344af38bb24bf022003fe70edcbd1a5b3957b3c939e583739eadb8de8d3d2cc2ad2903b19c991cb80012102ba2558223d7cd5df2d8decc4506a62ccaa96159f685360335c280952b25e7adefeffffff02692184df000000001976a9148b3ee15d631122010d31e1774aa318ca9ca8b67088ac80f0fa020000000017a9143e73638f202bb880a28e8df1946adc3058227d11878c730000", Protocol.PROTOCOL_VERSION)
+
+    val utxo = prevTx.txOut(1)
+    val spendingInput = TxIn(OutPoint(prevTx.hash, 1), sequence = 0xffffffffL, signatureScript = Seq.empty)
+    val newlyCreatedOutput = TxOut(0.49 btc, OP_0 :: OP_PUSHDATA(Crypto.hash160(pub1.toBin)) :: Nil)
+
+    val psbt = PSBT.createPSBT(inputs = Seq(spendingInput), outputs = Seq(newlyCreatedOutput))
+
+    val signatureScriptPubKey = Script.pay2pkh(pub1)
+    val sig = Transaction.signInput(psbt.tx, 0, signatureScriptPubKey, SIGHASH_ALL, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
+
+    val updated = psbt.copy(inputs = Seq(PartiallySignedInput(
+      witnessOutput = Some(utxo),
+      redeemScript = Some(Script.parse(script)),
+      witnessScript = Some(Script.parse(script)),
+      sighashType = Some(SIGHASH_ALL),
+      partialSigs = Map(pub1 -> sig)
+    )))
+
+    val finalized = PSBT.finalizePSBT(updated)
+
+    assert(finalized.inputs.head.finalScriptSig.isDefined)
+    assert(finalized.inputs.head.finalScriptWitness.isDefined)
+
+  }
+
 }

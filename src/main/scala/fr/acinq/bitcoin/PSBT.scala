@@ -80,7 +80,7 @@ object PSBT {
     def hasFinalSigs: Boolean = finalScriptSig.isDefined || finalScriptWitness.isDefined
 
     def finalizeIfComplete(tx: Transaction, index: Int): PartiallySignedInput = {
-      //this input has already been signed and its outputs scripts are complete
+
       if(hasFinalSigs) {
         return this
       }
@@ -165,10 +165,8 @@ object PSBT {
                     )
                   }
               }
-
             //P2WSH
             case OP_0 :: OP_PUSHDATA(scriptHash, size) :: Nil if size == 32 =>
-
               require(scriptHash == Crypto.sha256(Script.write(witnessProg)), "Script hash does not match witnessScript")
               val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
               val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
@@ -191,39 +189,49 @@ object PSBT {
                   bip32Data = Map.empty
                 )
               }
-            //not recognized
-            case _ => throw new IllegalArgumentException(s"UTXO's scriptPubKey not recognized: '${utxo.publicKeyScript}'")
           }
-        // P2WSH-nested-P2SH
+        // nested P2SH
         case (Some(redeem), Some(witness)) =>
 
           val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
           val scriptPubKey = utxo.publicKeyScript
-
           val expectedHash = BinaryData(Script.publicKeyHash(scriptPubKey))
           val serializedRedeem = Script.write(redeem)
+
           require(Crypto.hash160(serializedRedeem) == expectedHash, "P2SH redeem script does not match expected hash")
 
-          val OP_PUSHDATA(data, dataLength) = redeem.last
-          require(dataLength == 32) //P2WSH
-          require(data == Crypto.sha256(Script.write(witness)), "SHA of the witness script must match the witness program")
+          val (scriptSig, finalWitness) = redeem match {
+            // P2SH - P2WSH
+            case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 32 =>
+              require(data == Crypto.sha256(Script.write(witness)), "SHA of the witness script must match the witness program")
+              val pubKeys = Script.publicKeysFromRedeemScript(witness)
+              val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
 
-          val pubKeys = Script.publicKeysFromRedeemScript(witness)
-          val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
+              if(sigs.size < pubKeys.size){
+                return this
+              }
 
-          if(sigs.size < pubKeys.size){
-            return this
+              val finalScriptSignature = OP_PUSHDATA(serializedRedeem) :: Nil
+              val finalScriptWit = ScriptWitness(BinaryData.empty +: sigs :+ Script.write(witness))
+              (finalScriptSignature, finalScriptWit)
+
+            //P2SH - P2WPKH
+            case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 20 =>
+              partialSigs.find(el => el._1.hash160 == data) match {
+                case None             => return this
+                case Some((pub, sig)) =>
+
+                  val scriptSig = OP_PUSHDATA(Script.write(redeem)) :: Nil
+                  val finalWitProg = ScriptWitness(sig :: pub.toBin :: Nil)
+                  (scriptSig, finalWitProg)
+              }
           }
-
-          val finalScriptSignature = OP_PUSHDATA(serializedRedeem) :: Nil
-          val finalScriptWit = ScriptWitness(BinaryData.empty +: sigs :+ Script.write(witness))
-
           val runner = mkScriptRunner(tx, index, utxo.amount)
-          runner.verifyScripts(Script.write(finalScriptSignature), scriptPubKey, finalScriptWit) match {
+          runner.verifyScripts(Script.write(scriptSig), scriptPubKey, finalWitness) match {
             case false  => this
             case true   => this.copy(
-              finalScriptSig = Some(finalScriptSignature),
-              finalScriptWitness = Some(finalScriptWit),
+              finalScriptSig = Some(scriptSig),
+              finalScriptWitness = Some(finalWitness),
               redeemScript = None,
               witnessScript = None,
               sighashType = None,
@@ -231,7 +239,6 @@ object PSBT {
               bip32Data = Map.empty
             )
           }
-
       }
     }
   }
