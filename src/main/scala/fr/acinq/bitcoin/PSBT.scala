@@ -81,9 +81,7 @@ object PSBT {
 
     def finalizeIfComplete(tx: Transaction, index: Int): PartiallySignedInput = {
 
-      if(hasFinalSigs) {
-        return this
-      }
+      if(hasFinalSigs) return this
 
       //Try to create finalized script
       (redeemScript, witnessScript) match {
@@ -93,102 +91,69 @@ object PSBT {
           val utxo   = prevTx.txOut(index)
           val scriptPubKey = Script.parse(utxo.publicKeyScript)
           val pubkeyHash = BinaryData(Script.publicKeyHash(scriptPubKey))
-          Script.isPayToScript(scriptPubKey) match {
+
+          val scriptSig = Script.isPayToScript(scriptPubKey) match {
             //P2SH
-            case true =>
+            case true   =>
               //first step check the redeemScript hash
               require(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
               val multiSigPubKeys = Script.publicKeysFromRedeemScript(redeem)
               val sigs = multiSigPubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
 
-              //The PSBT does not contain all the signatures necessary to redeem the script
-              if (sigs.size < multiSigPubKeys.size) {
-                return this
-              }
+              //If the PSBT does not contain all the necessary signatures, abort.
+              if (sigs.size < multiSigPubKeys.size) return this
 
-              val scriptSig = (OP_0 +: sigs.map(OP_PUSHDATA(_))) ++ (OP_PUSHDATA(Script.write(redeem)) :: Nil)
-
-              //Execute the unlocking script
-              val runner = mkScriptRunner(tx, index)
-              runner.verifyScripts(Script.write(scriptSig), Script.write(scriptPubKey)) match {
-                case true => this.copy(
-                  finalScriptSig = Some(scriptSig),
-                  redeemScript = None,
-                  witnessScript = None,
-                  partialSigs = Map.empty,
-                  bip32Data = Map.empty,
-                  sighashType = None)
-                case false => this
-              }
+              //scriptSig for multisig P2SH
+              (OP_0 +: sigs.map(OP_PUSHDATA(_))) ++ (OP_PUSHDATA(Script.write(redeem)) :: Nil)
             //P2PKH
-            case false =>
-              partialSigs.find(el => el._1.hash160 == pubkeyHash) match {
-                case None             =>  this //signatures were not found in the PSBT, unable to finalize this input
-                case Some((pub, sig)) =>
+            case false  =>
+              //get the signature or abort
+              val (pub, sig) = partialSigs.find(el => el._1.hash160 == pubkeyHash).getOrElse(return this)
+              OP_PUSHDATA(sig) :: OP_PUSHDATA(pub) :: Nil
+          }
 
-                  val runner = mkScriptRunner(tx, index)
-                  val scriptSig = OP_PUSHDATA(sig) :: OP_PUSHDATA(pub) :: Nil
-                  runner.verifyScripts(Script.write(scriptSig), Script.write(scriptPubKey)) match {
-                    case false     => this
-                    case true      => this.copy(
-                      finalScriptSig = Some(scriptSig),
-                      redeemScript = None,
-                      partialSigs = Map.empty
-                    )
-                  }
-              }
+          val runner = mkScriptRunner(tx, index, utxo.amount)
+          runner.verifyScripts(Script.write(scriptSig), Script.write(scriptPubKey), ScriptWitness.empty) match {
+            case true => this.copy(
+              finalScriptSig = Some(scriptSig),
+              redeemScript = None,
+              witnessScript = None,
+              partialSigs = Map.empty,
+              bip32Data = Map.empty,
+              sighashType = None)
+            case false => this
           }
         // P2WPKH
         case (None, Some(witnessProg)) =>
 
           val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
-          Script.parse(utxo.publicKeyScript) match {
+
+          val finalWitness = Script.parse(utxo.publicKeyScript) match {
             //P2WPKH
             case OP_0 :: OP_PUSHDATA(pubkeyHash, size) :: Nil if size == 20 =>
-              //find a <pubKey, sig> pair for the given 'pubKeyHash'
-              partialSigs.find(el => el._1.hash160 == pubkeyHash) match {
-                case None             => this
-                case Some((pub, sig)) =>
-
-                  val finalWitProg = ScriptWitness(sig :: pub.toBin :: Nil)
-
-                  val runner = mkScriptRunner(tx, index, utxo.amount)
-                  runner.verifyScripts(BinaryData.empty, utxo.publicKeyScript, finalWitProg) match {
-                    case false  => this
-                    case true   => this.copy(
-                      finalScriptWitness = Some(finalWitProg),
-                      redeemScript = None,
-                      witnessScript = None,
-                      sighashType = None,
-                      partialSigs = Map.empty,
-                      bip32Data = Map.empty
-                    )
-                  }
-              }
+              val (pub, sig) = partialSigs.find(el => el._1.hash160 == pubkeyHash).getOrElse(return this)
+              ScriptWitness(sig :: pub.toBin :: Nil)
             //P2WSH
             case OP_0 :: OP_PUSHDATA(scriptHash, size) :: Nil if size == 32 =>
               require(scriptHash == Crypto.sha256(Script.write(witnessProg)), "Script hash does not match witnessScript")
               val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
               val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
+              if(sigs.size < pubKeys.size) return this
 
-              if(sigs.size < pubKeys.size){
-                return this
-              }
+              ScriptWitness(BinaryData.empty +: sigs :+ Script.write(witnessProg))
+          }
 
-              val finalScriptWit = ScriptWitness(BinaryData.empty +: sigs :+ Script.write(witnessProg))
-
-              val runner = mkScriptRunner(tx, index, utxo.amount)
-              runner.verifyScripts(BinaryData.empty, utxo.publicKeyScript, finalScriptWit) match {
-                case false  => this
-                case true   => this.copy(
-                  finalScriptWitness = Some(finalScriptWit),
-                  redeemScript = None,
-                  witnessScript = None,
-                  sighashType = None,
-                  partialSigs = Map.empty,
-                  bip32Data = Map.empty
-                )
-              }
+          val runner = mkScriptRunner(tx, index, utxo.amount)
+          runner.verifyScripts(BinaryData.empty, utxo.publicKeyScript, finalWitness) match {
+            case false  => this
+            case true   => this.copy(
+              finalScriptWitness = Some(finalWitness),
+              redeemScript = None,
+              witnessScript = None,
+              sighashType = None,
+              partialSigs = Map.empty,
+              bip32Data = Map.empty
+            )
           }
         // nested P2SH
         case (Some(redeem), Some(witness)) =>
