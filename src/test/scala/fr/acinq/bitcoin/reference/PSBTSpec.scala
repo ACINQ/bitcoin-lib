@@ -26,8 +26,7 @@ class PSBTSpec extends FlatSpec {
       Source.fromFile("src/test/resources/data/psbt_test_data.json").bufferedReader
     )
 
-    testData.invalid.zipWithIndex.foreach { case (invalidPSBT, index )=>
-      println(s"Reading invalidPSBT #$index")
+    testData.invalid.foreach { invalidPSBT=>
       assert(Try(PSBT.read64(invalidPSBT)).isFailure)
     }
 

@@ -11,7 +11,7 @@ import fr.acinq.bitcoin.Script.Runner
 import scala.annotation.tailrec
 
 /**
-  * see https://github.com/achow101/bips/blob/bip174-rev/bip-0174.mediawiki
+  * BIP174 Partially signed bitcoin transactions https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki
   */
 object PSBT {
 
@@ -254,6 +254,32 @@ object PSBT {
     }
   }
 
+  private def assertTypedKeySize(entry: MapEntry): Unit = {
+    import InputTypes._
+
+    if(!isKeyUnknown(entry.key, InputTypes)) {
+      InputTypes(entry.key.head) match {
+        case NonWitnessUTXO |
+             WitnessUTXO |
+             InputTypes.RedeemScript |
+             InputTypes.WitnessScript |
+             FinalScriptWitness |
+             FinalScriptSig |
+             SighashType if entry.key.size > 1 =>
+          throw new IllegalArgumentException(s"Invalid key size for type: ${InputTypes(entry.key.head)}")
+        case _ =>
+      }
+    } else if(!isKeyUnknown(entry.key, OutputTypes)){
+      OutputTypes(entry.key.head) match {
+        case  OutputTypes.RedeemScript |
+              OutputTypes.WitnessScript if entry.key.size > 1 =>
+          throw new IllegalArgumentException(s"Invalid key size for type: ${OutputTypes(entry.key.head)}")
+        case _ =>
+      }
+    }
+
+  }
+
   private def removeDuplicatesFromPsbtMap(psbtMap: Seq[MapEntry]): Seq[MapEntry] = {
     //this converts the list of entries to a scala map and back to list of entries, scala maps enforce uniqueness on the key
     psbtMap.map( el => el.key -> el.value ).toMap.map{ case (k,v) => MapEntry(k, v) }.toSeq
@@ -299,10 +325,10 @@ object PSBT {
     //Read exactly one map for globals
     val globalMap = readKeyValueMap(input)
 
-    //check for uniqueness of the Transaction record type
+    //check for uniqueness of the Transaction record type and the typed key size
     val tx = globalMap.filter(_.key.head == TransactionType.id) match {
-      case entry :: Nil => Transaction.read(entry.value)
-      case _        => throw new IllegalArgumentException("PSBT requires exactly one key-value entry for type Transaction")
+      case entry :: Nil if entry.key.size == 1 => Transaction.read(entry.value)
+      case _        => throw new IllegalArgumentException("Invalid record Transaction record (either duplicate or wrong key size)")
     }
 
     tx.txIn.foreach { in =>
@@ -319,6 +345,9 @@ object PSBT {
     assertNoDuplicates(globalMap)
     inputMaps.foreach(assertNoDuplicates)
     outputMaps.foreach(assertNoDuplicates)
+    //Check the size of the key
+    inputMaps.flatten.foreach(assertTypedKeySize)
+    outputMaps.flatten.foreach(assertTypedKeySize)
 
     val psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
 
@@ -362,7 +391,6 @@ object PSBT {
       val witScript = outputMap.find(_.key.head == OutputTypes.WitnessScript.id).map(mapEntryToScript)
       val hdKeyPaths = outputMap.filter(_.key.head == OutputTypes.Bip32Data.id).map(mapEntryToKeyPaths).toMap
       val unknowns = outputMap.filter(el => isKeyUnknown(el.key, InputTypes))
-      assertNoDuplicates(unknowns)
 
       PartiallySignedOutput(redeemScript, witScript, hdKeyPaths, unknowns)
     }
