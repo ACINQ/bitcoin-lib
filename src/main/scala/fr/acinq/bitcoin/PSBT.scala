@@ -2,17 +2,13 @@ package fr.acinq.bitcoin
 
 import java.io.{ByteArrayInputStream, InputStream, OutputStream}
 import java.nio.ByteOrder
-
-
 import Protocol._
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
 import fr.acinq.bitcoin.DeterministicWallet._
 import fr.acinq.bitcoin.Script.Runner
-
 import scala.annotation.tailrec
-import scala.util.{Failure, Success, Try}
 
 /**
   * see https://github.com/achow101/bips/blob/bip174-rev/bip-0174.mediawiki
@@ -303,9 +299,10 @@ object PSBT {
     //Read exactly one map for globals
     val globalMap = readKeyValueMap(input)
 
-    val tx = globalMap.find(_.key.head == TransactionType.id) match {
-      case Some(entry) => Transaction.read(entry.value)
-      case None        => throw new IllegalArgumentException("PSBT requires one key-value entry for type Transaction")
+    //check for uniqueness of the Transaction record type
+    val tx = globalMap.filter(_.key.head == TransactionType.id) match {
+      case entry :: Nil => Transaction.read(entry.value)
+      case _        => throw new IllegalArgumentException("PSBT requires exactly one key-value entry for type Transaction")
     }
 
     tx.txIn.foreach { in =>
@@ -323,10 +320,14 @@ object PSBT {
     inputMaps.foreach(assertNoDuplicates)
     outputMaps.foreach(assertNoDuplicates)
 
-    val psbis = inputMaps.map { inputMap =>
+    val psbis = inputMaps.zipWithIndex.map { case (inputMap, index) =>
 
-      val redeemOut = inputMap.find(_.key.head == NonWitnessUTXO.id).map { nonWitnessUtxoEntry =>
+      val nonWitOut = inputMap.find(_.key.head == NonWitnessUTXO.id).map { nonWitnessUtxoEntry =>
         Transaction.read(nonWitnessUtxoEntry.value)
+      }
+
+      nonWitOut.map { prevTx =>
+        require(prevTx.txid == tx.txIn(index).outPoint.txid, "Non-witness UTXO does not match outpoint hash")
       }
 
       val witOut =  inputMap.find(_.key.head == WitnessUTXO.id).map { witnessUtxoEntry =>
@@ -352,7 +353,7 @@ object PSBT {
 
       val unknowns = inputMap.filter(el => isKeyUnknown(el.key, InputTypes))
 
-      PartiallySignedInput(redeemOut, witOut, redeemScript, witScript, finRedeemScript, finWitScript, hdKeyPath, partialSig, sigHash, unknowns)
+      PartiallySignedInput(nonWitOut, witOut, redeemScript, witScript, finRedeemScript, finWitScript, hdKeyPath, partialSig, sigHash, unknowns)
     }
 
     val psbtOuts = outputMaps.map { outputMap =>
@@ -361,9 +362,14 @@ object PSBT {
       val witScript = outputMap.find(_.key.head == OutputTypes.WitnessScript.id).map(mapEntryToScript)
       val hdKeyPaths = outputMap.filter(_.key.head == OutputTypes.Bip32Data.id).map(mapEntryToKeyPaths).toMap
       val unknowns = outputMap.filter(el => isKeyUnknown(el.key, InputTypes))
+      assertNoDuplicates(unknowns)
 
       PartiallySignedOutput(redeemScript, witScript, hdKeyPaths, unknowns)
     }
+
+    //sanity checks
+    require(psbis.size == tx.txIn.size, "Inputs provided does not match the number of inputs in transaction.")
+    require(psbtOuts.size == tx.txOut.size, "Outputs provided does not match the number of outputs in transaction.")
 
     PartiallySignedTransaction(tx, psbis, psbtOuts, globalUnknowns)
   }
