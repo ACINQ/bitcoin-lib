@@ -310,11 +310,11 @@ object PSBT {
 
   private def mapEntryToScript(entry: MapEntry): Script = Script.parse(entry.value)
 
-  def read64(input: String): PartiallySignedTransaction = {
-    read(new ByteArrayInputStream(fromBase64String(input)))
+  def read64(input: String, protocolVersion: Long = PROTOCOL_VERSION): PartiallySignedTransaction = {
+    read(new ByteArrayInputStream(fromBase64String(input)), protocolVersion)
   }
 
-  def read(input: InputStream): PartiallySignedTransaction = {
+  def read(input: InputStream, protocolVersion: Long = PROTOCOL_VERSION): PartiallySignedTransaction = {
     import GlobalTypes._
     import InputTypes._
 
@@ -327,7 +327,7 @@ object PSBT {
 
     //check for uniqueness of the Transaction record type and the typed key size
     val tx = globalMap.filter(_.key.head == TransactionType.id) match {
-      case entry :: Nil if entry.key.size == 1 => Transaction.read(entry.value)
+      case entry :: Nil if entry.key.size == 1 => Transaction.read(entry.value, protocolVersion)
       case _        => throw new IllegalArgumentException("Invalid record Transaction record (either duplicate or wrong key size)")
     }
 
