@@ -507,6 +507,10 @@ object PSBT {
     PartiallySignedTransaction(firstPSBT.tx, combinedInputs, combinedOutputs, combinedUnknowns)
   }
 
+  def signPSBT(psbt: PartiallySignedTransaction, keys: Seq[PrivateKey]): PartiallySignedTransaction = {
+    psbt
+  }
+
   def finalizePSBT(psbt: PartiallySignedTransaction): PartiallySignedTransaction = {
 
     //try to finalize the inputs if they've already been signed (partial sigs are exaustive)
