@@ -451,13 +451,13 @@ object PSBT {
       //Write to stream
       redeemOut.foreach(writeKeyValue(_, out))
       witOut.foreach(writeKeyValue(_, out))
+      partialSigs.foreach(writeKeyValue(_, out))
+      sigHash.foreach(writeKeyValue(_, out))
       redeemScript.foreach(writeKeyValue(_, out))
       witscript.foreach(writeKeyValue(_, out))
       finScriptSig.foreach(writeKeyValue(_, out))
       finScriptWit.foreach(writeKeyValue(_, out))
       bip32Data.foreach(writeKeyValue(_, out))
-      partialSigs.foreach(writeKeyValue(_, out))
-      sigHash.foreach(writeKeyValue(_, out))
       input.unknowns.foreach(writeKeyValue(_, out))
       writeUInt8(SEPARATOR, out)
 
