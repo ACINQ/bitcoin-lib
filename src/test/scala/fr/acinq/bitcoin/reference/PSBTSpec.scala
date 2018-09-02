@@ -74,14 +74,13 @@ class PSBTSpec extends FlatSpec {
       assert(toBase64String(out.toByteArray) == finalizerTest.result)
     }
 
+    //extractor
+    testData.extractor.foreach { extractorTest =>
 
-//    //extractor
-//    testData.extractor.foreach { extractorTest =>
-//
-//      val extracted = extractPSBT(read64(extractorTest.extract))
-//
-//      assert(Transaction.write(extracted) == extractorTest.result)
-//    }
+      val extracted = extractPSBT(read64(extractorTest.extract))
+
+      assert(Transaction.write(extracted).toString == extractorTest.result)
+    }
 
 
   }
