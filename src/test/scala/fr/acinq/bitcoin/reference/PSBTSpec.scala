@@ -10,8 +10,6 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization._
-
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
@@ -24,16 +22,17 @@ class PSBTSpec extends FlatSpec {
     invalid: Seq[String],
     valid: Seq[String],
     combiner: Seq[CombinerData],
-   // finalizer: Seq[FinalizerData],
+    finalizer: Seq[FinalizerData],
     extractor: Seq[ExtractorData]
   )
 
   case class CombinerData(combine: Seq[String], result: String)
-  case class FinalizerData(finlize: String, result: String)
+  case class FinalizerData(finaliza: String, result: String)
   case class ExtractorData(extract: String, result: String)
 
 
   "PSBT" should "pass the reference tests" in {
+    val out = new ByteArrayOutputStream()
 
     val testData = Serialization.read[PSBTTestData](
       Source.fromFile("src/test/resources/data/psbt_test_data.json").bufferedReader
@@ -55,22 +54,34 @@ class PSBTSpec extends FlatSpec {
 
     //combiner test
     testData.combiner.foreach { combinerTest =>
-      val out = new ByteArrayOutputStream()
       val combined = combinerTest.combine.map(in => read64(in)).reduce(mergePSBT(_, _))
 
+      out.reset()
       PSBT.write(combined, out)
 
       assert(toBase64String(out.toByteArray) == combinerTest.result)
     }
 
+    //finalizer test
+    testData.finalizer.foreach { finalizerTest =>
 
-    //extractor
-    testData.extractor.foreach { extractorTest =>
+      val psbt = read64(finalizerTest.finaliza)
+      val finalized = finalizePSBT(psbt)
 
-      val extracted = extractPSBT(read64(extractorTest.extract))
+      out.reset()
+      PSBT.write(finalized, out)
 
-      assert(Transaction.write(extracted) == extractorTest.result)
+      assert(toBase64String(out.toByteArray) == finalizerTest.result)
     }
+
+
+//    //extractor
+//    testData.extractor.foreach { extractorTest =>
+//
+//      val extracted = extractPSBT(read64(extractorTest.extract))
+//
+//      assert(Transaction.write(extracted) == extractorTest.result)
+//    }
 
 
   }
