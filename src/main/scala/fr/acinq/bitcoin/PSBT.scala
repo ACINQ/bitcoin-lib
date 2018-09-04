@@ -44,6 +44,21 @@ object PSBT {
     require( !(witnessScript.isDefined && witnessOutput.isEmpty), "PSBT Input with witness script must have witness output")
     require( !(finalScriptWitness.isDefined && witnessOutput.isEmpty), "PSBT Input with final script witness must have witness output")
 
+    override def toString: String = {
+      s"""Input(
+         |  nonWitnessOutput: $nonWitnessOutput
+         |  witnessOutput: $witnessOutput
+         |  redeemScript: $redeemScript
+         |  witnessScript: $witnessScript
+         |  finalScriptSig: $finalScriptSig
+         |  finalScriptWitness: $finalScriptWitness
+         |  bip32Data: $bip32Data
+         |  partialSigs: $partialSigs
+         |  sighashType: $sighashType
+         |  unknowns: ${unknowns.size}
+         )""".stripMargin
+    }
+
     /**
       * Merges together 2 PSBT inputs, if a witness output is found the non witness is cleared.
       *
@@ -74,6 +89,59 @@ object PSBT {
     }
 
     def hasFinalSigs: Boolean = finalScriptSig.isDefined || finalScriptWitness.isDefined
+
+    def signIfPossible(tx: Transaction, index: Int,keys: Seq[PrivateKey]): PartiallySignedInput = {
+
+      if(hasFinalSigs) return this
+
+      (redeemScript, witnessScript) match {
+        case (None, None)         => throw new IllegalArgumentException("Not enough data to make a signature")
+        case (Some(redeem), None) =>
+          val prevTx = nonWitnessOutput.getOrElse(throw new RuntimeException("Non witness output not found"))
+          val utxo   = prevTx.txOut(index)
+          val scriptPubKey = Script.parse(utxo.publicKeyScript)
+          val pubkeyHash = BinaryData(Script.publicKeyHash(scriptPubKey))
+          Script.isPayToScript(scriptPubKey) match {
+            case true   =>
+              require(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
+              val pubKeys = Script.publicKeysFromRedeemScript(redeem)
+              val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
+              val sigs = filtered.map { privKey =>
+                val sig = Transaction.signInput(tx, index, redeem, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_BASE, privKey)
+                (privKey.publicKey, sig)
+              }
+              return this.copy(partialSigs = partialSigs ++ sigs.toMap)
+
+            case false  =>
+              //find a privKey that matches pubkeyHash
+              ???
+          }
+        case (None, Some(witnessProg)) => ???
+        case (Some(redeem), Some(witnessProg)) =>
+          val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
+          val scriptPubKey = utxo.publicKeyScript
+          val expectedHash = BinaryData(Script.publicKeyHash(scriptPubKey))
+          val serializedRedeem = Script.write(redeem)
+          require(Crypto.hash160(serializedRedeem) == expectedHash, "P2SH redeem script does not match expected hash")
+
+          redeem match {
+            case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 32 =>
+              require(data == Crypto.sha256(Script.write(witnessProg)), "SHA of the witness script must match the witness program")
+              val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
+              val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
+              val sigs = filtered.map { privKey =>
+                val sig = Transaction.signInput(tx, index, witnessProg, SIGHASH_ALL, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
+                (privKey.publicKey, sig)
+              }
+              return this.copy(partialSigs = partialSigs ++ sigs.toMap)
+            case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 20 =>
+              //data contains HASH160(pubKey)
+              ???
+          }
+
+      }
+      this
+    }
 
     def finalizeIfComplete(tx: Transaction, index: Int): PartiallySignedInput = {
 
@@ -183,6 +251,17 @@ object PSBT {
     unknowns: Seq[MapEntry] = Seq.empty
   ) {
 
+    override def toString: String = {
+      s"""
+         |Output(
+         |  redeemScript: $redeemScript
+         |  witnessScript: $witnessScript
+         |  bip32Data: $bip32Data
+         |  unknowns: ${unknowns.size}
+         |)
+       """.stripMargin
+    }
+
     def merge(psbtOut: PartiallySignedOutput): PartiallySignedOutput = PartiallySignedOutput(
       redeemScript = if(redeemScript.isEmpty) psbtOut.redeemScript else redeemScript,
       witnessScript = if(witnessScript.isEmpty) psbtOut.witnessScript else witnessScript,
@@ -197,7 +276,17 @@ object PSBT {
     inputs: Seq[PartiallySignedInput],
     outputs: Seq[PartiallySignedOutput],
     unknowns: Seq[MapEntry] = Seq.empty
-  )
+  ) {
+
+    override def toString: String = {
+      s"""
+         | tx: ${tx.txid}
+         | inputs: ${inputs.zipWithIndex.map{ case (in, i) => s"[$i] $in"}}
+         | outputs: $outputs
+       """.stripMargin
+    }
+
+  }
 
   final val PSBD_MAGIC = 0x70736274
   final val HEADER_SEPARATOR = 0xff
@@ -508,7 +597,10 @@ object PSBT {
   }
 
   def signPSBT(psbt: PartiallySignedTransaction, keys: Seq[PrivateKey]): PartiallySignedTransaction = {
-    psbt
+
+    psbt.copy(inputs = psbt.inputs.zipWithIndex.map { case (input, idx) =>
+      input.signIfPossible(psbt.tx, idx, keys)
+    })
   }
 
   def finalizePSBT(psbt: PartiallySignedTransaction): PartiallySignedTransaction = {
