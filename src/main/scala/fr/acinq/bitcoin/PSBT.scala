@@ -96,27 +96,29 @@ object PSBT {
 
       (redeemScript, witnessScript) match {
         case (None, None)         => throw new IllegalArgumentException("Not enough data to make a signature")
+        //P2PKH/P2SH
         case (Some(redeem), None) =>
           val prevTx = nonWitnessOutput.getOrElse(throw new RuntimeException("Non witness output not found"))
-          val utxo   = prevTx.txOut(index)
+          val utxo   = prevTx.txOut(tx.txIn(index).outPoint.index.toInt)
           val scriptPubKey = Script.parse(utxo.publicKeyScript)
-          val pubkeyHash = BinaryData(Script.publicKeyHash(scriptPubKey))
+          require(Script.write(scriptPubKey) == Script.write(Script.pay2sh(redeem)))
+
           Script.isPayToScript(scriptPubKey) match {
             case true   =>
-              require(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
               val pubKeys = Script.publicKeysFromRedeemScript(redeem)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
                 val sig = Transaction.signInput(tx, index, redeem, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_BASE, privKey)
                 (privKey.publicKey, sig)
               }
-              return this.copy(partialSigs = partialSigs ++ sigs.toMap)
-
+              this.copy(partialSigs = partialSigs ++ sigs.toMap)
             case false  =>
-              //find a privKey that matches pubkeyHash
-              ???
+              throw new NotImplementedError("Not enough data to make a signature")
           }
-        case (None, Some(witnessProg)) => ???
+        //P2WPKH/P2WSH
+        case (None, Some(witnessProg)) =>
+          throw new NotImplementedError("Not enough data to make a signature")
+        //nested
         case (Some(redeem), Some(witnessProg)) =>
           val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
           val scriptPubKey = utxo.publicKeyScript
@@ -130,17 +132,15 @@ object PSBT {
               val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
-                val sig = Transaction.signInput(tx, index, witnessProg, SIGHASH_ALL, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
+                val sig = Transaction.signInput(tx, index, witnessProg, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
                 (privKey.publicKey, sig)
               }
-              return this.copy(partialSigs = partialSigs ++ sigs.toMap)
+              this.copy(partialSigs = partialSigs ++ sigs.toMap)
             case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 20 =>
-              //data contains HASH160(pubKey)
-              ???
+              throw new NotImplementedError("Not enough data to make a signature")
           }
-
       }
-      this
+
     }
 
     def finalizeIfComplete(tx: Transaction, index: Int): PartiallySignedInput = {
