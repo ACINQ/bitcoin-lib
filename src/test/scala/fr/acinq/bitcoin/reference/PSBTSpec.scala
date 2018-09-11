@@ -56,8 +56,7 @@ class PSBTSpec extends FlatSpec {
     }
 
     //signer test
-    testData.signer.zipWithIndex.foreach { case (signerTest, idx) =>
-      println(s"Signer test #$idx")
+    testData.signer.foreach { signerTest =>
 
       val psbt = read64(signerTest.psbt)
       val keys = signerTest.privkeys.map(PrivateKey.fromBase58(_, Base58.Prefix.SecretKeyTestnet))

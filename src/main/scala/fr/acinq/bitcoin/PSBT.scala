@@ -104,7 +104,8 @@ object PSBT {
 
           Script.isPayToScript(scriptPubKey) match {
             case true   =>
-              require(Script.write(scriptPubKey) == Script.write(Script.pay2sh(redeem)))
+              if(Script.write(scriptPubKey) != Script.write(Script.pay2sh(redeem))) return this
+
               val pubKeys = Script.publicKeysFromRedeemScript(redeem)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
@@ -133,11 +134,11 @@ object PSBT {
           val scriptPubKey = utxo.publicKeyScript
           val expectedHash = BinaryData(Script.publicKeyHash(scriptPubKey))
           val serializedRedeem = Script.write(redeem)
-          require(Crypto.hash160(serializedRedeem) == expectedHash, "P2SH redeem script does not match expected hash")
+          if(Crypto.hash160(serializedRedeem) != expectedHash) return this
 
           redeem match {
             case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 32 =>
-              require(data == Crypto.sha256(Script.write(witnessProg)), "SHA of the witness script must match the witness program")
+              if(data != Crypto.sha256(Script.write(witnessProg))) return this
               val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
@@ -146,7 +147,15 @@ object PSBT {
               }
               this.copy(partialSigs = partialSigs ++ sigs.toMap)
             case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 20 =>
-              throw new NotImplementedError("Not enough data to make a signature")
+              keys.find(_.publicKey.hash160 == data) match {
+                case None => this
+                case Some(privKey) =>
+                  val sig = {
+                    val s = Transaction.signInput(tx, index, witnessProg, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
+                    (privKey.publicKey, s)
+                  }
+                  this.copy(partialSigs = partialSigs + sig)
+              }
           }
         //not enough data to sign this input, let's just return it
         case (None, None)         => this
