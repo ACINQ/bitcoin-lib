@@ -95,12 +95,12 @@ object PSBT {
       if(hasFinalSigs) return this
 
       (redeemScript, witnessScript) match {
-        case (None, None)         => throw new IllegalArgumentException("Not enough data to make a signature")
         //P2PKH/P2SH
         case (Some(redeem), None) =>
-          val prevTx = nonWitnessOutput.getOrElse(throw new RuntimeException("Non witness output not found"))
+          val prevTx = nonWitnessOutput.getOrElse(return this)
           val utxo   = prevTx.txOut(tx.txIn(index).outPoint.index.toInt)
           val scriptPubKey = Script.parse(utxo.publicKeyScript)
+          require(tx.txIn(index).outPoint.hash == prevTx.hash, s"This input references another transaction than ${prevTx.hash}")
 
           Script.isPayToScript(scriptPubKey) match {
             case true   =>
@@ -113,7 +113,6 @@ object PSBT {
               }
               this.copy(partialSigs = partialSigs ++ sigs.toMap)
             case false  =>
-              //TODO  add require
               val pubKeyHash = Script.publicKeyHash(redeem)
               keys.find(_.publicKey.hash160 == pubKeyHash) match {
                 case None          => this
@@ -130,7 +129,7 @@ object PSBT {
           throw new NotImplementedError("Not enough data to make a signature")
         //nested
         case (Some(redeem), Some(witnessProg)) =>
-          val utxo = witnessOutput.getOrElse(throw new IllegalArgumentException("Script pubkey not found"))
+          val utxo = witnessOutput.getOrElse(return this)
           val scriptPubKey = utxo.publicKeyScript
           val expectedHash = BinaryData(Script.publicKeyHash(scriptPubKey))
           val serializedRedeem = Script.write(redeem)
@@ -149,6 +148,8 @@ object PSBT {
             case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 20 =>
               throw new NotImplementedError("Not enough data to make a signature")
           }
+        //not enough data to sign this input, let's just return it
+        case (None, None)         => this
       }
 
     }
