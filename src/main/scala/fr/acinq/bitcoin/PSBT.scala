@@ -101,10 +101,10 @@ object PSBT {
           val prevTx = nonWitnessOutput.getOrElse(throw new RuntimeException("Non witness output not found"))
           val utxo   = prevTx.txOut(tx.txIn(index).outPoint.index.toInt)
           val scriptPubKey = Script.parse(utxo.publicKeyScript)
-          require(Script.write(scriptPubKey) == Script.write(Script.pay2sh(redeem)))
 
           Script.isPayToScript(scriptPubKey) match {
             case true   =>
+              require(Script.write(scriptPubKey) == Script.write(Script.pay2sh(redeem)))
               val pubKeys = Script.publicKeysFromRedeemScript(redeem)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
@@ -113,7 +113,17 @@ object PSBT {
               }
               this.copy(partialSigs = partialSigs ++ sigs.toMap)
             case false  =>
-              throw new NotImplementedError("Not enough data to make a signature")
+              //TODO  add require
+              val pubKeyHash = Script.publicKeyHash(redeem)
+              keys.find(_.publicKey.hash160 == pubKeyHash) match {
+                case None          => this
+                case Some(privKey) =>
+                  val sig = {
+                    val s = Transaction.signInput(tx, index, redeem, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_BASE, privKey)
+                    (privKey.publicKey, s)
+                  }
+                  this.copy(partialSigs = partialSigs + sig)
+              }
           }
         //P2WPKH/P2WSH
         case (None, Some(witnessProg)) =>
