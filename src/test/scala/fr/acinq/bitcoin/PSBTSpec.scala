@@ -387,6 +387,43 @@ class PSBTSpec extends FlatSpec{
 
   }
 
+  it should "sign native P2SH inputs" in {
+    val sigHash = SIGHASH_ALL
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
+    val priv2 = PrivateKey.fromBase58("QUpr3G5ia7K7txSq5k7QpgTfNy33iTQWb1nAUgb77xFesn89xsoJ", Base58.Prefix.SecretKeySegnet)
+    val priv3 = PrivateKey.fromBase58("QX3AN7b3WCAFaiCvAS2UD7HJZBsFU6r5shjfogJu55411hAF3BVx", Base58.Prefix.SecretKeySegnet)
+
+    //The UTXO containing the P2WSH script
+    val redeemScript = Script.createMultiSigMofN(2, Seq(priv2.publicKey, priv3.publicKey))
+    val prevTx = Transaction(version = 1, txIn = Nil, txOut = TxOut(0.49 btc, Script.pay2wsh(redeemScript)) :: Nil, lockTime = 0)
+
+    val utxo = prevTx.txOut.head
+    val spendingInput = TxIn(OutPoint(prevTx.hash, 0), sequence = 0xffffffffL, signatureScript = Nil)
+    val newlyCreatedOut = TxOut(0.48 btc, Script.pay2pkh(priv1.publicKey))
+
+    val psbt = PSBT.createPSBT(Seq(spendingInput), Seq(newlyCreatedOut)).copy(inputs = Seq(PartiallySignedInput(
+      witnessScript = Some(redeemScript.toList),
+      witnessOutput = Some(utxo),
+      sighashType = Some(sigHash)
+    )))
+
+    val sig2 = Transaction.signInput(psbt.tx, 0, Script.write(redeemScript), sigHash, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv2)
+    val sig3 = Transaction.signInput(psbt.tx, 0, Script.write(redeemScript), sigHash, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv3)
+
+    val signed = PSBT.signPSBT(psbt, Seq(priv3, priv2))
+
+    assert(!signed.inputs(0).partialSigs.isEmpty)
+    assert(signed.inputs(0).partialSigs.get(priv2.publicKey).get == sig2)
+    assert(signed.inputs(0).partialSigs.get(priv3.publicKey).get == sig3)
+
+    val finalized = PSBT.finalizePSBT(signed)
+
+    assert(finalized.inputs.head.finalScriptWitness.isDefined)
+    assert(finalized.inputs.head.finalScriptSig.isEmpty)
+    assert(finalized.inputs.head.witnessScript.isEmpty)
+
+  }
+
   it should "finalize P2SH-P2WKH inputs" in {
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
     val pub1 = priv1.publicKey

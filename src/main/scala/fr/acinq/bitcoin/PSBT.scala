@@ -127,7 +127,30 @@ object PSBT {
           }
         //P2WPKH/P2WSH
         case (None, Some(witnessProg)) =>
-          throw new NotImplementedError("Not enough data to make a signature")
+          val utxo = witnessOutput.getOrElse(return this)
+          Script.parse(utxo.publicKeyScript) match {
+            //P2WPKH
+            case OP_0 :: OP_PUSHDATA(pubkeyHash, size) :: Nil if size == 20 =>
+              keys.find(_.publicKey.hash160 == pubkeyHash) match {
+                case None          => this
+                case Some(privKey) =>
+                  val sig = {
+                    val s = Transaction.signInput(tx, index, utxo.publicKeyScript, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
+                    (privKey.publicKey, s)
+                  }
+                  this.copy(partialSigs = partialSigs + sig)
+              }
+            //P2WSH
+            case OP_0 :: OP_PUSHDATA(pubkeyHash, size) :: Nil if size == 32 =>
+              if(utxo.publicKeyScript != Script.write(Script.pay2wsh(witnessProg))) return this
+              val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
+              val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
+              val sigs = filtered.map { privKey =>
+                val sig = Transaction.signInput(tx, index, witnessProg, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
+                (privKey.publicKey, sig)
+              }
+              this.copy(partialSigs = partialSigs ++ sigs.toMap)
+          }
         //nested
         case (Some(redeem), Some(witnessProg)) =>
           val utxo = witnessOutput.getOrElse(return this)
