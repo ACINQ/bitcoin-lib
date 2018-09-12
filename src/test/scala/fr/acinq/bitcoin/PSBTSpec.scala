@@ -1,15 +1,11 @@
 package fr.acinq.bitcoin
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
-
+import java.io.ByteArrayOutputStream
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-import fr.acinq.bitcoin.DeterministicWallet.generate
 import fr.acinq.bitcoin.PSBT.{MapEntry, PartiallySignedInput}
-import fr.acinq.bitcoin.Script.Runner
 import org.scalatest.FlatSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-
 import scala.util.Try
 
 @RunWith(classOf[JUnitRunner])
@@ -316,7 +312,7 @@ class PSBTSpec extends FlatSpec{
 
   }
 
-  it should "finalize native P2WPKH" in {
+  it should "sign and finalize native P2WPKH" in {
     val sigHash = SIGHASH_ALL
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
     val pub1 = priv1.publicKey
@@ -330,19 +326,19 @@ class PSBTSpec extends FlatSpec{
     val spendingInput = TxIn(OutPoint(prevTx.hash, 0), sequence = 0xffffffffL, signatureScript = Nil, witness = ScriptWitness.empty)
     val newlyCreatedOut = TxOut(0.38 btc, Script.pay2pkh(pub1))
 
-    val psbt = PSBT.createPSBT(inputs = Seq(spendingInput), outputs = Seq(newlyCreatedOut))
-
-    val signatureScriptPubKey = Script.pay2pkh(pub1)
-    val sig = Transaction.signInput(psbt.tx, 0, signatureScriptPubKey, sigHash, utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
-
-    val updatedPSBT = psbt.copy(inputs = Seq(PartiallySignedInput(
+    val psbt = PSBT.createPSBT(Seq(spendingInput), Seq(newlyCreatedOut)).copy(inputs = Seq(PartiallySignedInput(
       witnessOutput = Some(utxo),
-      partialSigs = Map(pub1 -> sig),
       witnessScript = Some(Script.parse(utxo.publicKeyScript)),
       sighashType = Some(sigHash)
     )))
 
-    val finalized = PSBT.finalizePSBT(updatedPSBT)
+    val signed = PSBT.signPSBT(psbt, Seq(priv1))
+
+    //a signature corresponding to priv1.publicKey has been added to the PSBT
+    assert(signed.inputs(0).partialSigs.get(priv1.publicKey).isDefined)
+
+    //finalizing the PSBT will also run the script and check the outcome
+    val finalized = PSBT.finalizePSBT(signed)
 
     assert(finalized.inputs.head.finalScriptWitness.isDefined)
     assert(finalized.inputs.head.finalScriptSig.isEmpty)

@@ -135,7 +135,8 @@ object PSBT {
                 case None          => this
                 case Some(privKey) =>
                   val sig = {
-                    val s = Transaction.signInput(tx, index, utxo.publicKeyScript, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
+                    val signaturePubKeyScript = Script.pay2pkh(privKey.publicKey)
+                    val s = Transaction.signInput(tx, index, signaturePubKeyScript, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
                     (privKey.publicKey, s)
                   }
                   this.copy(partialSigs = partialSigs + sig)
@@ -285,6 +286,7 @@ object PSBT {
       }
 
     }
+
   }
 
   case class PartiallySignedOutput(
@@ -613,6 +615,11 @@ object PSBT {
 
   }
 
+  /**
+    *
+    *
+    */
+
   def createPSBT(inputs: Seq[TxIn], outputs: Seq[TxOut], lockTime: Long = 0, txFormatVersion: Int = 1): PartiallySignedTransaction = {
     val tx = Transaction(txFormatVersion, inputs, outputs, lockTime)
 
@@ -644,6 +651,7 @@ object PSBT {
     psbt.copy(inputs = psbt.inputs.zipWithIndex.map { case (input, idx) =>
       input.signIfPossible(psbt.tx, idx, keys)
     })
+
   }
 
   def finalizePSBT(psbt: PartiallySignedTransaction): PartiallySignedTransaction = {
