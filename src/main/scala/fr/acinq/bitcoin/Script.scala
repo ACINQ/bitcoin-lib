@@ -659,7 +659,7 @@ object Script {
           if (n < 0 || n > m) throw new RuntimeException("OP_CHECKMULTISIG: invalid number of signatures")
           val stack3 = stack2.tail
           // check that we have at least n + 1 items on the stack (+1 because of a bug in the reference client)
-          require(stack3.size >= n + 1, "invalid stack operation")
+          require(stack3.size >= n + 1, s"invalid stack operation stackSize=${stack3.size} required >= ${n + 1}")
           val sigs = stack3.take(n)
           if ((scriptFlag & ScriptFlags.SCRIPT_VERIFY_NULLDUMMY) != 0) require(stack3(n).isEmpty, "multisig dummy is not empty")
           val stack4 = stack3.drop(n + 1)
@@ -978,6 +978,20 @@ object Script {
     case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: OP_NOP :: Nil => data // non standard pay to pubkey...
     case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil => data // standard pay to pubkey
     case OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUAL :: Nil if data.size == 20 => data // standard pay to script
+    case _ => throw new RuntimeException("Unable to extract pubkey from given script")
+  }
+
+  /**
+    * Extract the public keys from a MULTISIG redeem script like: OP_N <pubKey1> ... <pubKeyM> OP_M OP_CHECKMULTISIG
+    * @param script
+    * @return a list of the pubKeys in the script
+    */
+  def publicKeysFromMultisigRedeem(script: List[ScriptElt]): List[BinaryData] = script match {
+    case op :: OP_PUSHDATA(pubKey, _) :: tail if isSimpleValue(op) && pubKey.size == 33 => pubKey :: publicKeysFromMultisigRedeem(tail)
+    case OP_PUSHDATA(pubKey, _) :: tail if pubKey.size == 33                            => pubKey :: publicKeysFromMultisigRedeem(tail)
+    case op :: OP_CHECKMULTISIG :: Nil if isSimpleValue(op)                             => Nil
+    case op :: OP_CHECKMULTISIGVERIFY :: Nil if isSimpleValue(op)                       => Nil
+    case _                                                                              => throw new RuntimeException("Given script does not match MULTISIG template")
   }
 
   def publicKeyHash(script: Array[Byte]): Array[Byte] = publicKeyHash(parse(script))

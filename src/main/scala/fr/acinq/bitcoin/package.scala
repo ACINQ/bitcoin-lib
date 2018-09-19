@@ -1,6 +1,7 @@
 package fr.acinq
 
 import java.math.BigInteger
+import java.util.Base64
 
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.spongycastle.util.encoders.Hex
@@ -88,6 +89,10 @@ package object bitcoin {
   implicit def millibtc2millisatoshi(input: MilliBtc): MilliSatoshi = satoshi2millisatoshi(millibtc2satoshi(input))
 
   implicit def millisatoshi2millibtc(input: MilliSatoshi): MilliBtc = satoshi2millibtc(millisatoshi2satoshi(input))
+
+  def toBase64String(blob: BinaryData) = Base64.getEncoder.encodeToString(blob)
+
+  def fromBase64String(encoded: String): BinaryData = Base64.getDecoder.decode(encoded)
 
   def toHexString(blob: BinaryData) = Hex.toHexString(blob)
 

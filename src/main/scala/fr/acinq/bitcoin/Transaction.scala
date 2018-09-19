@@ -105,6 +105,8 @@ case class TxIn(outPoint: OutPoint, signatureScript: BinaryData, sequence: Long,
 
   def hasWitness: Boolean = witness.isNotNull
 
+  def hasSigScript: Boolean = !signatureScript.isEmpty
+
   override def serializer: BtcSerializer[TxIn] = TxIn
 }
 
@@ -433,7 +435,7 @@ object Transaction extends BtcSerializer[Transaction] {
     */
   def sign(input: Transaction, signData: Seq[SignData]): Transaction = {
 
-    require(signData.length == input.txIn.length, "There should be signing data for every transaction")
+    require(signData.length == input.txIn.length, "There should be signing data for every input")
 
     // sign each input
     val signedInputs = for (i <- input.txIn.indices) yield {

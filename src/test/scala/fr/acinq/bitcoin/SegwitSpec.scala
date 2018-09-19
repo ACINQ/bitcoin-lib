@@ -159,7 +159,7 @@ class SegwitSpec extends FunSuite {
     // this tx was published on segnet as 943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb
   }
 
-  test("create p2pkh embedded in p2sh") {
+  test("create p2wpkh embedded in p2sh") {
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)
     val pub1 = priv1.publicKey
 

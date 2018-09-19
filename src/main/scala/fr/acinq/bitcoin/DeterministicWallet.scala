@@ -26,7 +26,7 @@ object DeterministicWallet {
     /**
       *
       * @param path key path. A list of integers separated by a `/`. May start with "/" or "m/". A single quote appended
-      *             at the end means use the hardened version of the ley index (example: m/44'/0'/0'/0)
+      *             at the end means use the hardened version of the key index (example: m/44'/0'/0'/0)
       * @return a KeyPath instance
       */
     def apply(path: String) : KeyPath = {
@@ -147,6 +147,8 @@ object DeterministicWallet {
     * @return the fingerprint for this public key
     */
   def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes).take(4).reverse.toArray))
+
+  def fingerprint(key: PublicKey): BinaryData = Crypto.hash160(key.data).take(4).reverse
 
   /**
     *
