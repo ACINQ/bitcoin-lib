@@ -973,10 +973,11 @@ object Script {
     * @param script
     * @return a list of the pubKeys in the script
     */
-  def publicKeysFromRedeemScript(script: List[ScriptElt]): List[BinaryData] = script match {
-    case op :: OP_PUSHDATA(pubKey, _) :: tail if isSimpleValue(op) && pubKey.size == 33 => pubKey :: publicKeysFromRedeemScript(tail)
-    case OP_PUSHDATA(pubKey, _) :: tail if pubKey.size == 33                            => pubKey :: publicKeysFromRedeemScript(tail)
+  def publicKeysFromMultisigRedeem(script: List[ScriptElt]): List[BinaryData] = script match {
+    case op :: OP_PUSHDATA(pubKey, _) :: tail if isSimpleValue(op) && pubKey.size == 33 => pubKey :: publicKeysFromMultisigRedeem(tail)
+    case OP_PUSHDATA(pubKey, _) :: tail if pubKey.size == 33                            => pubKey :: publicKeysFromMultisigRedeem(tail)
     case op :: OP_CHECKMULTISIG :: Nil if isSimpleValue(op)                             => Nil
+    case op :: OP_CHECKMULTISIGVERIFY :: Nil if isSimpleValue(op)                       => Nil
     case _                                                                              => throw new RuntimeException("Given script does not match MULTISIG template")
   }
 

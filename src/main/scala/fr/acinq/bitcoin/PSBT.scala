@@ -106,7 +106,7 @@ object PSBT {
             case true   =>
               if(Script.write(scriptPubKey) != Script.write(Script.pay2sh(redeem))) return this
 
-              val pubKeys = Script.publicKeysFromRedeemScript(redeem)
+              val pubKeys = Script.publicKeysFromMultisigRedeem(redeem)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
                 val sig = Transaction.signInput(tx, index, redeem, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_BASE, privKey)
@@ -144,7 +144,7 @@ object PSBT {
             //P2WSH
             case OP_0 :: OP_PUSHDATA(pubkeyHash, size) :: Nil if size == 32 =>
               if(utxo.publicKeyScript != Script.write(Script.pay2wsh(witnessProg))) return this
-              val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
+              val pubKeys = Script.publicKeysFromMultisigRedeem(witnessProg)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
                 val sig = Transaction.signInput(tx, index, witnessProg, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
@@ -163,7 +163,7 @@ object PSBT {
           redeem match {
             case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 32 =>
               if(data != Crypto.sha256(Script.write(witnessProg))) return this
-              val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
+              val pubKeys = Script.publicKeysFromMultisigRedeem(witnessProg)
               val filtered = keys.filter(priv => pubKeys.contains(priv.publicKey.toBin))
               val sigs = filtered.map { privKey =>
                 val sig = Transaction.signInput(tx, index, witnessProg, sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, privKey)
@@ -205,7 +205,7 @@ object PSBT {
             case true   =>
               //first step check the redeemScript hash
               require(Crypto.hash160(Script.write(redeemScript.get)) == pubkeyHash, "P2SH redeem script does not match expected hash")
-              val multiSigPubKeys = Script.publicKeysFromRedeemScript(redeem)
+              val multiSigPubKeys = Script.publicKeysFromMultisigRedeem(redeem)
               val sigs = multiSigPubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
 
               //If the PSBT does not contain all the necessary signatures, abort.
@@ -233,7 +233,7 @@ object PSBT {
             //P2WSH
             case OP_0 :: OP_PUSHDATA(scriptHash, size) :: Nil if size == 32 =>
               require(scriptHash == Crypto.sha256(Script.write(witnessProg)), "Script hash does not match witnessScript")
-              val pubKeys = Script.publicKeysFromRedeemScript(witnessProg)
+              val pubKeys = Script.publicKeysFromMultisigRedeem(witnessProg)
               val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
               if(sigs.size < pubKeys.size) return this
 
@@ -254,7 +254,7 @@ object PSBT {
             // P2SH - P2WSH
             case OP_0 :: OP_PUSHDATA(data, dataLength) :: Nil if dataLength == 32 =>
               require(data == Crypto.sha256(Script.write(witness)), "SHA of the witness script must match the witness program")
-              val pubKeys = Script.publicKeysFromRedeemScript(witness)
+              val pubKeys = Script.publicKeysFromMultisigRedeem(witness)
               val sigs = pubKeys.map(pubKeyData => partialSigs.get(PublicKey(pubKeyData))).filter(_.isDefined).flatten
               if(sigs.size < pubKeys.size) return this
 
