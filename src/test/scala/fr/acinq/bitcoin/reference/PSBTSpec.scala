@@ -1,18 +1,15 @@
 package fr.acinq.bitcoin.reference
 
 import java.io.ByteArrayOutputStream
-
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import fr.acinq.bitcoin._
-import fr.acinq.bitcoin.{BinaryData, PSBT, Transaction}
+import fr.acinq.bitcoin.{PSBT, Transaction}
 import fr.acinq.bitcoin.PSBT._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
-import org.junit.Ignore
-
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
 
