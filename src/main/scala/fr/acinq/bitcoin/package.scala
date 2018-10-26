@@ -122,6 +122,26 @@ package object bitcoin {
     (result, isNegative, overflow)
   }
 
+  /**
+    *
+    * @param value input value
+    * @return the compact encoding of the input value. this is used to encode proof-of-work target into the `bits`
+    *         block header field
+    */
+  def encodeCompact(value: BigInteger): Long = {
+    var size = value.toByteArray.length
+    var compact = if (size <= 3) value.longValue << 8 * (3 - size) else value.shiftRight(8 * (size - 3)).longValue
+    // The 0x00800000 bit denotes the sign.
+    // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
+    if ((compact & 0x00800000L) != 0) {
+      compact >>= 8
+      size += 1
+    }
+    compact |= size << 24
+    compact |= (if (value.signum() == -1) 0x00800000 else 0)
+    compact
+  }
+
   def isAnyoneCanPay(sighashType: Int): Boolean = (sighashType & SIGHASH_ANYONECANPAY) != 0
 
   def isHashSingle(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_SINGLE

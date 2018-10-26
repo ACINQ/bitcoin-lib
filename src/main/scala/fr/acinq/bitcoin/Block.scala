@@ -65,6 +65,21 @@ object BlockHeader extends BtcSerializer[BlockHeader] {
     val hash = new BigInteger(1, header.blockId.toArray)
     hash.compareTo(target) <= 0
   }
+
+  def calculateNextWorkRequired(lastHeader: BlockHeader, lastRetargetTime: Long): Long = {
+    var actualTimespan = lastHeader.time - lastRetargetTime
+    val targetTimespan = 14 * 24 * 60 * 60 // two weeks
+    if (actualTimespan < targetTimespan / 4) actualTimespan = targetTimespan / 4
+    if (actualTimespan > targetTimespan * 4) actualTimespan = targetTimespan * 4
+
+    var (target, false, false) = decodeCompact(lastHeader.bits)
+    target = target.multiply(BigInteger.valueOf(actualTimespan))
+    target = target.divide(BigInteger.valueOf(targetTimespan))
+
+    val powLimit = new BigInteger(1, BinaryData("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    target = target.min(powLimit)
+    encodeCompact(target)
+  }
 }
 
 /**
