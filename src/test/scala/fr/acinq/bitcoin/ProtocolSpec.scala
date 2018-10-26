@@ -4,11 +4,8 @@ import java.math.BigInteger
 import java.net.InetAddress
 
 import com.google.common.io.ByteStreams
-import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class ProtocolSpec extends FlatSpec {
   "Protocol" should "parse blochain blocks" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/block1.dat")

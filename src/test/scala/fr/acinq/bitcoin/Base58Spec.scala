@@ -3,11 +3,8 @@ package fr.acinq.bitcoin
 import java.math.BigInteger
 import java.util
 
-import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class Base58Spec extends FlatSpec {
 
   import fr.acinq.bitcoin.Base58._

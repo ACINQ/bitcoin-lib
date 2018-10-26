@@ -6,11 +6,8 @@ import fr.acinq.bitcoin._
 import org.json4s.DefaultFormats
 import org.json4s.JsonAST.{JInt, JString, JValue}
 import org.json4s.jackson.JsonMethods
-import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class SighashSpec extends FlatSpec {
   implicit val format = DefaultFormats
 

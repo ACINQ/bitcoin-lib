@@ -6,8 +6,6 @@ import fr.acinq.bitcoin._
 import org.json4s.DefaultFormats
 import org.json4s.JsonAST.{JArray, JInt, JString, JValue}
 import org.json4s.jackson.JsonMethods
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.{Failure, Success, Try}
@@ -61,7 +59,6 @@ object TransactionSpec {
   }
 }
 
-@RunWith(classOf[JUnitRunner])
 class TransactionSpec extends FlatSpec with Matchers {
 
   import TransactionSpec._

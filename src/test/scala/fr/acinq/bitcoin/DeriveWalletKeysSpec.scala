@@ -1,8 +1,6 @@
 package fr.acinq.bitcoin
 
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 /**
   * check that we can restore BIP44, BIP49 and BIP84 wallets and generate valid xpubs and addresses.
@@ -10,7 +8,6 @@ import org.scalatest.junit.JUnitRunner
   * use the same scheme will a different derivation path.
   * this was tested with electrum (BIPs 44, 49, 84) and mycellium (BIP44) testnet wallets
   */
-@RunWith(classOf[JUnitRunner])
 class DeriveWalletKeysSpec extends FunSuite {
   import DeriveWalletKeysSpec._
 

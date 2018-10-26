@@ -1,11 +1,8 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.PrivateKey
-import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class TransactionMalleabilitySpec extends FlatSpec {
   "Transaction" should "not be malleable" in {
     // tx we want to spend

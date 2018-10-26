@@ -3,13 +3,10 @@ package fr.acinq.bitcoin
 import java.math.BigInteger
 import java.nio.ByteOrder
 
-import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
 
 import scala.util.Random
 
-@RunWith(classOf[JUnitRunner])
 class DeterministicWalletSpec extends FlatSpec {
 
   import Protocol._

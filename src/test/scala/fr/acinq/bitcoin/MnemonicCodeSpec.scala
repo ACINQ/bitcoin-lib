@@ -4,9 +4,7 @@ import java.io.InputStreamReader
 
 import org.json4s.DefaultFormats
 import org.json4s.jackson.JsonMethods
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 import scala.util.Random
 
@@ -16,7 +14,6 @@ object MnemonicCodeSpec {
 
 }
 
-@RunWith(classOf[JUnitRunner])
 class MnemonicCodeSpec extends FunSuite {
 
   import MnemonicCode._

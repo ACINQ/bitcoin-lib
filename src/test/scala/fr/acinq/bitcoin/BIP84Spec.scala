@@ -2,15 +2,12 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
 /**
   * BIP 84 (Derivation scheme for P2WPKH based accounts) reference tests
   * see https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki
   */
-@RunWith(classOf[JUnitRunner])
 class BIP84Spec extends FunSuite {
   test("BIP49 reference tests") {
     val seed = MnemonicCode.toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".split(" "), "")
