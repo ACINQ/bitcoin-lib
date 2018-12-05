@@ -38,9 +38,12 @@ object Bech32 {
     * @return a (hrp, data) tuple
     */
   def decode(bech32: String): (String, Seq[Int5]) = {
+    require(bech32.toLowerCase == bech32 || bech32.toUpperCase == bech32, "mixed case strings are not valid bech32")
+    bech32.foreach(c => require(c >= 33 && c <= 126, "invalid character"))
     val input = bech32.toLowerCase()
     val pos = input.lastIndexOf('1')
     val hrp = input.take(pos)
+    require(hrp.size >= 1 && hrp.size <= 83, "hrp must contain 1 to 83 characters")
     val data = input.drop(pos + 1).map(c => map(c))
     val checksum = polymod(expand(hrp) ++ data)
     require(checksum == 1, s"invalid checksum for $bech32")
