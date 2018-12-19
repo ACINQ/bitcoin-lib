@@ -184,11 +184,8 @@ object Crypto {
   implicit def ecpoint2point(value: ECPoint): Point = Point(value)
 
   object PublicKey {
-    def apply(data: BinaryData): PublicKey = data.length match {
-      case 65 if data.head == 4 => new PublicKey(Point(data), false)
-      case 65 if data.head == 6 || data.head == 7 => new PublicKey(Point(data), false)
-      case 33 if data.head == 2 || data.head == 3 => new PublicKey(Point(data), true)
-    }
+    def apply(point: Point) = new PublicKey(point.toBin(true))
+    def apply(point: Point, compressed: Boolean) = new PublicKey(point.toBin(compressed))
   }
 
   /**
@@ -197,15 +194,21 @@ object Crypto {
     * @param compressed flags which specifies if the public key is compressed or uncompressed. Compressed public keys are
     *                   encoded on 33 bytes (first byte = sign of Y, then X on 32 bytes)
     */
-  case class PublicKey(value: Point, compressed: Boolean = true) {
-    def toBin: BinaryData = value.toBin(compressed)
+  case class PublicKey(raw: BinaryData) {
+    //require(isPubKeyCompressedOrUncompressed(raw))
+
+    lazy val compressed = isPubKeyCompressed(raw)
+
+    lazy val value: Point = Point(raw)
+
+    def toBin: BinaryData = raw
 
     /**
       *
       * @return the hash160 of the binary representation of this point. This can be used to generated addresses (the address
       *         of a public key is he base58 encoding of its hash)
       */
-    def hash160: BinaryData = Crypto.hash160(toBin)
+    def hash160: BinaryData = Crypto.hash160(raw)
 
     override def toString = toBin.toString
   }
