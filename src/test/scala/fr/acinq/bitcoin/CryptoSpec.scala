@@ -43,7 +43,7 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "validate public key at instantiation" in {
-    intercept[IllegalArgumentException] {
+    intercept[Throwable] { // can be IllegalArgumentException or AssertFailException depending on whether spongycastle or libsecp256k1 is used
       // by default we check
       PublicKey("04" * 65)
     }
@@ -52,7 +52,6 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "sign and verify signatures" in {
-    val random = new Random()
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
     val publicKey = privateKey.publicKey
     val data = Crypto.sha256("this is a test".getBytes("UTF-8"))
