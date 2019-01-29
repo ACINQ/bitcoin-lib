@@ -190,12 +190,17 @@ object Crypto {
 
   /**
     *
-    * @param value      value of this public key (a point)
-    * @param compressed flags which specifies if the public key is compressed or uncompressed. Compressed public keys are
-    *                   encoded on 33 bytes (first byte = sign of Y, then X on 32 bytes)
+    * @param raw          serialized value of this public key (a point)
+    * @param checkValid   indicates whether or not we check sure that this is a valid public key; this should be used
+    *                     carefully for optimization purposes
     */
-  case class PublicKey(raw: BinaryData) {
-    //require(isPubKeyCompressedOrUncompressed(raw))
+  case class PublicKey(raw: BinaryData, checkValid: Boolean = true) {
+    // we always make this very basic check
+    require(raw.size == 33 || raw.size == 65)
+    if (checkValid) {
+      // this is expensive and done only if needed
+      require(value.isInstanceOf[Point])
+    }
 
     lazy val compressed = isPubKeyCompressed(raw)
 

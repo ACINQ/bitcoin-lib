@@ -42,6 +42,15 @@ class CryptoSpec extends FlatSpec {
     assert(address === "19FgFQGZy47NcGTJ4hfNdGMwS8EATqoa1X")
   }
 
+  it should "validate public key at instantiation" in {
+    intercept[IllegalArgumentException] {
+      // by default we check
+      PublicKey("04" * 65)
+    }
+    // key is invalid but we don't check it
+    PublicKey("04" * 65, checkValid = false)
+  }
+
   it should "sign and verify signatures" in {
     val random = new Random()
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
