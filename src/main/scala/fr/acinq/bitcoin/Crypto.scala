@@ -191,7 +191,7 @@ object Crypto {
   /**
     *
     * @param raw          serialized value of this public key (a point)
-    * @param checkValid   indicates whether or not we check sure that this is a valid public key; this should be used
+    * @param checkValid   indicates whether or not we check that this is a valid public key; this should be used
     *                     carefully for optimization purposes
     */
   case class PublicKey(raw: BinaryData, checkValid: Boolean = true) {
