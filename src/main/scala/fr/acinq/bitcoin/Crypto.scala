@@ -196,7 +196,7 @@ object Crypto {
     */
   case class PublicKey(raw: BinaryData, checkValid: Boolean = true) {
     // we always make this very basic check
-    require(raw.size == 33 || raw.size == 65)
+    require(isPubKeyValid(raw))
     if (checkValid) {
       // this is expensive and done only if needed
       require(value.isInstanceOf[Point])
@@ -390,6 +390,12 @@ object Crypto {
     true
   }
 
+  /**
+    *
+    * @param key serialized public key
+    * @return true if the key is valid. Please not that this performs very basic tests and does not check that the
+    *         point represented by this key is actually valid.
+    */
   def isPubKeyValid(key: Seq[Byte]): Boolean = key.length match {
     case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 => true
     case 33 if key(0) == 2 || key(0) == 3 => true
