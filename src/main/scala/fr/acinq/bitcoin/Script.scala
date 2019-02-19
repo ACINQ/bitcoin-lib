@@ -435,7 +435,7 @@ object Script {
         if (sigBytes1.isEmpty) false
         else {
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
-          val result = Crypto.verifySignature(hash, sigBytes, PublicKey(pubKey))
+          val result = Crypto.verifySignature(hash, sigBytes1, PublicKey(pubKey))
           result
         }
       }
