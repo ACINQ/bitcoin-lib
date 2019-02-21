@@ -7,6 +7,7 @@ import org.json4s.DefaultFormats
 import org.json4s.JsonAST.{JArray, JInt, JString, JValue}
 import org.json4s.jackson.JsonMethods
 import org.scalatest.{FlatSpec, Matchers}
+import scodec.bits.ByteVector
 
 import scala.util.{Failure, Success, Try}
 
@@ -22,12 +23,12 @@ object TransactionSpec {
         m.map(_ match {
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) => {
             val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
-            prevoutMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> prevoutScript
+            prevoutMap += OutPoint(ByteVector.fromValidHex(hash).reverse, index.toLong) -> prevoutScript
           }
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey), JInt(amount))) => {
             val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
-            prevoutMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> prevoutScript
-            prevamountMap += OutPoint(fromHexString(hash).reverse, index.toLong) -> Satoshi(amount.toLong)
+            prevoutMap += OutPoint(ByteVector.fromValidHex(hash).reverse, index.toLong) -> prevoutScript
+            prevamountMap += OutPoint(ByteVector.fromValidHex(hash).reverse, index.toLong) -> Satoshi(amount.toLong)
           }
         })
 

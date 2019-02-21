@@ -4,6 +4,8 @@ import fr.acinq.bitcoin.Base58.Prefix
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.scalatest.{FunSuite, Matchers}
 
+import scodec.bits._
+
 class MultisigSpec extends FunSuite with Matchers {
   val key1 = PrivateKey(BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
   val pub1 = key1.publicKey
@@ -28,7 +30,7 @@ class MultisigSpec extends FunSuite with Matchers {
     // we want to redeem the first output of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
     val txIn = TxIn(
-      OutPoint(fromHexString("41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea").reverse, 0),
+      OutPoint(hex"41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea".reverse, 0),
       signatureScript = Array.empty[Byte], // empy signature script
       sequence = 0xFFFFFFFFL)
 

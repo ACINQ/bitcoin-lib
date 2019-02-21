@@ -4,6 +4,8 @@ import java.io._
 import java.net.{Inet4Address, Inet6Address, InetAddress}
 import java.nio.{ByteBuffer, ByteOrder}
 
+import scodec.bits.ByteVector
+
 import scala.collection.mutable.ArrayBuffer
 
 /**

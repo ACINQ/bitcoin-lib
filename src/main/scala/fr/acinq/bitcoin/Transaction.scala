@@ -5,16 +5,17 @@ import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import fr.acinq.bitcoin.Protocol._
 import fr.acinq.bitcoin.Script.Runner
+import scodec.bits.ByteVector
 
 import scala.collection.mutable.ArrayBuffer
 
 object OutPoint extends BtcSerializer[OutPoint] {
-  def apply(tx: Transaction, index: Int) = new OutPoint(tx.hash, index)
+  def apply(tx: Transaction, index: Int) = new OutPoint(ByteVector(tx.hash.toArray), index)
 
-  override def read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
+  override def read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(ByteVector.view(hash(input)), uint32(input))
 
   override def write(input: OutPoint, out: OutputStream, protocolVersion: Long) = {
-    out.write(input.hash)
+    out.write(input.hash.toArray)
     writeUInt32(input.index.toInt, out)
   }
 
@@ -30,7 +31,7 @@ object OutPoint extends BtcSerializer[OutPoint] {
   * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
   * @param index index of the output in tx that we want to refer to
   */
-case class OutPoint(hash: BinaryData, index: Long) extends BtcSerializable[OutPoint] {
+case class OutPoint(hash: ByteVector, index: Long) extends BtcSerializable[OutPoint] {
   require(hash.length == 32)
   require(index >= -1)
 
@@ -38,7 +39,7 @@ case class OutPoint(hash: BinaryData, index: Long) extends BtcSerializable[OutPo
     *
     * @return the id of the transaction this output belongs to
     */
-  val txid: BinaryData = hash.data.reverse
+  val txid: ByteVector = hash.reverse
 
   override def serializer: BtcSerializer[OutPoint] = OutPoint
 }
@@ -85,7 +86,7 @@ object TxIn extends BtcSerializer[TxIn] {
 
   def coinbase(script: BinaryData): TxIn = {
     require(script.length >= 2 && script.length <= 100, "coinbase script length must be between 2 and 100")
-    TxIn(OutPoint(new Array[Byte](32), 0xffffffffL), script, sequence = 0xffffffffL)
+    TxIn(OutPoint(Hash.Zeroes, 0xffffffffL), script, sequence = 0xffffffffL)
   }
 
   def coinbase(script: Seq[ScriptElt]): TxIn = coinbase(Script.write(script))
@@ -299,7 +300,7 @@ object Transaction extends BtcSerializer[Transaction] {
     */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: BinaryData, sighashType: Int): Seq[Byte] = {
     if (isHashSingle(sighashType) && inputIndex >= tx.txOut.length) {
-      Hash.One
+      Hash.One.toArray
     } else {
       val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
       Crypto.hash256(Transaction.write(txCopy, Transaction.SERIALIZE_TRANSACTION_NO_WITNESS) ++ writeUInt32(sighashType))
@@ -333,17 +334,17 @@ object Transaction extends BtcSerializer[Transaction] {
       case SigVersion.SIGVERSION_WITNESS_V0 =>
         val hashPrevOut: BinaryData = if (!isAnyoneCanPay(sighashType)) {
           Crypto.hash256(tx.txIn.map(_.outPoint).flatMap(OutPoint.write(_, Protocol.PROTOCOL_VERSION)))
-        } else Hash.Zeroes
+        } else Hash.Zeroes.toArray
 
         val hashSequence: BinaryData = if (!isAnyoneCanPay(sighashType) && !isHashSingle(sighashType) && !isHashNone(sighashType)) {
           Crypto.hash256(tx.txIn.map(_.sequence).flatMap(s => Protocol.writeUInt32(s.toInt)))
-        } else Hash.Zeroes
+        } else Hash.Zeroes.toArray
 
         val hashOutputs: BinaryData = if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
           Crypto.hash256(tx.txOut.flatMap(TxOut.write(_, Protocol.PROTOCOL_VERSION)))
         } else if (isHashSingle(sighashType) && inputIndex < tx.txOut.size) {
           Crypto.hash256(TxOut.write(tx.txOut(inputIndex), Protocol.PROTOCOL_VERSION))
-        } else Hash.Zeroes
+        } else Hash.Zeroes.toArray
 
         val out = new ByteArrayOutputStream()
         Protocol.writeUInt32(tx.version.toInt, out)
@@ -502,8 +503,8 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   import Transaction._
 
   // standard transaction hash, used to identify transactions (in transactions outputs for example)
-  lazy val hash: BinaryData = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS))
-  lazy val txid: BinaryData = hash.reverse
+  lazy val hash: ByteVector = ByteVector.view(Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS)))
+  lazy val txid: ByteVector = hash.reverse
   // witness transaction hash that includes witness data. used to compute the witness commitment included in the coinbase
   // transaction of segwit blocks
   lazy val whash: BinaryData = Crypto.hash256(Transaction.write(this))

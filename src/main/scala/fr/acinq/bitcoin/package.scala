@@ -4,6 +4,7 @@ import java.math.BigInteger
 
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.spongycastle.util.encoders.Hex
+import scodec.bits._
 
 /**
   * see https://en.bitcoin.it/wiki/Protocol_specification
@@ -25,8 +26,8 @@ package object bitcoin {
   val SIGHASH_ANYONECANPAY = 0x80
 
   object Hash {
-    val Zeroes: BinaryData = "0000000000000000000000000000000000000000000000000000000000000000"
-    val One: BinaryData = "0100000000000000000000000000000000000000000000000000000000000000"
+    val Zeroes: ByteVector = hex"0000000000000000000000000000000000000000000000000000000000000000"
+    val One: ByteVector = hex"0100000000000000000000000000000000000000000000000000000000000000"
   }
 
   object SigVersion {

@@ -8,6 +8,7 @@ import org.json4s.jackson.JsonMethods
 import org.json4s.{DefaultFormats, JValue}
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
+import scodec.bits.ByteVector
 
 import scala.util.Try
 
@@ -71,12 +72,12 @@ object ScriptSpec {
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
   def creditTx(scriptPubKey: Array[Byte], amount: Btc) = Transaction(version = 1,
-    txIn = TxIn(OutPoint(new Array[Byte](32), -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
+    txIn = TxIn(OutPoint(Hash.Zeroes, -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
     txOut = TxOut(amount, scriptPubKey) :: Nil,
     lockTime = 0)
 
   def spendingTx(scriptSig: Array[Byte], tx: Transaction) = Transaction(version = 1,
-    txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
+    txIn = TxIn(OutPoint(ByteVector.view(Crypto.hash256(Transaction.write(tx))), 0), scriptSig, 0xffffffff) :: Nil,
     txOut = TxOut(tx.txOut(0).amount, Array.empty[Byte]) :: Nil,
     lockTime = 0)
 

@@ -1,11 +1,12 @@
 package fr.acinq.bitcoin.reference
 
-import fr.acinq.bitcoin.{BinaryData, BlockHeader}
+import fr.acinq.bitcoin.{BlockHeader, Hash}
 import org.scalatest.FunSuite
+import scodec.bits.ByteVector
 
 class PowSpec extends FunSuite {
   test("calculate next work required") {
-    val header = BlockHeader(version = 2, hashPreviousBlock = BinaryData("00" * 32), hashMerkleRoot = BinaryData("00" * 32), time = 0L, bits = 0L, nonce = 0L)
+    val header = BlockHeader(version = 2, hashPreviousBlock = "00" * 32, hashMerkleRoot = Hash.Zeroes, time = 0L, bits = 0L, nonce = 0L)
 
     assert(BlockHeader.calculateNextWorkRequired(header.copy(time = 1262152739, bits = 0x1d00ffff), 1261130161) === 0x1d00d86aL)
     assert(BlockHeader.calculateNextWorkRequired(header.copy(time = 1233061996, bits = 0x1d00ffff), 1231006505) === 0x1d00ffffL)

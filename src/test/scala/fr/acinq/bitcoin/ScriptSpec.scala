@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import com.google.common.io.BaseEncoding
 import fr.acinq.bitcoin.Base58.Prefix
 import org.scalatest.FlatSpec
+import scodec.bits.ByteVector
 
 class ScriptSpec extends FlatSpec {
   "Script" should "parse signature scripts" in {
@@ -31,7 +32,7 @@ class ScriptSpec extends FlatSpec {
   }
   it should "parse if/else/endif" in {
     val tx = Transaction(version = 1,
-      txIn = TxIn(OutPoint(new Array[Byte](32), 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
+      txIn = TxIn(OutPoint(Hash.Zeroes, 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
       txOut = TxOut(0x12a05f200L satoshi, Array.empty[Byte]) :: Nil,
       lockTime = 0)
     val ctx = Script.Context(tx, 0, 0 satoshi)
