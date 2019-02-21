@@ -16,12 +16,12 @@ object BlockHeader extends BtcSerializer[BlockHeader] {
     val time = uint32(input)
     val bits = uint32(input)
     val nonce = uint32(input)
-    BlockHeader(version, hashPreviousBlock, ByteVector.view(hashMerkleRoot), time, bits, nonce)
+    BlockHeader(version, ByteVector.view(hashPreviousBlock), ByteVector.view(hashMerkleRoot), time, bits, nonce)
   }
 
   override def write(input: BlockHeader, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.version.toInt, out)
-    writeBytes(input.hashPreviousBlock, out)
+    writeBytes(input.hashPreviousBlock.toArray, out)
     writeBytes(input.hashMerkleRoot.toArray, out)
     writeUInt32(input.time.toInt, out)
     writeUInt32(input.bits.toInt, out)
@@ -93,7 +93,7 @@ object BlockHeader extends BtcSerializer[BlockHeader] {
   * @param bits              The calculated difficulty target being used for this block
   * @param nonce             The nonce used to generate this block… to allow variations of the header and compute different hashes
   */
-case class BlockHeader(version: Long, hashPreviousBlock: BinaryData, hashMerkleRoot: ByteVector, time: Long, bits: Long, nonce: Long) extends BtcSerializable[BlockHeader] {
+case class BlockHeader(version: Long, hashPreviousBlock: ByteVector, hashMerkleRoot: ByteVector, time: Long, bits: Long, nonce: Long) extends BtcSerializable[BlockHeader] {
   require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
   require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
 
@@ -133,7 +133,7 @@ object Block extends BtcSerializer[Block] {
     val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(BinaryData("04")) :: OP_PUSHDATA("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8")) :: Nil
     val scriptPubKey = OP_PUSHDATA("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") :: OP_CHECKSIG :: Nil
     Block(
-      BlockHeader(version = 1, hashPreviousBlock = Hash.Zeroes.toArray, hashMerkleRoot = hex"3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a", time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
+      BlockHeader(version = 1, hashPreviousBlock = Hash.Zeroes, hashMerkleRoot = hex"3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a", time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
       List(
         Transaction(version = 1,
           txIn = List(TxIn.coinbase(script)),
@@ -204,9 +204,9 @@ object Block extends BtcSerializer[Block] {
   * @param tx     transactions
   */
 case class Block(header: BlockHeader, tx: Seq[Transaction]) extends BtcSerializable[Block] {
-  lazy val hash = header.hash
+  lazy val hash = ByteVector.view(header.hash)
 
-  lazy val blockId = header.blockId
+  lazy val blockId = ByteVector.view(header.blockId)
 
   override def serializer: BtcSerializer[Block] = Block
 }

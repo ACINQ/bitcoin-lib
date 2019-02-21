@@ -449,16 +449,16 @@ case class Inventory(inventory: Seq[InventoryVector]) extends BtcSerializable[In
 object Getheaders extends BtcSerializer[Getheaders] {
   override def write(t: Getheaders, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.version.toInt, out)
-    writeCollection(t.locatorHashes, (h: BinaryData, o: OutputStream, _: Long) => o.write(h), out, protocolVersion)
+    writeCollection(t.locatorHashes, (h: ByteVector, o: OutputStream, _: Long) => o.write(h.toArray), out, protocolVersion)
     writeBytes(t.stopHash, out)
   }
 
   override def read(in: InputStream, protocolVersion: Long): Getheaders = {
-    Getheaders(version = uint32(in), locatorHashes = readCollection[BinaryData](in, (i: InputStream, _: Long) => BinaryData(hash(i)), protocolVersion), stopHash = hash(in))
+    Getheaders(version = uint32(in), locatorHashes = readCollection[ByteVector](in, (i: InputStream, _: Long) => ByteVector.view(hash(i)), protocolVersion), stopHash = hash(in))
   }
 }
 
-case class Getheaders(version: Long, locatorHashes: Seq[BinaryData], stopHash: BinaryData) extends BtcSerializable[Getheaders] {
+case class Getheaders(version: Long, locatorHashes: Seq[ByteVector], stopHash: BinaryData) extends BtcSerializable[Getheaders] {
   locatorHashes.foreach(h => require(h.length == 32))
   require(stopHash.length == 32)
 

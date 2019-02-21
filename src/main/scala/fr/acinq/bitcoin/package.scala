@@ -149,7 +149,7 @@ package object bitcoin {
 
   def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_NONE
 
-  def computeP2PkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+  def computeP2PkhAddress(pub: PublicKey, chainHash: ByteVector): String = {
     val hash = pub.hash160
     chainHash match {
       case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash)
@@ -157,7 +157,7 @@ package object bitcoin {
     }
   }
 
-  def computeBIP44Address(pub: PublicKey, chainHash: BinaryData) = computeP2PkhAddress(pub, chainHash)
+  def computeBIP44Address(pub: PublicKey, chainHash: ByteVector) = computeP2PkhAddress(pub, chainHash)
 
   /**
     *
@@ -165,7 +165,7 @@ package object bitcoin {
     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
     * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
     */
-  def computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+  def computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: ByteVector): String = {
     val script = Script.pay2wpkh(pub)
     val hash = Crypto.hash160(Script.write(script))
     chainHash match {
@@ -175,7 +175,7 @@ package object bitcoin {
     }
   }
 
-  def computeBIP49Address(pub: PublicKey, chainHash: BinaryData) = computeP2ShOfP2WpkhAddress(pub, chainHash)
+  def computeBIP49Address(pub: PublicKey, chainHash: ByteVector) = computeP2ShOfP2WpkhAddress(pub, chainHash)
 
     /**
     *
@@ -184,7 +184,7 @@ package object bitcoin {
     * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
     *         understood only by native sewgit wallets
     */
-  def computeP2WpkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+  def computeP2WpkhAddress(pub: PublicKey, chainHash: ByteVector): String = {
     val hash = pub.hash160
     val hrp = chainHash match {
       case Block.LivenetGenesisBlock.hash => "bc"
@@ -195,5 +195,5 @@ package object bitcoin {
     Bech32.encodeWitnessAddress(hrp, 0, hash)
   }
 
-  def computeBIP84Address(pub: PublicKey, chainHash: BinaryData) = computeP2WpkhAddress(pub, chainHash)
+  def computeBIP84Address(pub: PublicKey, chainHash: ByteVector) = computeP2WpkhAddress(pub, chainHash)
 }

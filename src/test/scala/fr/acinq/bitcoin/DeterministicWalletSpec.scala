@@ -14,7 +14,7 @@ class DeterministicWalletSpec extends FlatSpec {
 
   // these tests are the "official" ones (see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
 
-  "Determinstic Wallet" should "generate and derive keys (test vector #1)" in {
+  "Deterministic Wallet" should "generate and derive keys (test vector #1)" in {
     val m = generate(fromHexString("000102030405060708090a0b0c0d0e0f"))
     assert(encode(m, xprv) === "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi")
 
