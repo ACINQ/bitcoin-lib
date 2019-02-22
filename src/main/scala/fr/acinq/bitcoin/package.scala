@@ -90,20 +90,6 @@ package object bitcoin {
 
   implicit def millisatoshi2millibtc(input: MilliSatoshi): MilliBtc = satoshi2millibtc(millisatoshi2satoshi(input))
 
-  def toHexString(blob: BinaryData) = Hex.toHexString(blob)
-
-  def fromHexString(hex: String): BinaryData = Hex.decode(hex.stripPrefix("0x"))
-
-  implicit def string2binaryData(input: String): BinaryData = BinaryData(fromHexString(input))
-
-  implicit def seq2binaryData(input: Seq[Byte]): BinaryData = BinaryData(input)
-
-  implicit def array2binaryData(input: Array[Byte]): BinaryData = BinaryData(input)
-
-  implicit def binaryData2array(input: BinaryData): Array[Byte] = input.data.toArray
-
-  implicit def binaryData2Seq(input: BinaryData): Seq[Byte] = input.data
-
   /**
     *
     * @param input compact size encoded integer as used to encode proof-of-work difficulty target

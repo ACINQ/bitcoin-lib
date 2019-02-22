@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.Crypto.{PrivateKey, Scalar}
 import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
 import org.scalatest.FunSuite
+import scodec.bits.ByteVector
 
 import scala.util.Random
 
@@ -23,8 +24,8 @@ class Secp256k1Spec extends FunSuite {
     for (i <- 0 until 1000) {
       Random.nextBytes(priv)
       Random.nextBytes(data)
-      val sig1: BinaryData = Crypto.encodeSignature(Crypto.sign(data, PrivateKey(priv, true)))
-      val sig2: BinaryData = NativeSecp256k1.sign(data, priv)
+      val sig1: ByteVector = Crypto.encodeSignature(Crypto.sign(data, PrivateKey(ByteVector.view(priv), true)))
+      val sig2: ByteVector = ByteVector.view(NativeSecp256k1.sign(data, priv))
       assert(sig1 == sig2)
     }
   }
@@ -35,8 +36,8 @@ class Secp256k1Spec extends FunSuite {
     for (i <- 0 until 1000) {
       Random.nextBytes(priv1)
       Random.nextBytes(priv2)
-      val secret1 = Crypto.ecdh(Scalar(priv1), Scalar(priv2).toPoint)
-      val secret2: BinaryData = NativeSecp256k1.createECDHSecret(priv1, NativeSecp256k1.computePubkey(priv2, false))
+      val secret1: ByteVector = Crypto.ecdh(Scalar(ByteVector.view(priv1)), Scalar(ByteVector.view(priv2)).toPoint)
+      val secret2: ByteVector = ByteVector.view(NativeSecp256k1.createECDHSecret(priv1, NativeSecp256k1.computePubkey(priv2, false)))
       assert(secret1 == secret2)
     }
   }

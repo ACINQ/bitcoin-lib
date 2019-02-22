@@ -3,7 +3,8 @@ package fr.acinq.bitcoin
 import com.google.common.io.BaseEncoding
 import fr.acinq.bitcoin.Base58.Prefix
 import org.scalatest.FlatSpec
-import scodec.bits.ByteVector
+
+import scodec.bits._
 
 class ScriptSpec extends FlatSpec {
   "Script" should "parse signature scripts" in {
@@ -27,28 +28,25 @@ class ScriptSpec extends FlatSpec {
     assert(multisigAddress === "2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
   }
   it should "detect 'pay to script' scripts" in {
-    val script = fromHexString("a91415727299b05b45fdaf9ac9ecf7565cfe27c3e56787")
+    val script = hex"a91415727299b05b45fdaf9ac9ecf7565cfe27c3e56787"
     assert(Script.isPayToScript(script))
   }
   it should "parse if/else/endif" in {
     val tx = Transaction(version = 1,
       txIn = TxIn(OutPoint(Hash.Zeroes, 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
-      txOut = TxOut(0x12a05f200L satoshi, Array.empty[Byte]) :: Nil,
+      txOut = TxOut(0x12a05f200L satoshi, ByteVector.empty) :: Nil,
       lockTime = 0)
     val ctx = Script.Context(tx, 0, 0 satoshi)
     val runner = new Script.Runner(ctx)
     val script = OP_1 :: OP_2 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack = runner.run(script)
-    val List(Seq(check)) = stack
-    assert(check === 4)
+    assert(stack === List(ByteVector(4)))
     val script1 = OP_1 :: OP_1 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack1 = runner.run(script1)
-    val List(Seq(check1)) = stack1
-    assert(check1 === 3)
+    assert(stack1 === List(ByteVector(3)))
     val script2 = OP_1 :: OP_1 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_3 :: OP_EQUAL :: OP_IF :: OP_5 :: OP_ENDIF :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack2 = runner.run(script2)
-    val List(Seq(check2)) = stack2
-    assert(check2 === 5)
+    assert(stack2 === List(ByteVector(5)))
   }
   it should "encode/decode simple numbers" in {
     for (i <- -1 to 16) {
@@ -56,8 +54,8 @@ class ScriptSpec extends FlatSpec {
     }
   }
   it should "encode/decode booleans" in {
-    assert(Script.castToBoolean(Array.empty[Byte]) === false)
-    assert(Script.castToBoolean(Seq(0, 0, 0)) === false)
-    assert(Script.castToBoolean(Array(0x80.toByte)) === false)
+    assert(Script.castToBoolean(ByteVector.empty) === false)
+    assert(Script.castToBoolean(ByteVector(0, 0, 0)) === false)
+    assert(Script.castToBoolean(hex"80") === false)
   }
 }

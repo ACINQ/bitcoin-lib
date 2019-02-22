@@ -18,7 +18,7 @@ object TransactionSpec {
     json.extract[List[List[JValue]]].map(_ match {
       case JString(value) :: Nil => comment = value
       case JArray(m) :: JString(serializedTransaction) :: JString(verifyFlags) :: Nil => {
-        val prevoutMap = collection.mutable.HashMap.empty[OutPoint, BinaryData]
+        val prevoutMap = collection.mutable.HashMap.empty[OutPoint, ByteVector]
         val prevamountMap = collection.mutable.HashMap.empty[OutPoint, Satoshi]
         m.map(_ match {
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) => {
@@ -45,7 +45,7 @@ object TransactionSpec {
         } match {
           case Success(_) if valid => ()
           case Success(_) if !valid => throw new RuntimeException(s"$serializedTransaction should not be valid, [$comment]")
-          case Failure(t) if !valid => ()
+          case Failure(_) if !valid => ()
           case Failure(t) if valid => throw new RuntimeException(s"$serializedTransaction should be valid, [$comment]", t)
         }
       }

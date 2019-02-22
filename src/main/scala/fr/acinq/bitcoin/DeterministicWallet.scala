@@ -6,6 +6,7 @@ import java.nio.ByteOrder
 
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, Scalar}
 import fr.acinq.bitcoin.Protocol._
+import scodec.bits.ByteVector
 
 /**
   * see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
@@ -48,7 +49,7 @@ object DeterministicWallet {
 
   def isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-  case class ExtendedPrivateKey(secretkeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+  case class ExtendedPrivateKey(secretkeybytes: ByteVector, chaincode: ByteVector, depth: Int, path: KeyPath, parent: Long) {
     require(secretkeybytes.length == 32)
     require(chaincode.length == 32)
 
@@ -60,7 +61,7 @@ object DeterministicWallet {
   object ExtendedPrivateKey {
     def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPrivateKey) = {
       val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
-      val bis = new ByteArrayInputStream((bin))
+      val bis = new ByteArrayInputStream(bin.toArray)
       val depth = Protocol.uint8(bis)
       val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
       val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
@@ -76,17 +77,17 @@ object DeterministicWallet {
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
-    out.write(input.chaincode)
+    out.write(input.chaincode.toArray)
     out.write(0)
-    out.write(input.secretkeybytes)
-    val buffer = out.toByteArray
+    out.write(input.secretkeybytes.toArray)
+    val buffer = ByteVector.view(out.toByteArray)
     Base58Check.encode(prefix, buffer)
   }
 
   @deprecated("use encode(priv, prefix (xpriv or tpriv for example)) instead", "v0.9.17")
   def encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
 
-  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+  case class ExtendedPublicKey(publickeybytes: ByteVector, chaincode: ByteVector, depth: Int, path: KeyPath, parent: Long) {
     require(publickeybytes.length == 33)
     require(chaincode.length == 32)
 
@@ -96,7 +97,7 @@ object DeterministicWallet {
   object ExtendedPublicKey {
     def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPublicKey) = {
       val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
-      val bis = new ByteArrayInputStream((bin))
+      val bis = new ByteArrayInputStream(bin.toArray)
       val depth = Protocol.uint8(bis)
       val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
       val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
@@ -111,9 +112,9 @@ object DeterministicWallet {
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
-    out.write(input.chaincode)
-    out.write(input.publickeybytes)
-    val buffer = out.toByteArray
+    out.write(input.chaincode.toArray)
+    out.write(input.publickeybytes.toArray)
+    val buffer = ByteVector.view(out.toByteArray)
     Base58Check.encode(prefix, buffer)
   }
 
@@ -125,8 +126,8 @@ object DeterministicWallet {
     * @param seed random seed
     * @return a "master" private key
     */
-  def generate(seed: Seq[Byte]): ExtendedPrivateKey = {
-    val I = Crypto.hmac512("Bitcoin seed".getBytes("UTF-8"), seed)
+  def generate(seed: ByteVector): ExtendedPrivateKey = {
+    val I = ByteVector.view(Crypto.hmac512("Bitcoin seed".getBytes("UTF-8"), seed.toArray))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     ExtendedPrivateKey(IL, IR, depth = 0, path = List.empty[Long], parent = 0L)
@@ -146,7 +147,7 @@ object DeterministicWallet {
     * @param input extended public key
     * @return the fingerprint for this public key
     */
-  def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes).take(4).reverse.toArray))
+  def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes.toArray).take(4).reverse.toArray))
 
   /**
     *
@@ -163,11 +164,11 @@ object DeterministicWallet {
     */
   def derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = {
     val I = if (isHardened(index)) {
-      val buffer = 0.toByte +: parent.secretkeybytes.data
-      Crypto.hmac512(parent.chaincode, buffer ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
+      val buffer = 0.toByte +: parent.secretkeybytes
+      ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, buffer.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
     } else {
       val pub = publicKey(parent).publickeybytes
-      Crypto.hmac512(parent.chaincode, pub.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
+      ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, pub.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
     }
     val IL = I.take(32)
     val IR = I.takeRight(32)
@@ -193,7 +194,7 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = {
     require(!isHardened(index), "Cannot derive public keys from public hardened keys")
 
-    val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
+    val I = ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, parent.publickeybytes.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
     val IL = I.take(32)
     val IR = I.takeRight(32)
     val p = new BigInteger(1, IL.toArray)
@@ -204,7 +205,7 @@ object DeterministicWallet {
     if (Ki.isInfinity) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val buffer = Ki.getEncoded(true)
+    val buffer = ByteVector.view(Ki.getEncoded(true))
     ExtendedPublicKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 

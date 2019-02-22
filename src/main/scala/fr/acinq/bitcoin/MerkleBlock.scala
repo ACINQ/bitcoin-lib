@@ -2,8 +2,9 @@ package fr.acinq.bitcoin
 
 import java.io.{InputStream, OutputStream}
 
-import fr.acinq.bitcoin.MerkleBlock.{toBits, topHeight}
+import fr.acinq.bitcoin.MerkleBlock.topHeight
 import fr.acinq.bitcoin.Protocol._
+import scodec.bits.ByteVector
 
 import scala.annotation.tailrec
 
@@ -19,7 +20,7 @@ import scala.annotation.tailrec
   * @param hashes hashes in depth-first order (including standard varint size prefix)
   * @param flags flag bits, packed per 8 in a byte, least significant bit first (including standard varint size prefix)
   */
-case class MerkleBlock(version: Long, previousBlockHash: BinaryData, merkleRoot: BinaryData, timestamp: Long, bits: Long, nonce: Long, txCount: Int, hashes: Seq[BinaryData], flags: BinaryData) extends BtcSerializable[MerkleBlock] {
+case class MerkleBlock(version: Long, previousBlockHash: ByteVector, merkleRoot: ByteVector, timestamp: Long, bits: Long, nonce: Long, txCount: Int, hashes: Seq[ByteVector], flags: ByteVector) extends BtcSerializable[MerkleBlock] {
   require(previousBlockHash.length == 32, "length of preivous block hash should be 32")
   require(merkleRoot.length == 32, "length of merkle root hash should be 32")
   hashes.foreach(h => require(h.length == 32, "length of hash should be 32"))
@@ -27,7 +28,7 @@ case class MerkleBlock(version: Long, previousBlockHash: BinaryData, merkleRoot:
 
   override def serializer: BtcSerializer[MerkleBlock] = MerkleBlock
 
-  def computeRoot = MerkleBlock.computeRoot(txCount, topHeight(txCount), 0, hashes, toBits(flags), Nil)
+  def computeRoot = MerkleBlock.computeRoot(txCount, topHeight(txCount), 0, hashes, MerkleBlock.toBits(flags), Nil)
 }
 
 
@@ -41,7 +42,7 @@ object MerkleBlock extends BtcSerializer[MerkleBlock] {
     val nonce = uint32(input)
     val txCount = uint32(input).toInt
     val hashCount = varint(input)
-    val hashes = collection.mutable.ArrayBuffer.empty[BinaryData]
+    val hashes = collection.mutable.ArrayBuffer.empty[ByteVector]
     for(i <- 0 until hashCount.toInt) hashes += hash(input)
     val flags = script(input)
     MerkleBlock(version, previousBlockHash, merkleRoot, timestamp, bits, nonce, txCount, hashes.toList, flags)
@@ -49,22 +50,22 @@ object MerkleBlock extends BtcSerializer[MerkleBlock] {
 
   override def write(input: MerkleBlock, out: OutputStream, protocolVersion: Long) = {
     writeUInt32(input.version, out)
-    writeBytes(input.previousBlockHash, out)
-    writeBytes(input.merkleRoot, out)
+    writeBytes(input.previousBlockHash.toArray, out)
+    writeBytes(input.merkleRoot.toArray, out)
     writeUInt32(input.timestamp, out)
     writeUInt32(input.bits, out)
     writeUInt32(input.nonce, out)
     writeUInt32(input.txCount, out)
     writeVarint(input.hashes.length, out)
-    input.hashes.foreach(bin => writeBytes(bin, out))
-    writeScript(input.flags, out)
+    input.hashes.foreach(bin => writeBytes(bin.toArray, out))
+    writeScript(input.flags.toArray, out)
   }
 
   def isBitSet(byte: Byte, bit: Int): Boolean = ((byte.toInt >> bit) & 0x01) != 0
 
   def toBits(byte: Byte): List[Boolean] = (for (i <- 0 to 7) yield isBitSet(byte, i)).toList
 
-  def toBits(flags: BinaryData) : List[Boolean] = flags.flatMap(toBits).toList
+  def toBits(flags: ByteVector) : List[Boolean] = flags.toSeq.flatMap(toBits).toList
 
   /**
     *
@@ -111,7 +112,7 @@ object MerkleBlock extends BtcSerializer[MerkleBlock] {
     *         - matched is a list of matched txids and their position in the original block
     *         - remaining_hashes and remaining_bits are hashes and bits that have not been used
     */
-  def computeRoot(count: Int, height: Int, pos: Int, hashes: Seq[BinaryData], bits: List[Boolean], matched: List[(BinaryData, Int)]) : (BinaryData, List[(BinaryData, Int)], Seq[BinaryData], List[Boolean]) = {
+  def computeRoot(count: Int, height: Int, pos: Int, hashes: Seq[ByteVector], bits: List[Boolean], matched: List[(ByteVector, Int)]) : (ByteVector, List[(ByteVector, Int)], Seq[ByteVector], List[Boolean]) = {
     bits match {
       case false :: tail => (hashes.head, matched, hashes.tail, tail)
       case true :: tail if height == 0 => (hashes.head, (hashes.head, pos) :: matched, hashes.tail, tail)
