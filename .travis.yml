@@ -22,6 +22,5 @@ script:
 scala:
 - 2.11.11
 jdk:
-- oraclejdk8
 - openjdk11
 
