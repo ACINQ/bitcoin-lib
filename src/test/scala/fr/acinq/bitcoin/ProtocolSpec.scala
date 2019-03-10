@@ -32,7 +32,7 @@ class ProtocolSpec extends FlatSpec {
     val bytes = ByteStreams.toByteArray(stream)
     val block = Block.read(bytes)
     val check = Block.write(block)
-    assert(check == bytes)
+    assert(check == ByteVector.view(bytes))
   }
   it should "decode transactions" in {
     // data copied from https://people.xiph.org/~greg/signdemo.txt
