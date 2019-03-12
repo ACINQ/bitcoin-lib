@@ -93,11 +93,8 @@ object BlockHeader extends BtcSerializer[BlockHeader] {
   * @param bits              The calculated difficulty target being used for this block
   * @param nonce             The nonce used to generate this block… to allow variations of the header and compute different hashes
   */
-case class BlockHeader(version: Long, hashPreviousBlock: ByteVector, hashMerkleRoot: ByteVector, time: Long, bits: Long, nonce: Long) extends BtcSerializable[BlockHeader] {
-  require(hashPreviousBlock.length == 32, "hashPreviousBlock must be 32 bytes")
-  require(hashMerkleRoot.length == 32, "hashMerkleRoot must be 32 bytes")
-
-  lazy val hash: ByteVector = Crypto.hash256(BlockHeader.write(this))
+case class BlockHeader(version: Long, hashPreviousBlock: ByteVector32, hashMerkleRoot: ByteVector32, time: Long, bits: Long, nonce: Long) extends BtcSerializable[BlockHeader] {
+  lazy val hash: ByteVector32 = Crypto.hash256(BlockHeader.write(this))
 
   // hash is reversed here (same as tx id)
   lazy val blockId = hash.reverse
@@ -133,7 +130,7 @@ object Block extends BtcSerializer[Block] {
     val script = OP_PUSHDATA(ByteVector.view(writeUInt32(486604799L))) :: OP_PUSHDATA(hex"04") :: OP_PUSHDATA(ByteVector("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8"))) :: Nil
     val scriptPubKey = OP_PUSHDATA(hex"04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") :: OP_CHECKSIG :: Nil
     Block(
-      BlockHeader(version = 1, hashPreviousBlock = Hash.Zeroes, hashMerkleRoot = hex"3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a", time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
+      BlockHeader(version = 1, hashPreviousBlock = ByteVector32.Zeroes, hashMerkleRoot = ByteVector32(hex"3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"), time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
       List(
         Transaction(version = 1,
           txIn = List(TxIn.coinbase(script)),
@@ -171,10 +168,10 @@ object Block extends BtcSerializer[Block] {
     * @param tx coinbase transaction
     * @return the witness commitment included in this transaction, if any
     */
-  def witnessCommitment(tx: Transaction): Option[ByteVector] = tx.txOut.map(o => Script.parse(o.publicKeyScript)).reverse.collectFirst {
+  def witnessCommitment(tx: Transaction): Option[ByteVector32] = tx.txOut.map(o => Script.parse(o.publicKeyScript)).reverse.collectFirst {
     // we've reversed the outputs because if there are more than one scriptPubKey matching the pattern, the one with
     // the highest output index is assumed to be the commitment.
-    case OP_RETURN :: OP_PUSHDATA(commitmentHeader, _) :: Nil if commitmentHeader.length == 36 && Protocol.uint32(commitmentHeader.take(4).toArray, ByteOrder.BIG_ENDIAN) == 0xaa21a9edL => commitmentHeader.takeRight(32)
+    case OP_RETURN :: OP_PUSHDATA(commitmentHeader, _) :: Nil if commitmentHeader.length == 36 && Protocol.uint32(commitmentHeader.take(4).toArray, ByteOrder.BIG_ENDIAN) == 0xaa21a9edL => ByteVector32(commitmentHeader.takeRight(32))
   }
 
   /**
@@ -188,7 +185,7 @@ object Block extends BtcSerializer[Block] {
     val coinbase = block.tx.head
     (witnessReservedValue(coinbase), witnessCommitment(coinbase)) match {
       case (Some(nonce), Some(commitment)) =>
-        val rootHash = MerkleTree.computeRoot(Hash.Zeroes +: block.tx.tail.map(tx => tx.whash))
+        val rootHash = MerkleTree.computeRoot(ByteVector32.Zeroes +: block.tx.tail.map(tx => tx.whash))
         val commitmentHash = Crypto.hash256(rootHash ++ nonce)
         commitment == commitmentHash
       case _ if block.tx.exists(_.hasWitness) => false // block has segwit transactions but no witness commitment

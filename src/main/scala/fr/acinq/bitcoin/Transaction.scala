@@ -10,7 +10,7 @@ import scodec.bits.ByteVector
 import scala.collection.mutable.ArrayBuffer
 
 object OutPoint extends BtcSerializer[OutPoint] {
-  def apply(tx: Transaction, index: Int) = new OutPoint(ByteVector(tx.hash.toArray), index)
+  def apply(tx: Transaction, index: Int) = new OutPoint(ByteVector32(tx.hash), index)
 
   override def read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
 
@@ -19,7 +19,7 @@ object OutPoint extends BtcSerializer[OutPoint] {
     writeUInt32(input.index.toInt, out)
   }
 
-  def isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == Hash.Zeroes
+  def isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
 
   def isNull(input: OutPoint) = isCoinbase(input)
 
@@ -31,15 +31,14 @@ object OutPoint extends BtcSerializer[OutPoint] {
   * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
   * @param index index of the output in tx that we want to refer to
   */
-case class OutPoint(hash: ByteVector, index: Long) extends BtcSerializable[OutPoint] {
-  require(hash.length == 32)
+case class OutPoint(hash: ByteVector32, index: Long) extends BtcSerializable[OutPoint] {
   require(index >= -1)
 
   /**
     *
     * @return the id of the transaction this output belongs to
     */
-  val txid: ByteVector = hash.reverse
+  val txid: ByteVector32 = hash.reverse
 
   override def serializer: BtcSerializer[OutPoint] = OutPoint
 }
@@ -86,7 +85,7 @@ object TxIn extends BtcSerializer[TxIn] {
 
   def coinbase(script: ByteVector): TxIn = {
     require(script.length >= 2 && script.length <= 100, "coinbase script length must be between 2 and 100")
-    TxIn(OutPoint(Hash.Zeroes, 0xffffffffL), script, sequence = 0xffffffffL)
+    TxIn(OutPoint(ByteVector32.Zeroes, 0xffffffffL), script, sequence = 0xffffffffL)
   }
 
   def coinbase(script: Seq[ScriptElt]): TxIn = coinbase(Script.write(script))
@@ -298,9 +297,9 @@ object Transaction extends BtcSerializer[Transaction] {
     * @param sighashType          signature hash type
     * @return a hash which can be used to sign the referenced tx input
     */
-  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): ByteVector = {
+  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): ByteVector32 = {
     if (isHashSingle(sighashType) && inputIndex >= tx.txOut.length) {
-      Hash.One
+      ByteVector32.One
     } else {
       val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
       Crypto.hash256(Transaction.write(txCopy, Transaction.SERIALIZE_TRANSACTION_NO_WITNESS) ++ ByteVector.view(writeUInt32(sighashType)))
@@ -316,7 +315,7 @@ object Transaction extends BtcSerializer[Transaction] {
     * @param sighashType          signature hash type
     * @return a hash which can be used to sign the referenced tx input
     */
-  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int): ByteVector =
+  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int): ByteVector32 =
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType)
 
   /**
@@ -329,22 +328,22 @@ object Transaction extends BtcSerializer[Transaction] {
     * @param amount               amount of the output claimed by this input
     * @return a hash which can be used to sign the referenced tx input
     */
-  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector = {
+  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector32 = {
     signatureVersion match {
       case SigVersion.SIGVERSION_WITNESS_V0 =>
         val hashPrevOut: ByteVector = if (!isAnyoneCanPay(sighashType)) {
           Crypto.hash256(tx.txIn.map(_.outPoint).map(OutPoint.write(_, Protocol.PROTOCOL_VERSION)).foldLeft(ByteVector.empty)(_ ++ _))
-        } else Hash.Zeroes
+        } else ByteVector32.Zeroes
 
         val hashSequence: ByteVector = if (!isAnyoneCanPay(sighashType) && !isHashSingle(sighashType) && !isHashNone(sighashType)) {
           Crypto.hash256(tx.txIn.map(_.sequence).map(s => ByteVector.view(Protocol.writeUInt32(s.toInt))).foldLeft(ByteVector.empty)(_ ++ _))
-        } else Hash.Zeroes
+        } else ByteVector32.Zeroes
 
         val hashOutputs: ByteVector = if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
           Crypto.hash256(tx.txOut.map(TxOut.write(_, Protocol.PROTOCOL_VERSION)).foldLeft(ByteVector.empty)(_ ++ _))
         } else if (isHashSingle(sighashType) && inputIndex < tx.txOut.size) {
           Crypto.hash256(TxOut.write(tx.txOut(inputIndex), Protocol.PROTOCOL_VERSION))
-        } else Hash.Zeroes
+        } else ByteVector32.Zeroes
 
         val out = new ByteArrayOutputStream()
         Protocol.writeUInt32(tx.version.toInt, out)
@@ -358,7 +357,7 @@ object Transaction extends BtcSerializer[Transaction] {
         Protocol.writeUInt32(tx.lockTime.toInt, out)
         Protocol.writeUInt32(sighashType, out)
         val preimage = out.toByteArray
-        ByteVector.view(Crypto.hash256(preimage))
+        Crypto.hash256(ByteVector.view(preimage))
       case _ =>
         hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
     }
@@ -374,7 +373,7 @@ object Transaction extends BtcSerializer[Transaction] {
     * @param amount               amount of the output claimed by this input
     * @return a hash which can be used to sign the referenced tx input
     */
-  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector =
+  def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector32 =
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
 
   /**
@@ -503,12 +502,12 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   import Transaction._
 
   // standard transaction hash, used to identify transactions (in transactions outputs for example)
-  lazy val hash: ByteVector = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS))
-  lazy val txid: ByteVector = hash.reverse
+  lazy val hash: ByteVector32 = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS))
+  lazy val txid: ByteVector32 = hash.reverse
   // witness transaction hash that includes witness data. used to compute the witness commitment included in the coinbase
   // transaction of segwit blocks
-  lazy val whash: ByteVector = Crypto.hash256(Transaction.write(this))
-  lazy val wtxid: ByteVector = whash.reverse
+  lazy val whash: ByteVector32 = Crypto.hash256(Transaction.write(this))
+  lazy val wtxid: ByteVector32 = whash.reverse
   lazy val bin: ByteVector = Transaction.write(this)
 
   // this is much easier to use than Scala's default toString

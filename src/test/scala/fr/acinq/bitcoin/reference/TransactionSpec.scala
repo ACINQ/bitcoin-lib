@@ -23,12 +23,12 @@ object TransactionSpec {
         m.map(_ match {
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) => {
             val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
-            prevoutMap += OutPoint(ByteVector.fromValidHex(hash).reverse, index.toLong) -> prevoutScript
+            prevoutMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> prevoutScript
           }
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey), JInt(amount))) => {
             val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
-            prevoutMap += OutPoint(ByteVector.fromValidHex(hash).reverse, index.toLong) -> prevoutScript
-            prevamountMap += OutPoint(ByteVector.fromValidHex(hash).reverse, index.toLong) -> Satoshi(amount.toLong)
+            prevoutMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> prevoutScript
+            prevamountMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> Satoshi(amount.toLong)
           }
         })
 

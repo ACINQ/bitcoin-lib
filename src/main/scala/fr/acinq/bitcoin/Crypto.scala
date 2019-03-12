@@ -30,7 +30,7 @@ object Crypto {
     logger.info("couldn't find secp256k1 library, defaulting to spongycastle")
   }
 
-  def fixSize(data: ByteVector): ByteVector = data.padLeft(32)
+  def fixSize(data: ByteVector): ByteVector32 = ByteVector32(data.padLeft(32))
 
   /**
     * A scalar is a 256 bit number
@@ -62,7 +62,7 @@ object Crypto {
       *
       * @return a 32 bytes binary representation of this value
       */
-    def toBin: ByteVector = fixSize(ByteVector.view(value.toByteArray.dropWhile(_ == 0)))
+    def toBin: ByteVector32 = fixSize(ByteVector.view(value.toByteArray.dropWhile(_ == 0)))
 
     /**
       *
@@ -274,7 +274,7 @@ object Crypto {
     */
   def hash256(input: Array[Byte]) = sha256(sha256(input))
 
-  def hash256(input: ByteVector): ByteVector = ByteVector.view(sha256(sha256(input.toArray)))
+  def hash256(input: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(sha256(sha256(input.toArray))))
 
   /**
     * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures

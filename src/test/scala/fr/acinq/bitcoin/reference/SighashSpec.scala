@@ -20,7 +20,7 @@ class SighashSpec extends FlatSpec {
       case JString(raw_transaction) :: JString(script) :: JInt(input_index) :: JInt(hashType) :: JString(signature_hash) :: Nil => {
         val tx = Transaction.read(raw_transaction)
         val hash = Transaction.hashForSigning(tx, input_index.intValue, ByteVector.fromValidHex(script), hashType.intValue)
-        assert(hash.reverse === ByteVector.fromValidHex(signature_hash))
+        assert(hash.reverse === ByteVector32(ByteVector.fromValidHex(signature_hash)))
       }
       case _ => println("warning: could not parse sighash.json properly!")
     })

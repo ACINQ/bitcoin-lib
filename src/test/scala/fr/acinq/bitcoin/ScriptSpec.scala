@@ -33,7 +33,7 @@ class ScriptSpec extends FlatSpec {
   }
   it should "parse if/else/endif" in {
     val tx = Transaction(version = 1,
-      txIn = TxIn(OutPoint(Hash.Zeroes, 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
+      txIn = TxIn(OutPoint(ByteVector32.Zeroes, 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
       txOut = TxOut(0x12a05f200L satoshi, ByteVector.empty) :: Nil,
       lockTime = 0)
     val ctx = Script.Context(tx, 0, 0 satoshi)

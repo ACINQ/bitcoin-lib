@@ -82,7 +82,7 @@ class SegwitSpec extends FunSuite {
       Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)))
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx2.txid == hex"3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e")
+    assert(tx2.txid == ByteVector32(hex"3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e"))
     // this tx was published on segnet as 3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e
 
     // and now we create a segwit tx that spends the P2WPK output
@@ -101,7 +101,7 @@ class SegwitSpec extends FunSuite {
     }
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx3.txid == hex"a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8")
+    assert(tx3.txid == ByteVector32(hex"a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8"))
     // this tx was published on segnet as a474219df20b95210b8dac45bb5ed49f0979f8d9b6c17420f3e50f6abc071af8
   }
 
@@ -133,7 +133,7 @@ class SegwitSpec extends FunSuite {
       Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)))
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx2.txid == hex"9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355")
+    assert(tx2.txid == ByteVector32(hex"9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355"))
     // this tx was published on segnet as 9d896b6d2b8fc9665da72f5b1942f924a37c5c714f31f40ee2a6c945f74dd355
 
     // and now we create a segwit tx that spends the P2WSH output
@@ -151,7 +151,7 @@ class SegwitSpec extends FunSuite {
     }
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx3.txid == hex"943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb")
+    assert(tx3.txid == ByteVector32(hex"943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb"))
     // this tx was published on segnet as 943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb
   }
 
@@ -184,7 +184,7 @@ class SegwitSpec extends FunSuite {
     }
 
     Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx1.txid === hex"98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5")
+    assert(tx1.txid === ByteVector32(hex"98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
     // this tx was published on segnet as 98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5
   }
 

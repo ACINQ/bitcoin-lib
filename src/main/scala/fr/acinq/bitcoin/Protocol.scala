@@ -12,6 +12,19 @@ import scala.collection.mutable.ArrayBuffer
   * see https://en.bitcoin.it/wiki/Protocol_specification
   */
 
+case class ByteVector32(bytes: ByteVector) {
+  require(bytes.size == 32, s"size must be 32 bytes, is ${bytes.size} bytes")
+
+  def reverse: ByteVector32 = ByteVector32(bytes.reverse)
+}
+
+object ByteVector32 {
+  val Zeroes = ByteVector32(hex"0000000000000000000000000000000000000000000000000000000000000000")
+  val One = ByteVector32(hex"0100000000000000000000000000000000000000000000000000000000000000")
+
+  implicit def hash32toByteVector(h: ByteVector32): ByteVector = h.bytes
+}
+
 object Protocol {
   /**
     * basic serialization functions
@@ -135,7 +148,7 @@ object Protocol {
     writeBytes(input.getBytes("UTF-8"), out)
   }
 
-  def hash(input: InputStream): ByteVector = bytes(input, 32) // a hash is always 256 bits
+  def hash(input: InputStream): ByteVector32 = ByteVector32(bytes(input, 32)) // a hash is always 256 bits
 
   def script(input: InputStream): ByteVector = {
     val length = varint(input) // read size
@@ -442,7 +455,7 @@ object Getheaders extends BtcSerializer[Getheaders] {
   }
 
   override def read(in: InputStream, protocolVersion: Long): Getheaders = {
-    Getheaders(version = uint32(in), locatorHashes = readCollection[ByteVector](in, (i: InputStream, _: Long) => hash(i), protocolVersion), stopHash = hash(in))
+    Getheaders(version = uint32(in), locatorHashes = readCollection[ByteVector](in, (i: InputStream, _: Long) => hash(i).bytes, protocolVersion), stopHash = hash(in))
   }
 }
 

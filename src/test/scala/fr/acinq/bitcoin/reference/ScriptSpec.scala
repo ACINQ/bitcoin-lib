@@ -72,7 +72,7 @@ object ScriptSpec {
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
   def creditTx(scriptPubKey: ByteVector, amount: Btc) = Transaction(version = 1,
-    txIn = TxIn(OutPoint(Hash.Zeroes, -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
+    txIn = TxIn(OutPoint(ByteVector32.Zeroes, -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
     txOut = TxOut(amount, scriptPubKey) :: Nil,
     lockTime = 0)
 
