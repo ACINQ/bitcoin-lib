@@ -252,6 +252,8 @@ object Crypto {
 
   def sha256 = hash(new SHA256Digest) _
 
+  def sha256(in: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(sha256(in.toArray)))
+
   def ripemd160 = hash(new RIPEMD160Digest) _
 
   /**
