@@ -22,6 +22,8 @@ object ByteVector32 {
   val Zeroes = ByteVector32(hex"0000000000000000000000000000000000000000000000000000000000000000")
   val One = ByteVector32(hex"0100000000000000000000000000000000000000000000000000000000000000")
 
+  def fromValidHex(str: String) = ByteVector32(ByteVector.fromValidHex(str))
+
   implicit def hash32toByteVector(h: ByteVector32): ByteVector = h.bytes
 }
 
