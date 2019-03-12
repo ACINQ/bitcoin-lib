@@ -3,7 +3,7 @@
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.11</artifactId>
     <packaging>jar</packaging>
-    <version>0.9.20-SNAPSHOT</version>
+    <version>0.9.20-scodec-bits-SNAPSHOT</version>
     <description>Simple Scala Bitcoin library</description>
     <url>https://github.com/ACINQ/bitcoin-lib</url>
     <name>bitcoin-lib</name>
