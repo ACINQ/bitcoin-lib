@@ -10,7 +10,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.version>2.11.11</scala.version>
+        <scala.version>2.11.12</scala.version>
         <scala.version.short>2.11</scala.version.short>
     </properties>
 
@@ -86,6 +86,10 @@
                 <configuration>
                     <source>1.7</source>
                     <target>1.7</target>
+                    <excludes>
+                        <!-- this file is not needed and it contains non-standard imports that are missing from openjdk11 -->
+                        <exclude>**/NativeSecp256k1Test.java</exclude>
+                    </excludes>
                 </configuration>
                 <executions>
                     <execution>
@@ -106,6 +110,11 @@
                         <arg>-feature</arg>
                         <arg>-language:postfixOps</arg>
                         <arg>-language:implicitConversions</arg>
+                        <arg>-Xfatal-warnings</arg>
+                        <arg>-unchecked</arg>
+                        <arg>-Xmax-classfile-name</arg>
+                        <arg>140</arg>
+                        <arg>-nobootcp</arg>
                     </args>
                     <scalaCompatVersion>${scala.version.short}</scalaCompatVersion>
                 </configuration>

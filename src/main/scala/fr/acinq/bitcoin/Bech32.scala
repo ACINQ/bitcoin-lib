@@ -14,16 +14,38 @@ object Bech32 {
   type Int5 = Byte
 
   // char -> 5 bits value
-  val map: Map[Char, Int5] = alphabet.zipWithIndex.toMap.mapValues(_.toByte)
-  // 5 bits value -> char
-  val pam: Map[Int5, Char] = map.map(_.swap)
+  private val InvalidChar = 255.toByte
+  val map = {
+    val result = new Array[Int5](255)
+    for (i <- 0 until result.length) result(i) = InvalidChar
+    alphabet.zipWithIndex.foreach { case (c, i) => result(c) = i.toByte }
+    result
+  }
 
-  def expand(hrp: String): Seq[Int5] = hrp.map(c => (c.toInt >>> 5).toByte) ++ (0.toByte +: hrp.map(c => (c.toInt & 31).toByte))
 
-  def polymod(values: Seq[Int5]): Int = {
-    val GEN = Seq(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+  private def expand(hrp: String): Array[Int5] = {
+    val result = new Array[Int5](2 * hrp.length + 1)
+    var i = 0
+    while (i < hrp.length) {
+      result(i) = (hrp(i).toInt >>> 5).toByte
+      result(hrp.length() + 1 + i) = (hrp(i).toInt & 31).toByte
+      i = i + 1
+    }
+    result(hrp.length()) = 0.toByte
+    result
+  }
+
+  private def polymod(values: Array[Int5], values1: Array[Int5]): Int = {
+    val GEN = Array(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
     var chk = 1
     values.foreach(v => {
+      val b = chk >>> 25
+      chk = ((chk & 0x1ffffff) << 5) ^ v
+      for (i <- 0 until 5) {
+        if (((b >>> i) & 1) != 0) chk = chk ^ GEN(i)
+      }
+    })
+    values1.foreach(v => {
       val b = chk >>> 25
       chk = ((chk & 0x1ffffff) << 5) ^ v
       for (i <- 0 until 5) {
@@ -39,15 +61,20 @@ object Bech32 {
     * @param bech32 bech32 string
     * @return a (hrp, data) tuple
     */
-  def decode(bech32: String): (String, Seq[Int5]) = {
+  def decode(bech32: String): (String, Array[Int5]) = {
     require(bech32.toLowerCase == bech32 || bech32.toUpperCase == bech32, "mixed case strings are not valid bech32")
     bech32.foreach(c => require(c >= 33 && c <= 126, "invalid character"))
     val input = bech32.toLowerCase()
     val pos = input.lastIndexOf('1')
     val hrp = input.take(pos)
     require(hrp.size >= 1 && hrp.size <= 83, "hrp must contain 1 to 83 characters")
-    val data = input.drop(pos + 1).map(c => map(c))
-    val checksum = polymod(expand(hrp) ++ data)
+    val data = new Array[Int5](input.length - pos - 1)
+    for (i <- 0 until data.size) {
+      val elt = map(input(pos + 1 + i))
+      require(elt != InvalidChar, s"invalid bech32 character ${input(pos + 1 + i)}")
+      data(i) = elt
+    }
+    val checksum = polymod(expand(hrp), data)
     require(checksum == 1, s"invalid checksum for $bech32")
     (hrp, data.dropRight(6))
   }
@@ -58,10 +85,12 @@ object Bech32 {
     * @param data data (a sequence of 5 bits integers)
     * @return a checksum computed over hrp and data
     */
-  def checksum(hrp: String, data: Seq[Int5]): Seq[Int5] = {
+  private def checksum(hrp: String, data: Array[Int5]): Array[Int5] = {
     val values = expand(hrp) ++ data
-    val poly = polymod(values ++ Seq(0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte)) ^ 1.toByte
-    for (i <- 0 to 5) yield ((poly >>> 5 * (5 - i)) & 31).toByte
+    val poly = polymod(values, Array(0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte)) ^ 1.toByte
+    val result = new Array[Int5](6)
+    for (i <- 0 to 5) result(i) = ((poly >>> 5 * (5 - i)) & 31).toByte
+    result
   }
 
   /**
@@ -69,7 +98,7 @@ object Bech32 {
     * @param input a sequence of 8 bits integers
     * @return a sequence of 5 bits integers
     */
-  def eight2five(input: Seq[Byte]): Seq[Int5] = {
+  private def eight2five(input: Array[Byte]): Array[Int5] = {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
@@ -82,7 +111,7 @@ object Bech32 {
       }
     })
     if (count > 0) output.append(((buffer << (5 - count)) & 31).toByte)
-    output
+    output.toArray
   }
 
   /**
@@ -90,7 +119,7 @@ object Bech32 {
     * @param input a sequence of 5 bits integers
     * @return a sequence of 8 bits integers
     */
-  def five2eight(input: Seq[Int5]): Seq[Byte] = {
+  private def five2eight(input: Array[Int5]): Array[Byte] = {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
@@ -104,7 +133,7 @@ object Bech32 {
     })
     require(count <= 4, "Zero-padding of more than 4 bits")
     require((buffer & ((1 << count) - 1)) == 0, "Non-zero padding in 8-to-5 conversion")
-    output
+    output.toArray
   }
 
   /**
@@ -119,7 +148,7 @@ object Bech32 {
     // prepend witness version: 0
     val data1 = witnessVersion +: Bech32.eight2five(data.toArray)
     val checksum = Bech32.checksum(hrp, data1)
-    hrp + "1" + new String((data1 ++ checksum).map(i => Bech32.pam(i)).toArray)
+    hrp + "1" + new String((data1 ++ checksum).map(i => alphabet(i)))
   }
 
   /**
