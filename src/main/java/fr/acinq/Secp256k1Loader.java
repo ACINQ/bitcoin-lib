@@ -62,7 +62,7 @@ public class Secp256k1Loader {
     }
 
     private static File getTempDir() {
-        return new File(System.getProperty("fr.acinq.bitcoin.tmpdir", System.getProperty("java.io.tmpdir")));
+        return new File(System.getProperty("fr.acinq.secp256k1.tmpdir", System.getProperty("java.io.tmpdir")));
     }
 
     /**
