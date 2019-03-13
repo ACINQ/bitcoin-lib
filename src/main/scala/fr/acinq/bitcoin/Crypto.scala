@@ -74,7 +74,7 @@ object Crypto {
       Point(params.getG() * value)
     }
 
-    override def toString = this.toBin.toString
+    override def toString = this.toBin.toHex
   }
 
   object Scalar {
@@ -126,7 +126,7 @@ object Crypto {
       */
     def toBin: ByteVector = if (compressed) value.toBin :+ 1.toByte else value.toBin
 
-    override def toString = toBin.toString
+    override def toString = toBin.toHex
   }
 
   implicit def privatekey2scalar(priv: PrivateKey): Scalar = priv.value
@@ -163,7 +163,7 @@ object Crypto {
     // because ECPoint is not serializable
     protected def writeReplace: Object = PointProxy(toBin(true))
 
-    override def toString = toBin(true).toString
+    override def toString = toBin(true).toHex
 
   }
 
@@ -214,7 +214,7 @@ object Crypto {
       */
     def hash160: ByteVector = ByteVector.view(Crypto.hash160(raw.toArray))
 
-    override def toString = toBin.toString
+    override def toString = toBin.toHex
   }
 
   implicit def publickey2point(pub: PublicKey): Point = pub.value
