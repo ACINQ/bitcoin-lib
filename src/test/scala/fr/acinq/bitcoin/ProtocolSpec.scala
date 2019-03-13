@@ -5,6 +5,7 @@ import java.net.InetAddress
 
 import com.google.common.io.ByteStreams
 import org.scalatest.FlatSpec
+import scodec.bits._
 
 class ProtocolSpec extends FlatSpec {
   "Protocol" should "parse blochain blocks" in {
@@ -27,10 +28,10 @@ class ProtocolSpec extends FlatSpec {
   }
   it should "serialize/deserialize blocks" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/block1.dat")
-    val bytes: BinaryData = ByteStreams.toByteArray(stream)
+    val bytes = ByteStreams.toByteArray(stream)
     val block = Block.read(bytes)
     val check = Block.write(block)
-    assert(check == bytes)
+    assert(check == ByteVector.view(bytes))
   }
   it should "decode transactions" in {
     // data copied from https://people.xiph.org/~greg/signdemo.txt
@@ -40,11 +41,11 @@ class ProtocolSpec extends FlatSpec {
     assert(Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, publicKeyHash) === "mkZBYBiq6DNoQEKakpMJegyDbw2YiNQnHT")
   }
   it should "generate genesis block" in {
-    assert(Block.write(Block.LivenetGenesisBlock) === BinaryData("0100000000000000000000000000000000000000000000000000000000000000000000003BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A29AB5F49FFFF001D1DAC2B7C0101000000010000000000000000000000000000000000000000000000000000000000000000FFFFFFFF4D04FFFF001D0104455468652054696D65732030332F4A616E2F32303039204368616E63656C6C6F72206F6E206272696E6B206F66207365636F6E64206261696C6F757420666F722062616E6B73FFFFFFFF0100F2052A01000000434104678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5FAC00000000"))
-    assert(Block.LivenetGenesisBlock.blockId === BinaryData("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
-    assert(Block.TestnetGenesisBlock.blockId === BinaryData("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"))
-    assert(Block.RegtestGenesisBlock.blockId === BinaryData("0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"))
-    assert(Block.SegnetGenesisBlock.blockId === BinaryData("18fb5ff510c09532033d2137a6914010509ee6258275a4b7e1b7b24b1d2191b2"))
+    assert(Block.write(Block.LivenetGenesisBlock) === hex"0100000000000000000000000000000000000000000000000000000000000000000000003BA3EDFD7A7B12B27AC72C3E67768F617FC81BC3888A51323A9FB8AA4B1E5E4A29AB5F49FFFF001D1DAC2B7C0101000000010000000000000000000000000000000000000000000000000000000000000000FFFFFFFF4D04FFFF001D0104455468652054696D65732030332F4A616E2F32303039204368616E63656C6C6F72206F6E206272696E6B206F66207365636F6E64206261696C6F757420666F722062616E6B73FFFFFFFF0100F2052A01000000434104678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5FAC00000000")
+    assert(Block.LivenetGenesisBlock.blockId === ByteVector32(hex"000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
+    assert(Block.TestnetGenesisBlock.blockId === ByteVector32(hex"000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"))
+    assert(Block.RegtestGenesisBlock.blockId === ByteVector32(hex"0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"))
+    assert(Block.SegnetGenesisBlock.blockId === ByteVector32(hex"18fb5ff510c09532033d2137a6914010509ee6258275a4b7e1b7b24b1d2191b2"))
   }
   it should "decode proof-of-work difficulty" in {
     assert(decodeCompact(0) === (BigInteger.ZERO, false, false))
@@ -64,8 +65,8 @@ class ProtocolSpec extends FlatSpec {
     assert(decodeCompact(0x03123456) === (BigInteger.valueOf(0x123456), false, false))
     assert(decodeCompact(0x04123456) === (BigInteger.valueOf(0x12345600), false, false))
     assert(decodeCompact(0x04923456) === (BigInteger.valueOf(0x12345600), true, false))
-    assert(decodeCompact(0x05009234) === (new BigInteger(1, BinaryData("92340000")), false, false))
-    assert(decodeCompact(0x20123456) === (new BigInteger(1, BinaryData("1234560000000000000000000000000000000000000000000000000000000000")), false, false))
+    assert(decodeCompact(0x05009234) === (new BigInteger(1, hex"92340000".toArray), false, false))
+    assert(decodeCompact(0x20123456) === (new BigInteger(1, hex"1234560000000000000000000000000000000000000000000000000000000000".toArray), false, false))
     val (_, false, true) = decodeCompact(0xff123456L)
   }
   it should "read and write version messages" in {
@@ -80,42 +81,42 @@ class ProtocolSpec extends FlatSpec {
       start_height = 0x00041a23L,
       relay = true)
 
-    assert(Version.write(version) === BinaryData("721101000100000000000000c420c45300000000010000000000000000000000000000000000ffff55eb1103479d010000000000000000000000000000000000ffff6d18bab9479d91a26eae39be1743102f5361746f7368693a302e392e39392f231a040001"))
+    assert(Version.write(version) === hex"721101000100000000000000c420c45300000000010000000000000000000000000000000000ffff55eb1103479d010000000000000000000000000000000000ffff6d18bab9479d91a26eae39be1743102f5361746f7368693a302e392e39392f231a040001")
 
     val message = Message(magic = 0x0709110bL, command = "version", payload = Version.write(version))
-    assert(Message.write(message) === BinaryData("0b11090776657273696f6e0000000000660000008c48bb56721101000100000000000000c420c45300000000010000000000000000000000000000000000ffff55eb1103479d010000000000000000000000000000000000ffff6d18bab9479d91a26eae39be1743102f5361746f7368693a302e392e39392f231a040001"))
+    assert(Message.write(message) === hex"0b11090776657273696f6e0000000000660000008c48bb56721101000100000000000000c420c45300000000010000000000000000000000000000000000ffff55eb1103479d010000000000000000000000000000000000ffff6d18bab9479d91a26eae39be1743102f5361746f7368693a302e392e39392f231a040001")
 
-    val message1 = Message.read(Message.write(message))
+    val message1 = Message.read(Message.write(message).toArray)
     assert(message1.command === "version")
-    val version1 = Version.read(message1.payload)
+    val version1 = Version.read(message1.payload.toArray)
     assert(version1 === version)
   }
   it should "read and write verack messages" in {
     val message = Message.read("0b11090776657261636b000000000000000000005df6e0e2")
     assert(message.command === "verack")
-    assert(message.payload.data.isEmpty)
+    assert(message.payload.isEmpty)
 
-    val message1 = Message(magic = 0x0709110bL, command = "verack", payload = Array.empty[Byte])
-    assert(Message.write(message1) === BinaryData("0b11090776657261636b000000000000000000005df6e0e2"))
+    val message1 = Message(magic = 0x0709110bL, command = "verack", payload = ByteVector.empty)
+    assert(Message.write(message1) === hex"0b11090776657261636b000000000000000000005df6e0e2")
   }
   it should "read and write addr messages" in {
     // example take from https://en.bitcoin.it/wiki/Protocol_specification#addr
     val message = Message.read("f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d")
     assert(message.command === "addr")
-    val addr = Addr.read(message.payload)
+    val addr = Addr.read(message.payload.toArray)
     assert(addr.addresses.length === 1)
     assert(addr.addresses(0).address.getAddress === Array(10: Byte, 0: Byte, 0: Byte, 1: Byte))
     assert(addr.addresses(0).port === 8333)
 
     val addr1 = Addr(List(NetworkAddressWithTimestamp(time = 1292899810L, services = 1L, address = InetAddress.getByAddress(Array(10: Byte, 0: Byte, 0: Byte, 1: Byte)), port = 8333)))
     val message1 = Message(magic = 0xd9b4bef9, command = "addr", payload = Addr.write(addr1))
-    assert(Message.write(message1) === BinaryData("f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d"))
+    assert(Message.write(message1) === hex"f9beb4d96164647200000000000000001f000000ed52399b01e215104d010000000000000000000000000000000000ffff0a000001208d")
   }
   it should "read and write addr messages 2" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/addr.dat")
     val message = Message.read(stream)
     assert(message.command === "addr")
-    val addr = Addr.read(message.payload)
+    val addr = Addr.read(message.payload.toArray)
     assert(addr.addresses.length === 1000)
   }
   it should "read and write inventory messages" in {
@@ -127,37 +128,37 @@ class ProtocolSpec extends FlatSpec {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/inv.dat")
     val message = Message.read(stream)
     assert(message.command === "inv")
-    val inv = Inventory.read(message.payload)
+    val inv = Inventory.read(message.payload.toArray)
     assert(inv.inventory.size === 500)
-    assert(message.payload == BinaryData(Inventory.write(inv)))
+    assert(message.payload == Inventory.write(inv))
   }
   it should "read and write getblocks messages" in {
     val message = Message.read("f9beb4d9676574626c6f636b7300000045000000f5fcbcad72110100016fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d61900000000000000000000000000000000000000000000000000000000000000000000000000")
     assert(message.command == "getblocks")
-    val getblocks = Getblocks.read(message.payload)
+    val getblocks = Getblocks.read(message.payload.toArray)
     assert(getblocks.version === 70002)
-    assert(getblocks.locatorHashes(0).toString === "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000")
+    assert(getblocks.locatorHashes.head === hex"6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000")
     assert(Getblocks.write(getblocks) === message.payload)
   }
   it should "read and write getheaders message" in {
     val getheaders = Getheaders.read("711101000106226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f0000000000000000000000000000000000000000000000000000000000000000")
     assert(getheaders.locatorHashes(0) === Block.RegtestGenesisBlock.hash)
-    assert(Getheaders.write(getheaders) === BinaryData("711101000106226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f0000000000000000000000000000000000000000000000000000000000000000"))
+    assert(Getheaders.write(getheaders) === hex"711101000106226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f0000000000000000000000000000000000000000000000000000000000000000")
   }
   it should "read and write getdata messages" in {
     val stream = classOf[ProtocolSpec].getResourceAsStream("/getdata.dat")
     val message = Message.read(stream)
     assert(message.command === "getdata")
-    val getdata = Getdata.read(message.payload)
+    val getdata = Getdata.read(message.payload.toArray)
     assert(getdata.inventory.size === 128)
-    assert(getdata.inventory(0).hash === BinaryData("4860eb18bf1b1620e37e9490fc8a427514416fd75159ab86688e9a8300000000"))
+    assert(getdata.inventory(0).hash === hex"4860eb18bf1b1620e37e9490fc8a427514416fd75159ab86688e9a8300000000")
     val check = Getdata.write(getdata)
-    assert(BinaryData(check) == message.payload)
+    assert(check == message.payload)
   }
   it should "read and write block messages" in {
     val message = Message.read("f9beb4d9626c6f636b00000000000000d7000000934d270a010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000")
     assert(message.command === "block")
-    val block = Block.read(message.payload)
+    val block = Block.read(message.payload.toArray)
     assert(block.header.hashPreviousBlock == Block.LivenetGenesisBlock.hash)
     assert(OutPoint.isCoinbase(block.tx(0).txIn(0).outPoint))
     assert(Block.checkProofOfWork(block))
@@ -175,8 +176,8 @@ class ProtocolSpec extends FlatSpec {
   it should "read and write reject messages" in {
     val message = Message.read("0b11090772656a6563740000000000001f00000051e3a01d076765746461746101156572726f722070617273696e67206d657373616765")
     assert(message.command === "reject")
-    val reject = Reject.read(message.payload)
+    val reject = Reject.read(message.payload.toArray)
     assert(reject.message === "getdata")
-    assert(BinaryData(Reject.write(reject)) == message.payload)
+    assert(Reject.write(reject) == message.payload)
   }
 }

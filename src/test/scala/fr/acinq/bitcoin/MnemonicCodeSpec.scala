@@ -5,6 +5,7 @@ import java.io.InputStreamReader
 import org.json4s.DefaultFormats
 import org.json4s.jackson.JsonMethods
 import org.scalatest.FunSuite
+import scodec.bits.ByteVector
 
 import scala.util.Random
 
@@ -25,10 +26,11 @@ class MnemonicCodeSpec extends FunSuite {
     val stream = classOf[MnemonicCodeSpec].getResourceAsStream("/bip39_vectors.json")
     val vectors = JsonMethods.parse(new InputStreamReader(stream)).extract[TestVectors]
     vectors.english.map(_ match {
-      case Array(raw, mnemonics, seed ,xprv) =>
-        assert(toMnemonics(BinaryData(raw)).mkString(" ") === mnemonics)
-        assert(toSeed(toMnemonics(BinaryData(raw)), "TREZOR") === BinaryData(seed))
-        val master = DeterministicWallet.generate(BinaryData(seed))
+      case Array(raw, mnemonics, seed, xprv) =>
+        val bin = ByteVector.fromValidHex(raw)
+        assert(toMnemonics(bin).mkString(" ") === mnemonics)
+        assert(toSeed(toMnemonics(bin), "TREZOR") === ByteVector.fromValidHex(seed))
+        val master = DeterministicWallet.generate(ByteVector.fromValidHex(seed))
         assert(DeterministicWallet.encode(master, DeterministicWallet.xprv) == xprv)
     })
   }
@@ -39,7 +41,7 @@ class MnemonicCodeSpec extends FunSuite {
       for (length <- Seq(16, 20, 24, 28, 32, 36, 40)) {
         val entropy = new Array[Byte](length)
         random.nextBytes(entropy)
-        val mnemonics = MnemonicCode.toMnemonics(entropy)
+        val mnemonics = MnemonicCode.toMnemonics(ByteVector.view(entropy))
         MnemonicCode.validate(mnemonics)
       }
     }

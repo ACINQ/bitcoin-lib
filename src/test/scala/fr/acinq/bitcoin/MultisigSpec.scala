@@ -3,24 +3,25 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.Base58.Prefix
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.scalatest.{FunSuite, Matchers}
+import scodec.bits._
 
 class MultisigSpec extends FunSuite with Matchers {
-  val key1 = PrivateKey(BinaryData("C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01"))
+  val key1 = PrivateKey(hex"C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01")
   val pub1 = key1.publicKey
 
-  val key2 = PrivateKey(BinaryData("5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01"))
+  val key2 = PrivateKey(hex"5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01")
   val pub2 = key2.publicKey
 
-  val key3 = PrivateKey(BinaryData("29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01"))
+  val key3 = PrivateKey(hex"29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01")
   val pub3 = key3.publicKey
 
-  val redeemScript: BinaryData = Script.write(Script.createMultiSigMofN(2, List(pub1, pub2, pub3)))
+  val redeemScript = Script.write(Script.createMultiSigMofN(2, List(pub1, pub2, pub3)))
   val multisigAddress = Crypto.hash160(redeemScript)
 
   test("create and sign multisig transactions") {
 
     // tested with bitcoin core client using command: createmultisig 2 "[\"0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A\",\"032C58BC9615A6FF24E9132CEF33F1EF373D97DC6DA7933755BC8BB86DBEE9F55C\",\"02C4D72D99CA5AD12C17C9CFE043DC4E777075E8835AF96F46D8E3CCD929FE1926\"]"
-    redeemScript should equal(BinaryData("52210394d30868076ab1ea7736ed3bdbec99497a6ad30b25afd709cdf3804cd389996a21032c58bc9615a6ff24e9132cef33f1ef373d97dc6da7933755bc8bb86dbee9f55c2102c4d72d99ca5ad12c17c9cfe043dc4e777075e8835af96f46d8e3ccd929fe192653ae"))
+    redeemScript should equal(hex"52210394d30868076ab1ea7736ed3bdbec99497a6ad30b25afd709cdf3804cd389996a21032c58bc9615a6ff24e9132cef33f1ef373d97dc6da7933755bc8bb86dbee9f55c2102c4d72d99ca5ad12c17c9cfe043dc4e777075e8835af96f46d8e3ccd929fe192653ae")
 
     // 196 = prefix for P2SH adress on testnet
     Base58Check.encode(Prefix.ScriptAddressTestnet, multisigAddress) should equal("2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
@@ -28,8 +29,8 @@ class MultisigSpec extends FunSuite with Matchers {
     // we want to redeem the first output of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
     val txIn = TxIn(
-      OutPoint(fromHexString("41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea").reverse, 0),
-      signatureScript = Array.empty[Byte], // empy signature script
+      OutPoint(ByteVector32(hex"41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea".reverse), 0),
+      signatureScript = ByteVector.empty, // empy signature script
       sequence = 0xFFFFFFFFL)
 
     // and we want to sent the output to our multisig address
@@ -41,7 +42,7 @@ class MultisigSpec extends FunSuite with Matchers {
     val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
 
     val signData = SignData(
-      BinaryData("76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac"), // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
+      hex"76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac", // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
       PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet))
 
     val signedTx = Transaction.sign(tx, List(signData))
@@ -64,7 +65,7 @@ class MultisigSpec extends FunSuite with Matchers {
     // create a tx with empty)put signature scripts
     val tx = Transaction(
       version = 1L,
-      txIn = List(TxIn(OutPoint(previousTx, 0), Array.empty[Byte], 0xffffffffL)),
+      txIn = List(TxIn(OutPoint(previousTx, 0), ByteVector.empty, 0xffffffffL)),
       txOut = List(TxOut(
         amount = amount,
         publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),

@@ -9,6 +9,7 @@ import org.scalatest.FunSuite
   * this was tested with electrum (BIPs 44, 49, 84) and mycellium (BIP44) testnet wallets
   */
 class DeriveWalletKeysSpec extends FunSuite {
+
   import DeriveWalletKeysSpec._
 
   val mnemonics = "gun please vital unable phone catalog explain raise erosion zoo truly exist"
@@ -41,9 +42,13 @@ class DeriveWalletKeysSpec extends FunSuite {
 }
 
 object DeriveWalletKeysSpec {
+
   trait DerivationScheme
+
   object BIP44 extends DerivationScheme
+
   object BIP49 extends DerivationScheme
+
   object BIP84 extends DerivationScheme
 
   def deriveAddresses(xpub: String, derivationScheme: Option[DerivationScheme] = None) = {

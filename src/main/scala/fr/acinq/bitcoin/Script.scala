@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 
 import fr.acinq.bitcoin.Crypto._
+import scodec.bits.ByteVector
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -137,11 +138,11 @@ object Script {
   import ScriptFlags._
   import fr.acinq.bitcoin.ScriptElt._
 
-  type Stack = List[Seq[Byte]]
+  type Stack = List[ByteVector]
 
-  private val True = Seq(1: Byte)
+  private val True = ByteVector.fromByte(1)
 
-  private val False = Seq.empty[Byte]
+  private val False = ByteVector.empty
 
   /**
     * parse a script from a input stream of binary data
@@ -165,22 +166,24 @@ object Script {
     }
   }
 
-  def parse(blob: BinaryData): List[ScriptElt] = if (blob.length > 10000) throw new RuntimeException("script is too large") else parse(new ByteArrayInputStream(blob))
+  def parse(blob: ByteVector): List[ScriptElt] = if (blob.length > 10000) throw new RuntimeException("script is too large") else parse(new ByteArrayInputStream(blob.toArray))
+
+  def parse(blob: Array[Byte]): List[ScriptElt] = parse(ByteVector.view(blob))
 
   def write(script: Seq[ScriptElt], out: OutputStream): Unit = script match {
     case Nil => ()
-    case OP_PUSHDATA(data, length) :: tail if data.length < 0x4c && data.length == length => out.write(data.length); out.write(data); write(tail, out)
-    case OP_PUSHDATA(data, 0x4c) :: tail if data.length < 0xff => writeUInt8(0x4c, out); writeUInt8(data.length, out); out.write(data); write(tail, out)
-    case OP_PUSHDATA(data, 0x4d) :: tail if data.length < 0xffff => writeUInt8(0x4d, out); writeUInt16(data.length, out); out.write(data); write(tail, out)
-    case OP_PUSHDATA(data, 0x4e) :: tail if data.length < 0xffffffff => writeUInt8(0x4e, out); writeUInt32(data.length, out); out.write(data); write(tail, out)
+    case OP_PUSHDATA(data, length) :: tail if data.length < 0x4c && data.length == length => out.write(data.length.toInt); out.write(data.toArray); write(tail, out)
+    case OP_PUSHDATA(data, 0x4c) :: tail if data.length < 0xff => writeUInt8(0x4c, out); writeUInt8(data.length.toInt, out); out.write(data.toArray); write(tail, out)
+    case OP_PUSHDATA(data, 0x4d) :: tail if data.length < 0xffff => writeUInt8(0x4d, out); writeUInt16(data.length.toInt, out); out.write(data.toArray); write(tail, out)
+    case OP_PUSHDATA(data, 0x4e) :: tail if data.length < 0xffffffff => writeUInt8(0x4e, out); writeUInt32(data.length, out); out.write(data.toArray); write(tail, out)
     case op@OP_PUSHDATA(data, code) :: tail => throw new RuntimeException(s"invalid element $op")
     case head :: tail => out.write(elt2code(head)); write(tail, out)
   }
 
-  def write(script: Seq[ScriptElt]): BinaryData = {
+  def write(script: Seq[ScriptElt]): ByteVector = {
     val out = new ByteArrayOutputStream()
     write(script, out)
-    out.toByteArray
+    ByteVector.view(out.toByteArray)
   }
 
   def isUpgradableNop(op: ScriptElt) = op match {
@@ -210,8 +213,8 @@ object Script {
     case _ => 1
   }
 
-  def encodeNumber(value: Long): BinaryData = {
-    if (value == 0) Array.empty[Byte]
+  def encodeNumber(value: Long): ByteVector = {
+    if (value == 0) ByteVector.empty
     else {
       val result = ArrayBuffer.empty[Byte]
       val neg = value < 0
@@ -240,11 +243,11 @@ object Script {
       else if (neg) {
         result(result.length - 1) = (result(result.length - 1) | 0x80).toByte
       }
-      result.toArray
+      ByteVector.view(result.toArray)
     }
   }
 
-  def decodeNumber(input: Seq[Byte], checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long = {
+  def decodeNumber(input: ByteVector, checkMinimalEncoding: Boolean, maximumSize: Int = 4): Long = {
     if (input.isEmpty) 0
     else if (input.length > maximumSize) throw new RuntimeException(s"number cannot be encoded on more than $maximumSize bytes")
     else {
@@ -267,7 +270,7 @@ object Script {
         }
       }
       var result = 0L
-      for (i <- input.indices) {
+      for (i <- input.toSeq.indices) {
         result |= (input(i) & 0xffL) << (8 * i)
       }
 
@@ -280,11 +283,12 @@ object Script {
     }
   }
 
-  def castToBoolean(input: Seq[Byte]): Boolean = input.reverse.toList match {
-    case head :: tail if head == 0x80.toByte && tail.forall(_ == 0) => false
+  def castToBoolean(input: ByteVector): Boolean = input.toSeq.reverse match {
+    case head +: tail if head == 0x80.toByte && tail.forall(_ == 0) => false
     case something if something.exists(_ != 0) => true
     case _ => false
   }
+
 
   def isPushOnly(script: Seq[ScriptElt]): Boolean = !script.exists {
     case op if isSimpleValue(op) => false
@@ -297,14 +301,14 @@ object Script {
     case _ => false
   }
 
-  def isPayToScript(script: Array[Byte]): Boolean = script.length == 23 && script(0) == elt2code(OP_HASH160).toByte && script(1) == 0x14 && script(22) == elt2code(OP_EQUAL).toByte
+  def isPayToScript(script: ByteVector): Boolean = script.length == 23 && script(0) == elt2code(OP_HASH160).toByte && script(1) == 0x14 && script(22) == elt2code(OP_EQUAL).toByte
 
-  def removeSignature(script: List[ScriptElt], signature: BinaryData): List[ScriptElt] = {
+  def removeSignature(script: List[ScriptElt], signature: ByteVector): List[ScriptElt] = {
     val toRemove = OP_PUSHDATA(signature)
     script.filterNot(_ == toRemove)
   }
 
-  def removeSignatures(script: List[ScriptElt], sigs: List[BinaryData]): List[ScriptElt] = sigs.foldLeft(script)(removeSignature)
+  def removeSignatures(script: List[ScriptElt], sigs: List[ByteVector]): List[ScriptElt] = sigs.foldLeft(script)(removeSignature)
 
   def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int): Boolean = {
     // There are two kinds of nLockTime: lock-by-blockheight
@@ -423,7 +427,7 @@ object Script {
 
     import Runner._
 
-    def checkSignature(pubKey: Seq[Byte], sigBytes: Seq[Byte], scriptCode: Seq[Byte], signatureVersion: Int): Boolean = {
+    def checkSignature(pubKey: ByteVector, sigBytes: ByteVector, scriptCode: ByteVector, signatureVersion: Int): Boolean = {
       if (sigBytes.isEmpty) false
       else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) throw new RuntimeException("invalid signature")
       else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion)) throw new RuntimeException("invalid public key")
@@ -441,7 +445,7 @@ object Script {
       }
     }
 
-    def checkSignatures(pubKeys: Seq[Seq[Byte]], sigs: Seq[Seq[Byte]], scriptCode: Seq[Byte], signatureVersion: Int): Boolean = sigs match {
+    def checkSignatures(pubKeys: Seq[ByteVector], sigs: Seq[ByteVector], scriptCode: ByteVector, signatureVersion: Int): Boolean = sigs match {
       case Nil => true
       case _ if sigs.length > pubKeys.length => false
       case sig :: _ if !Crypto.checkSignatureEncoding(sig, scriptFlag) => throw new RuntimeException("invalid signature")
@@ -454,7 +458,7 @@ object Script {
 
     def checkMinimalEncoding: Boolean = (scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0
 
-    def decodeNumber(input: Seq[Byte], maximumSize: Int = 4): Long = Script.decodeNumber(input, checkMinimalEncoding, maximumSize)
+    def decodeNumber(input: ByteVector, maximumSize: Int = 4): Long = Script.decodeNumber(input, checkMinimalEncoding, maximumSize)
 
     /**
       * execute a serialized script, starting from an empty stack
@@ -462,7 +466,7 @@ object Script {
       * @param script serialized script
       * @return the stack created by the script
       */
-    def run(script: BinaryData): Stack = run(parse(script))
+    def run(script: ByteVector): Stack = run(parse(script))
 
     /**
       * execute a script, starting from an empty stack
@@ -470,7 +474,7 @@ object Script {
       * @param script
       * @return the stack created by the script
       */
-    def run(script: List[ScriptElt]): Stack = run(script, List.empty[Seq[Byte]])
+    def run(script: List[ScriptElt]): Stack = run(script, List.empty[ByteVector])
 
     /**
       * execute a serialized script, starting from an existing stack
@@ -479,7 +483,7 @@ object Script {
       * @param stack  initial stack
       * @return the stack updated by the script
       */
-    def run(script: BinaryData, stack: Stack): Stack = run(parse(script), stack)
+    def run(script: ByteVector, stack: Stack): Stack = run(parse(script), stack)
 
     def run(script: List[ScriptElt], stack: Stack): Stack = run(script, stack, SigVersion.SIGVERSION_BASE)
 
@@ -492,7 +496,7 @@ object Script {
       * @return the stack updated by the script
       */
     def run(script: List[ScriptElt], stack: Stack, signatureVersion: Int): Stack =
-      run(script, stack, State(conditions = List.empty[Boolean], altstack = List.empty[Seq[Byte]], opCount = 0, scriptCode = script), signatureVersion)
+      run(script, stack, State(conditions = List.empty[Boolean], altstack = List.empty[ByteVector], opCount = 0, scriptCode = script), signatureVersion)
 
 
     /**
@@ -540,7 +544,7 @@ object Script {
         case OP_ENDIF :: tail => run(tail, stack, state.copy(conditions = conditions.tail, opCount = opCount + 1), signatureVersion)
         case head :: tail if conditions.contains(false) => run(tail, stack, state.copy(opCount = opCount + cost(head)), signatureVersion)
         // and now, things that are checked only in an executed IF branch
-        case OP_0 :: tail => run(tail, Seq.empty[Byte] :: stack, state, signatureVersion)
+        case OP_0 :: tail => run(tail, ByteVector.empty :: stack, state, signatureVersion)
         case op :: tail if isSimpleValue(op) => run(tail, encodeNumber(simpleValue(op)) :: stack, state, signatureVersion)
         case OP_NOP :: tail => run(tail, stack, state.copy(opCount = opCount + 1), signatureVersion)
         case op :: tail if isUpgradableNop(op) && ((scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0) => throw new RuntimeException("use of upgradable NOP is discouraged")
@@ -666,7 +670,7 @@ object Script {
 
           // Drop the signature in pre-segwit scripts but not segwit scripts
           val scriptCode1 = if (signatureVersion == SigVersion.SIGVERSION_BASE) {
-            val scriptCode1 = removeSignatures(scriptCode, sigs.map(bytes => BinaryData(bytes)))
+            val scriptCode1 = removeSignatures(scriptCode, sigs)
             if (scriptCode1.length != scriptCode.length && (scriptFlag & SCRIPT_VERIFY_CONST_SCRIPTCODE) != 0)
               throw new RuntimeException("Signature is found in scriptCode")
             scriptCode1
@@ -796,7 +800,7 @@ object Script {
         case OP_PUSHDATA(data, code) :: _ if ((scriptFlag & SCRIPT_VERIFY_MINIMALDATA) != 0) && !OP_PUSHDATA.isMinimal(data, code) => {
           throw new RuntimeException("not minimal push")
         }
-        case OP_PUSHDATA(data, _) :: tail => run(tail, data.toSeq :: stack, state, signatureVersion)
+        case OP_PUSHDATA(data, _) :: tail => run(tail, data :: stack, state, signatureVersion)
         case OP_ROLL :: tail => stack match {
           case head :: stacktail =>
             val n = decodeNumber(head).toInt
@@ -851,16 +855,16 @@ object Script {
       }
     }
 
-    def verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: BinaryData): Unit = {
-      val (stack, scriptPubKey) = witnessVersion match {
+    def verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteVector): Unit = {
+      val (stack: Seq[ByteVector], scriptPubKey) = witnessVersion match {
         case 0 if program.length == 20 =>
           // P2WPKH, program is simply the pubkey hash
           require(witness.stack.length == 2, "Invalid witness program, should have 2 items")
           (witness.stack, OP_DUP :: OP_HASH160 :: OP_PUSHDATA(program) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
         case 0 if program.length == 32 =>
           // P2WPSH, program is the hash of the script, and witness is the stack + the script
-          val check: BinaryData = Crypto.sha256(witness.stack.last)
-          require(check == program, "witness program mismatch")
+          val check = Crypto.sha256(witness.stack.last)
+          require(check.bytes == program, "witness program mismatch")
           (witness.stack.dropRight(1), Script.parse(witness.stack.last))
         case 0 =>
           throw new IllegalArgumentException(s"Invalid witness program length: ${program.length}")
@@ -872,13 +876,12 @@ object Script {
       }
       stack.foreach(item => require(item.length <= MaxScriptElementSize, "item is bigger than maximum push size"))
 
-      // FIXME: stack.map(...) is fugly
-      val stack1 = run(scriptPubKey, stack.map(_.toSeq).toList.reverse, SigVersion.SIGVERSION_WITNESS_V0)
+      val stack1 = run(scriptPubKey, stack.toList.reverse, SigVersion.SIGVERSION_WITNESS_V0)
       require(stack1.length == 1)
       require(castToBoolean(stack1.head))
     }
 
-    def verifyScripts(scriptSig: BinaryData, scriptPubKey: BinaryData): Boolean = verifyScripts(scriptSig, scriptPubKey, ScriptWitness.empty)
+    def verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector): Boolean = verifyScripts(scriptSig, scriptPubKey, ScriptWitness.empty)
 
     /**
       * verify a script sig/script pubkey pair:
@@ -893,7 +896,7 @@ object Script {
       * @param scriptPubKey public key script
       * @return true if the scripts were successfully verified
       */
-    def verifyScripts(scriptSig: BinaryData, scriptPubKey: BinaryData, witness: ScriptWitness): Boolean = {
+    def verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector, witness: ScriptWitness): Boolean = {
       def checkStack(stack: Stack): Boolean = {
         if (stack.isEmpty) false
         else if (!Script.castToBoolean(stack.head)) false
@@ -974,13 +977,13 @@ object Script {
     * @param script public key script
     * @return the public key hash wrapped in the script
     */
-  def publicKeyHash(script: List[ScriptElt]): Array[Byte] = script match {
+  def publicKeyHash(script: List[ScriptElt]): ByteVector = script match {
     case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: OP_NOP :: Nil => data // non standard pay to pubkey...
     case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil => data // standard pay to pubkey
     case OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUAL :: Nil if data.size == 20 => data // standard pay to script
   }
 
-  def publicKeyHash(script: Array[Byte]): Array[Byte] = publicKeyHash(parse(script))
+  def publicKeyHash(script: ByteVector): ByteVector = publicKeyHash(parse(script))
 
   /**
     * extract a public key from a signature script
@@ -988,7 +991,7 @@ object Script {
     * @param script signature script
     * @return the public key wrapped in the script
     */
-  def publicKey(script: List[ScriptElt]): Array[Byte] = script match {
+  def publicKey(script: List[ScriptElt]): ByteVector = script match {
     case OP_PUSHDATA(data1, _) :: OP_PUSHDATA(data2, _) :: Nil if data1.length > 2 && data2.length > 2 => data2
     case OP_PUSHDATA(data, _) :: OP_CHECKSIG :: Nil => data
   }
@@ -1016,7 +1019,7 @@ object Script {
     * @param pubKeyHash public key hash
     * @return a pay-to-public-key-hash script
     */
-  def pay2pkh(pubKeyHash: BinaryData): Seq[ScriptElt] = {
+  def pay2pkh(pubKeyHash: ByteVector): Seq[ScriptElt] = {
     require(pubKeyHash.length == 20, "pubkey hash length must be 20 bytes")
     OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubKeyHash) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
   }
@@ -1040,7 +1043,7 @@ object Script {
     * @param script bitcoin script
     * @return a pay-to-script script
     */
-  def pay2sh(script: BinaryData): Seq[ScriptElt] = OP_HASH160 :: OP_PUSHDATA(hash160(script)) :: OP_EQUAL :: Nil
+  def pay2sh(script: ByteVector): Seq[ScriptElt] = OP_HASH160 :: OP_PUSHDATA(hash160(script)) :: OP_EQUAL :: Nil
 
   /**
     *
@@ -1054,14 +1057,14 @@ object Script {
     * @param script bitcoin script
     * @return a pay-to-witness-script script
     */
-  def pay2wsh(script: BinaryData): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(sha256(script)) :: Nil
+  def pay2wsh(script: ByteVector): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(sha256(script)) :: Nil
 
   /**
     *
     * @param pubKeyHash public key hash
     * @return a pay-to-witness-public-key-hash script
     */
-  def pay2wpkh(pubKeyHash: BinaryData): Seq[ScriptElt] = {
+  def pay2wpkh(pubKeyHash: ByteVector): Seq[ScriptElt] = {
     require(pubKeyHash.length == 20, "pubkey hash length must be 20 bytes")
     OP_0 :: OP_PUSHDATA(pubKeyHash) :: Nil
   }

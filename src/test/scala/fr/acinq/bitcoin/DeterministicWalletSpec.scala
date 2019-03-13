@@ -4,6 +4,7 @@ import java.math.BigInteger
 import java.nio.ByteOrder
 
 import org.scalatest.FlatSpec
+import scodec.bits._
 
 import scala.util.Random
 
@@ -14,8 +15,8 @@ class DeterministicWalletSpec extends FlatSpec {
 
   // these tests are the "official" ones (see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
 
-  "Determinstic Wallet" should "generate and derive keys (test vector #1)" in {
-    val m = generate(fromHexString("000102030405060708090a0b0c0d0e0f"))
+  "Deterministic Wallet" should "generate and derive keys (test vector #1)" in {
+    val m = generate(hex"000102030405060708090a0b0c0d0e0f")
     assert(encode(m, xprv) === "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi")
 
     val m_pub = publicKey(m)
@@ -59,7 +60,7 @@ class DeterministicWalletSpec extends FlatSpec {
     assert(encode(derivePrivateKey(m, hardened(0) :: 1L :: hardened(2) :: 2L :: 1000000000L :: Nil), xprv) === "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76")
   }
   it should "generate and derive keys (test vector #2)" in {
-    val m = generate(fromHexString("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"))
+    val m = generate(hex"fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542")
     assert(encode(m, xprv) === "xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U")
 
     val m_pub = publicKey(m)
@@ -92,16 +93,16 @@ class DeterministicWalletSpec extends FlatSpec {
     assert(encode(m0_2147483647h_1_2147483646h_2_pub, xpub) === "xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt")
   }
   it should "generate and derive keys (test vector #3)" in {
-    val m = generate(BinaryData("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be"))
+    val m = generate(hex"4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be")
     assert(encode(m, xprv) === "xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6")
     assert(encode(publicKey(m), xpub) == "xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13")
     assert(encode(derivePrivateKey(m, hardened(0)), xprv) === "xprv9uPDJpEQgRQfDcW7BkF7eTya6RPxXeJCqCJGHuCJ4GiRVLzkTXBAJMu2qaMWPrS7AANYqdq6vcBcBUdJCVVFceUvJFjaPdGZ2y9WACViL4L")
     assert(encode(publicKey(derivePrivateKey(m, hardened(0))), xpub) == "xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y")
   }
   it should "be possible to go up the private key chain if you have the master pub key and a child private key!!" in {
-    val m = generate(fromHexString("000102030405060708090a0b0c0d0e0f"))
+    val m = generate(hex"000102030405060708090a0b0c0d0e0f")
     assert(encode(m, xprv) === "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi")
-    val k = new BigInteger(1, m.secretkeybytes.data.toArray) // k is our master private key
+    val k = new BigInteger(1, m.secretkeybytes.toArray) // k is our master private key
 
     val m_pub = publicKey(m)
     assert(encode(m_pub, xpub) === "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8")
@@ -111,10 +112,10 @@ class DeterministicWalletSpec extends FlatSpec {
 
     // now we have: the master public key, and a child private key, and we want to climb the tree back up
     // to the parent private key
-    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes.data ++ writeUInt32(42, ByteOrder.BIG_ENDIAN))
+    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes ++ writeUInt32(42, ByteOrder.BIG_ENDIAN))
     val IL = I.take(32)
     val IR = I.takeRight(32)
-    val guess = new BigInteger(1, m42.secretkeybytes).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)
+    val guess = new BigInteger(1, m42.secretkeybytes.toArray).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)
     assert(guess === k)
   }
   it should "parse string-formatted derivation paths" in {
@@ -138,7 +139,7 @@ class DeterministicWalletSpec extends FlatSpec {
     val seed = new Array[Byte](32)
     for (i <- 0 until 50) {
       random.nextBytes(seed)
-      val master = DeterministicWallet.generate(seed)
+      val master = DeterministicWallet.generate(ByteVector.view(seed))
       for (j <- 0 until 50) {
         val index = random.nextLong()
         val priv = DeterministicWallet.derivePrivateKey(master, index)

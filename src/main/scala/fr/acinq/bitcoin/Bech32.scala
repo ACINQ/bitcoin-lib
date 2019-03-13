@@ -1,5 +1,7 @@
 package fr.acinq.bitcoin
 
+import scodec.bits.ByteVector
+
 /**
   * See https://github.com/sipa/bech32/blob/master/bip-witaddr.mediawiki
   */
@@ -142,9 +144,9 @@ object Bech32 {
     * @param data           witness program: if version is 0, either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
     * @return a bech32 encoded witness address
     */
-  def encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: BinaryData): String = {
+  def encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: ByteVector): String = {
     // prepend witness version: 0
-    val data1 = witnessVersion +: Bech32.eight2five(data)
+    val data1 = witnessVersion +: Bech32.eight2five(data.toArray)
     val checksum = Bech32.checksum(hrp, data1)
     hrp + "1" + new String((data1 ++ checksum).map(i => alphabet(i)))
   }
@@ -157,7 +159,7 @@ object Bech32 {
     *         is the witness version and program the decoded witness program.
     *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
     */
-  def decodeWitnessAddress(address: String): (String, Byte, BinaryData) = {
+  def decodeWitnessAddress(address: String): (String, Byte, ByteVector) = {
     if (address.indexWhere(_.isLower) != -1 && address.indexWhere(_.isUpper) != -1) throw new IllegalArgumentException("input mixes lowercase and uppercase characters")
     val (hrp, data) = decode(address)
     require(hrp == "bc" || hrp == "tb" || hrp == "bcrt", s"invalid HRP $hrp")
@@ -166,16 +168,16 @@ object Bech32 {
     val bin = five2eight(data.drop(1))
     require(bin.length >= 2 && bin.length <= 40, s"invalid witness program length ${bin.length}")
     if (version == 0) require(bin.length == 20 || bin.length == 32, s"invalid witness program length ${bin.length}")
-    (hrp, version, bin)
+    (hrp, version, ByteVector.view(bin))
   }
 
   /**
     *
-    * @param hrp human readable prefix
+    * @param hrp   human readable prefix
     * @param int5s 5-bit data
     * @return hrp + data encoded as a Bech32 string
     */
-  def encode(hrp: String, int5s: Array[Int5]) : String = {
+  def encode(hrp: String, int5s: Array[Int5]): String = {
     require(hrp.toLowerCase == hrp || hrp.toUpperCase == hrp, "mixed case strings are not valid bech32 prefixes")
     val checksum = Bech32.checksum(hrp, int5s)
     hrp + "1" + new String((int5s ++ checksum).map(i => alphabet(i)))

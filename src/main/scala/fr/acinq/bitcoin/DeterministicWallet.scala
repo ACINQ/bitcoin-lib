@@ -6,6 +6,7 @@ import java.nio.ByteOrder
 
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, Scalar}
 import fr.acinq.bitcoin.Protocol._
+import scodec.bits.ByteVector
 
 /**
   * see https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
@@ -29,8 +30,9 @@ object DeterministicWallet {
       *             at the end means use the hardened version of the ley index (example: m/44'/0'/0'/0)
       * @return a KeyPath instance
       */
-    def apply(path: String) : KeyPath = {
+    def apply(path: String): KeyPath = {
       def toNumber(value: String): Long = if (value.last == '\'') hardened(value.dropRight(1).toLong) else value.toLong
+
       val path1 = path.stripPrefix("m").stripPrefix("/")
       if (path1.isEmpty) KeyPath.Root else new KeyPath(path1.split('/').map(toNumber))
     }
@@ -48,9 +50,7 @@ object DeterministicWallet {
 
   def isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-  case class ExtendedPrivateKey(secretkeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
-    require(secretkeybytes.length == 32)
-    require(chaincode.length == 32)
+  case class ExtendedPrivateKey(secretkeybytes: ByteVector32, chaincode: ByteVector32, depth: Int, path: KeyPath, parent: Long) {
 
     def privateKey: PrivateKey = PrivateKey(Scalar(secretkeybytes), compressed = true)
 
@@ -60,13 +60,13 @@ object DeterministicWallet {
   object ExtendedPrivateKey {
     def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPrivateKey) = {
       val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
-      val bis = new ByteArrayInputStream((bin))
+      val bis = new ByteArrayInputStream(bin.toArray)
       val depth = Protocol.uint8(bis)
       val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
       val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
-      val chaincode = Protocol.bytes(bis, 32)
+      val chaincode = ByteVector32(Protocol.bytes(bis, 32))
       require(bis.read() == 0)
-      val secretkeybytes = Protocol.bytes(bis, 32)
+      val secretkeybytes = ByteVector32(Protocol.bytes(bis, 32))
       (prefix, ExtendedPrivateKey(secretkeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
     }
   }
@@ -76,17 +76,17 @@ object DeterministicWallet {
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
-    out.write(input.chaincode)
+    out.write(input.chaincode.toArray)
     out.write(0)
-    out.write(input.secretkeybytes)
-    val buffer = out.toByteArray
+    out.write(input.secretkeybytes.toArray)
+    val buffer = ByteVector.view(out.toByteArray)
     Base58Check.encode(prefix, buffer)
   }
 
   @deprecated("use encode(priv, prefix (xpriv or tpriv for example)) instead", "v0.9.17")
   def encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
 
-  case class ExtendedPublicKey(publickeybytes: BinaryData, chaincode: BinaryData, depth: Int, path: KeyPath, parent: Long) {
+  case class ExtendedPublicKey(publickeybytes: ByteVector, chaincode: ByteVector32, depth: Int, path: KeyPath, parent: Long) {
     require(publickeybytes.length == 33)
     require(chaincode.length == 32)
 
@@ -96,11 +96,11 @@ object DeterministicWallet {
   object ExtendedPublicKey {
     def decode(input: String, parentPath: KeyPath = KeyPath.Root): (Int, ExtendedPublicKey) = {
       val (prefix, bin) = Base58Check.decodeWithIntPrefix(input)
-      val bis = new ByteArrayInputStream((bin))
+      val bis = new ByteArrayInputStream(bin.toArray)
       val depth = Protocol.uint8(bis)
       val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
       val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
-      val chaincode = Protocol.bytes(bis, 32)
+      val chaincode = ByteVector32(Protocol.bytes(bis, 32))
       val publickeybytes = Protocol.bytes(bis, 33)
       (prefix.toInt, ExtendedPublicKey(publickeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
     }
@@ -111,9 +111,9 @@ object DeterministicWallet {
     writeUInt8(input.depth, out)
     writeUInt32(input.parent.toInt, out, ByteOrder.BIG_ENDIAN)
     writeUInt32(input.path.lastChildNumber.toInt, out, ByteOrder.BIG_ENDIAN)
-    out.write(input.chaincode)
-    out.write(input.publickeybytes)
-    val buffer = out.toByteArray
+    out.write(input.chaincode.toArray)
+    out.write(input.publickeybytes.toArray)
+    val buffer = ByteVector.view(out.toByteArray)
     Base58Check.encode(prefix, buffer)
   }
 
@@ -125,10 +125,10 @@ object DeterministicWallet {
     * @param seed random seed
     * @return a "master" private key
     */
-  def generate(seed: Seq[Byte]): ExtendedPrivateKey = {
-    val I = Crypto.hmac512("Bitcoin seed".getBytes("UTF-8"), seed)
-    val IL = I.take(32)
-    val IR = I.takeRight(32)
+  def generate(seed: ByteVector): ExtendedPrivateKey = {
+    val I = Crypto.hmac512(ByteVector.view("Bitcoin seed".getBytes("UTF-8")), seed)
+    val IL = ByteVector32(I.take(32))
+    val IR = ByteVector32(I.takeRight(32))
     ExtendedPrivateKey(IL, IR, depth = 0, path = List.empty[Long], parent = 0L)
   }
 
@@ -163,14 +163,14 @@ object DeterministicWallet {
     */
   def derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = {
     val I = if (isHardened(index)) {
-      val buffer = 0.toByte +: parent.secretkeybytes.data
+      val buffer = 0.toByte +: parent.secretkeybytes
       Crypto.hmac512(parent.chaincode, buffer ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     } else {
       val pub = publicKey(parent).publickeybytes
-      Crypto.hmac512(parent.chaincode, pub.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
+      Crypto.hmac512(parent.chaincode, pub ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     }
-    val IL = I.take(32)
-    val IR = I.takeRight(32)
+    val IL = ByteVector32(I.take(32))
+    val IR = ByteVector32(I.takeRight(32))
     val p = new BigInteger(1, IL.toArray)
     if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child private key")
@@ -180,7 +180,7 @@ object DeterministicWallet {
     if (key.isZero) {
       throw new RuntimeException("cannot generated child private key")
     }
-    val buffer = key.toBin.take(32)
+    val buffer = ByteVector32(key.toBin.take(32))
     ExtendedPrivateKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 
@@ -193,9 +193,9 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = {
     require(!isHardened(index), "Cannot derive public keys from public hardened keys")
 
-    val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes.data ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
-    val IL = I.take(32)
-    val IR = I.takeRight(32)
+    val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
+    val IL = ByteVector32(I.take(32))
+    val IR = ByteVector32(I.takeRight(32))
     val p = new BigInteger(1, IL.toArray)
     if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child public key")
@@ -204,7 +204,7 @@ object DeterministicWallet {
     if (Ki.isInfinity) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val buffer = Ki.getEncoded(true)
+    val buffer = ByteVector.view(Ki.getEncoded(true))
     ExtendedPublicKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 

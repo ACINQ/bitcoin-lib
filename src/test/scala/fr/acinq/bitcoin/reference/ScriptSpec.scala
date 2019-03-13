@@ -7,7 +7,7 @@ import org.json4s.JsonAST.{JArray, JDouble, JString}
 import org.json4s.jackson.JsonMethods
 import org.json4s.{DefaultFormats, JValue}
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
+import scodec.bits.ByteVector
 
 import scala.util.Try
 
@@ -17,22 +17,22 @@ import scala.util.Try
   */
 
 object ScriptSpec {
-  def parseFromText(input: String): Array[Byte] = {
-    def parseInternal(tokens: List[String], acc: Array[Byte] = Array.empty[Byte]): Array[Byte] = tokens match {
+  def parseFromText(input: String): ByteVector = {
+    def parseInternal(tokens: List[String], acc: ByteVector = ByteVector.empty): ByteVector = tokens match {
       case Nil => acc
       case head :: tail if head.matches("^-?[0-9]*$") => head.toLong match {
         case -1 => parseInternal(tail, acc :+ ScriptElt.elt2code(OP_1NEGATE).toByte)
         case 0 => parseInternal(tail, acc :+ ScriptElt.elt2code(OP_0).toByte)
         case value if value >= 1 && value <= 16 =>
-          val bytes = Array((ScriptElt.elt2code(OP_1) - 1 + value).toByte)
+          val bytes = ByteVector((ScriptElt.elt2code(OP_1) - 1 + value).toByte)
           parseInternal(tail, acc ++ bytes)
         case value =>
           val bytes = Script.encodeNumber(value)
           parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(bytes) :: Nil))
       }
       case head :: tail if ScriptElt.name2code.get(head).isDefined => parseInternal(tail, acc :+ ScriptElt.name2code(head).toByte)
-      case head :: tail if head.startsWith("0x") => parseInternal(tail, acc ++ fromHexString(head))
-      case head :: tail if head.startsWith("'") && head.endsWith("'") => parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(head.stripPrefix("'").stripSuffix("'").getBytes("UTF-8")) :: Nil))
+      case head :: tail if head.startsWith("0x") => parseInternal(tail, acc ++ ByteVector.fromValidHex(head))
+      case head :: tail if head.startsWith("'") && head.endsWith("'") => parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(ByteVector.view(head.stripPrefix("'").stripSuffix("'").getBytes("UTF-8"))) :: Nil))
     }
 
     try {
@@ -70,14 +70,14 @@ object ScriptSpec {
 
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
-  def creditTx(scriptPubKey: Array[Byte], amount: Btc) = Transaction(version = 1,
-    txIn = TxIn(OutPoint(new Array[Byte](32), -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
+  def creditTx(scriptPubKey: ByteVector, amount: Btc) = Transaction(version = 1,
+    txIn = TxIn(OutPoint(ByteVector32.Zeroes, -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
     txOut = TxOut(amount, scriptPubKey) :: Nil,
     lockTime = 0)
 
-  def spendingTx(scriptSig: Array[Byte], tx: Transaction) = Transaction(version = 1,
+  def spendingTx(scriptSig: ByteVector, tx: Transaction) = Transaction(version = 1,
     txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
-    txOut = TxOut(tx.txOut(0).amount, Array.empty[Byte]) :: Nil,
+    txOut = TxOut(tx.txOut(0).amount, ByteVector.empty) :: Nil,
     lockTime = 0)
 
   // use 0 btc if no amount is specified
@@ -85,7 +85,7 @@ object ScriptSpec {
     runTest(witnessText, 0 btc, scriptSigText, scriptPubKeyText, flags, comments, expectedText)
 
   def runTest(witnessText: Seq[String], amount: Btc, scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedText: String): Unit = {
-    val witness = ScriptWitness(witnessText.map(BinaryData(_)))
+    val witness = ScriptWitness(witnessText.map(ByteVector.fromValidHex(_)))
     val scriptPubKey = parseFromText(scriptPubKeyText)
     val scriptSig = parseFromText(scriptSigText)
     val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).updateWitness(0, witness)

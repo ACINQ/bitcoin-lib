@@ -35,6 +35,7 @@ case class MilliBtc(amount: BigDecimal) extends BtcAmount {
 
 case class Btc(amount: BigDecimal) extends BtcAmount {
   require(amount.abs <= 21e6, "amount must not be greater than 21 millions")
+
   // @formatter:off
     def +(other: Btc) = Btc(amount + other.amount)
     def -(other: Btc) = Btc(amount - other.amount)
