@@ -91,13 +91,13 @@ object Protocol {
     buffer.getLong()
   }
 
-  def writeUInt64(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt64(input, order))
+  def writeUInt64(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt64(input, order).toArray)
 
-  def writeUInt64(input: Long, order: ByteOrder): Array[Byte] = {
+  def writeUInt64(input: Long, order: ByteOrder): ByteVector = {
     val bin = new Array[Byte](8)
     val buffer = ByteBuffer.wrap(bin).order(order)
     buffer.putLong(input)
-    bin
+    ByteVector.view(bin)
   }
 
   def varint(blob: Array[Byte]): Long = varint(new ByteArrayInputStream(blob))
