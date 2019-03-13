@@ -73,7 +73,7 @@ object Base58Check {
     * @return a Base58 String
     */
   def encode(prefix: Int, data: ByteVector): String = {
-    encode(ByteVector.view(Protocol.writeUInt32(prefix, ByteOrder.BIG_ENDIAN)), data)
+    encode(Protocol.writeUInt32(prefix, ByteOrder.BIG_ENDIAN), data)
   }
 
   /**

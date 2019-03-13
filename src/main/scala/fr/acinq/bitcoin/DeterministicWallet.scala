@@ -125,7 +125,7 @@ object DeterministicWallet {
     * @return a "master" private key
     */
   def generate(seed: ByteVector): ExtendedPrivateKey = {
-    val I = ByteVector.view(Crypto.hmac512("Bitcoin seed".getBytes("UTF-8"), seed.toArray))
+    val I = Crypto.hmac512(ByteVector.view("Bitcoin seed".getBytes("UTF-8")), seed)
     val IL = ByteVector32(I.take(32))
     val IR = ByteVector32(I.takeRight(32))
     ExtendedPrivateKey(IL, IR, depth = 0, path = List.empty[Long], parent = 0L)
@@ -145,7 +145,7 @@ object DeterministicWallet {
     * @param input extended public key
     * @return the fingerprint for this public key
     */
-  def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes.toArray).take(4).reverse.toArray))
+  def fingerprint(input: ExtendedPublicKey): Long = uint32(new ByteArrayInputStream(Crypto.hash160(input.publickeybytes).take(4).reverse.toArray))
 
   /**
     *
@@ -163,10 +163,10 @@ object DeterministicWallet {
   def derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = {
     val I = if (isHardened(index)) {
       val buffer = 0.toByte +: parent.secretkeybytes
-      ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, buffer.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
+      Crypto.hmac512(parent.chaincode, buffer ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     } else {
       val pub = publicKey(parent).publickeybytes
-      ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, pub.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
+      Crypto.hmac512(parent.chaincode, pub ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     }
     val IL = ByteVector32(I.take(32))
     val IR = ByteVector32(I.takeRight(32))
@@ -192,7 +192,7 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = {
     require(!isHardened(index), "Cannot derive public keys from public hardened keys")
 
-    val I = ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, parent.publickeybytes.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
+    val I = Crypto.hmac512(parent.chaincode, parent.publickeybytes ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN))
     val IL = ByteVector32(I.take(32))
     val IR = ByteVector32(I.takeRight(32))
     val p = new BigInteger(1, IL.toArray)

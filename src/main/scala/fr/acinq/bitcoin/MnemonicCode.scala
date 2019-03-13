@@ -26,7 +26,7 @@ object MnemonicCode {
     zeroes ++ digits
   }
 
-  private def toBinary(x: Seq[Byte]): List[Boolean] = x.flatMap(toBinary).toList
+  private def toBinary(x: ByteVector): List[Boolean] = x.toSeq.flatMap(toBinary).toList
 
   private def fromBinary(bin: Seq[Boolean]): Int = bin.foldLeft(0) { case (acc, flag) => if (flag) 2 * acc + 1 else 2 * acc }
 
@@ -39,7 +39,7 @@ object MnemonicCode {
     */
   def toMnemonics(entropy: ByteVector, wordlist: Seq[String] = englishWordlist): List[String] = {
     require(wordlist.length == 2048, "invalid word list (size should be 2048)")
-    val digits = toBinary(entropy.toSeq) ++ toBinary(Crypto.sha256(entropy.toArray)).take(entropy.length.toInt / 4)
+    val digits = toBinary(entropy) ++ toBinary(Crypto.sha256(entropy)).take(entropy.length.toInt / 4)
     digits.grouped(11).map(fromBinary).map(index => wordlist(index)).toList
   }
 
@@ -62,8 +62,8 @@ object MnemonicCode {
     val bits = indexes.flatMap(i => toBits(i))
     val bitlength = (bits.length * 32) / 33
     val (databits, checksumbits) = bits.splitAt(bitlength)
-    val data = databits.grouped(8).map(fromBinary).map(_.toByte).toArray
-    val check = toBinary(Crypto.sha256(data)).take(data.length / 4)
+    val data = ByteVector(databits.grouped(8).map(fromBinary).map(_.toByte))
+    val check = toBinary(Crypto.sha256(data)).take(data.length.toInt / 4)
     require(check == checksumbits, "invalid checksum")
   }
 

@@ -113,10 +113,10 @@ class DeterministicWalletSpec extends FlatSpec {
 
     // now we have: the master public key, and a child private key, and we want to climb the tree back up
     // to the parent private key
-    val I = Crypto.hmac512(m_pub.chaincode.toArray, m_pub.publickeybytes.toArray ++ writeUInt32(42, ByteOrder.BIG_ENDIAN))
+    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes ++ writeUInt32(42, ByteOrder.BIG_ENDIAN))
     val IL = I.take(32)
     val IR = I.takeRight(32)
-    val guess = new BigInteger(1, m42.secretkeybytes.toArray).subtract(new BigInteger(1, IL)).mod(Crypto.curve.getN)
+    val guess = new BigInteger(1, m42.secretkeybytes.toArray).subtract(new BigInteger(1, IL.toArray)).mod(Crypto.curve.getN)
     assert(guess === k)
   }
   it should "parse string-formatted derivation paths" in {

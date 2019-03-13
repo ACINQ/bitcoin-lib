@@ -168,7 +168,7 @@ object Bech32 {
     val bin = five2eight(data.drop(1))
     require(bin.length >= 2 && bin.length <= 40, s"invalid witness program length ${bin.length}")
     if (version == 0) require(bin.length == 20 || bin.length == 32, s"invalid witness program length ${bin.length}")
-    (hrp, version, ByteVector.view(bin.toArray))
+    (hrp, version, ByteVector.view(bin))
   }
 
   /**

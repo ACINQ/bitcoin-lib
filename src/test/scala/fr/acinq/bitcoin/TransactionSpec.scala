@@ -29,7 +29,7 @@ class TransactionSpec extends FunSuite with Matchers {
     writeUInt32(0, out)
     writeUInt32(1, out)
     // hash code type
-    val serialized = out.toByteArray
+    val serialized = ByteVector.view(out.toByteArray)
     val hashed = Crypto.hash256(serialized)
     val pkey_encoded = ByteVector.fromValidBase58("92f9274aR3s6zd1vuAgxquv4KP5S5thJadF3k54NHuTV4fXL1vW")
     val pkey = PrivateKey(pkey_encoded.slice(1, pkey_encoded.size - 4))
@@ -93,7 +93,7 @@ class TransactionSpec extends FunSuite with Matchers {
     )
 
     // step #2: serialize transaction and add SIGHASHTYPE
-    val serializedTx1AndHashType = Transaction.write(tx1) ++ ByteVector.view(writeUInt32(1))
+    val serializedTx1AndHashType = Transaction.write(tx1) ++ writeUInt32(1)
 
     // step #3: hash the result
     val hashed = Crypto.hash256(serializedTx1AndHashType)

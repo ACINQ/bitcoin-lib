@@ -212,7 +212,7 @@ object Crypto {
       * @return the hash160 of the binary representation of this point. This can be used to generated addresses (the address
       *         of a public key is he base58 encoding of its hash)
       */
-    def hash160: ByteVector = ByteVector.view(Crypto.hash160(raw.toArray))
+    def hash160: ByteVector = Crypto.hash160(raw)
 
     override def toString = toBin.toHex
   }
@@ -228,35 +228,31 @@ object Crypto {
     * @param pub  public value
     * @return ecdh(priv, pub) as computed by libsecp256k1
     */
-  def ecdh(priv: Scalar, pub: Point): ByteVector = {
-    ByteVector.view(Crypto.sha256(pub.multiply(priv).getEncoded(true)))
+  def ecdh(priv: Scalar, pub: Point): ByteVector32 = {
+    Crypto.sha256(ByteVector.view(pub.multiply(priv).getEncoded(true)))
   }
 
-  def hmac512(key: Array[Byte], data: Array[Byte]): Array[Byte] = {
+  def hmac512(key: ByteVector, data: ByteVector): ByteVector = {
     val mac = new HMac(new SHA512Digest())
-    mac.init(new KeyParameter(key))
-    mac.update(data, 0, data.length)
+    mac.init(new KeyParameter(key.toArray))
+    mac.update(data.toArray, 0, data.length.toInt)
     val out = new Array[Byte](64)
     mac.doFinal(out, 0)
-    out
+    ByteVector.view(out)
   }
 
-  def hash(digest: Digest)(input: Array[Byte]): Array[Byte] = {
-    digest.update(input, 0, input.length)
+  def hash(digest: Digest)(input: ByteVector): ByteVector = {
+    digest.update(input.toArray, 0, input.length.toInt)
     val out = new Array[Byte](digest.getDigestSize)
     digest.doFinal(out, 0)
-    out
+    ByteVector.view(out)
   }
 
   def sha1 = hash(new SHA1Digest) _
 
-  def sha256 = hash(new SHA256Digest) _
-
-  def sha256(in: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(sha256(in.toArray)))
+  def sha256 = (x: ByteVector) => ByteVector32(hash(new SHA256Digest)(x))
 
   def ripemd160 = hash(new RIPEMD160Digest) _
-
-  def ripemd160(in: ByteVector): ByteVector = ByteVector(ripemd160(in.toArray))
 
   /**
     * 160 bits bitcoin hash, used mostly for address encoding
@@ -265,9 +261,7 @@ object Crypto {
     * @param input array of byte
     * @return the 160 bits BTC hash of input
     */
-  def hash160(input: Array[Byte]) = ripemd160(sha256(input))
-
-  def hash160(input: ByteVector): ByteVector = ByteVector.view(ripemd160(sha256(input.toArray)))
+  def hash160(input: ByteVector): ByteVector = ripemd160(sha256(input))
 
   /**
     * 256 bits bitcoin hash
@@ -276,9 +270,7 @@ object Crypto {
     * @param input array of byte
     * @return the 256 bits BTC hash of input
     */
-  def hash256(input: Array[Byte]) = sha256(sha256(input))
-
-  def hash256(input: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(sha256(sha256(input.toArray))))
+  def hash256(input: ByteVector): ByteVector32 = ByteVector32(sha256(sha256(input)))
 
   /**
     * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures

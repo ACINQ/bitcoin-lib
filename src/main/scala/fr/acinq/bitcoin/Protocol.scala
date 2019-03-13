@@ -69,16 +69,16 @@ object Protocol {
     buffer.getInt() & 0xFFFFFFFFL
   }
 
-  def writeUInt32(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt32(input, order))
+  def writeUInt32(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt32(input, order).toArray)
 
-  def writeUInt32(input: Long, order: ByteOrder): Array[Byte] = {
+  def writeUInt32(input: Long, order: ByteOrder): ByteVector = {
     val bin = new Array[Byte](4)
     val buffer = ByteBuffer.wrap(bin).order(order)
     buffer.putInt((input & 0xffffffff).toInt)
-    bin
+    ByteVector.view(bin)
   }
 
-  def writeUInt32(input: Long): Array[Byte] = writeUInt32(input, ByteOrder.LITTLE_ENDIAN)
+  def writeUInt32(input: Long): ByteVector = writeUInt32(input, ByteOrder.LITTLE_ENDIAN)
 
   def uint64(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Long = {
     val bin = new Array[Byte](8)
@@ -278,10 +278,11 @@ object Message extends BtcSerializer[Message] {
     val length = uint32(in)
     require(length < 2000000, "invalid payload length")
     val checksum = uint32(in)
-    val payload = new Array[Byte](length.toInt)
-    in.read(payload)
-    require(checksum == uint32(new ByteArrayInputStream(Crypto.hash256(payload).take(4))), "invalid checksum")
-    Message(magic, command, ByteVector.view(payload))
+    val payload_array = new Array[Byte](length.toInt)
+    in.read(payload_array)
+    val payload = ByteVector.view(payload_array)
+    require(checksum == uint32(Crypto.hash256(payload).toArray.take(4), order = ByteOrder.LITTLE_ENDIAN), "invalid checksum")
+    Message(magic, command, payload)
   }
 
   override def write(input: Message, out: OutputStream, protocolVersion: Long) = {

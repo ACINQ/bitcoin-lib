@@ -56,7 +56,7 @@ class CryptoSpec extends FlatSpec {
   it should "sign and verify signatures" in {
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
     val publicKey = privateKey.publicKey
-    val data = ByteVector.view(Crypto.sha256("this is a test".getBytes("UTF-8")))
+    val data = Crypto.sha256(ByteVector("this is a test".getBytes("UTF-8")))
     val (r, s) = Crypto.sign(data, privateKey)
     val encoded = Crypto.encodeSignature(r, s)
     assert(Crypto.verifySignature(data, encoded, publicKey))
@@ -98,7 +98,7 @@ class CryptoSpec extends FlatSpec {
 
     dataset.map {
       case (k, m, s) =>
-        val sig: ByteVector = Crypto.encodeSignature(Crypto.sign(ByteVector.view(Crypto.sha256(m.getBytes("UTF-8"))), PrivateKey(k)))
+        val sig: ByteVector = Crypto.encodeSignature(Crypto.sign(Crypto.sha256(ByteVector.view(m.getBytes("UTF-8"))), PrivateKey(k)))
         assert(sig == s)
     }
   }

@@ -708,8 +708,8 @@ object Script {
           case _ => throw new RuntimeException("Cannot perform OP_EQUALVERIFY on a stack with less than 2 elements")
         }
         case OP_FROMALTSTACK :: tail => run(tail, altstack.head :: stack, state.copy(altstack = altstack.tail), signatureVersion)
-        case OP_HASH160 :: tail => run(tail, ByteVector.view(Crypto.hash160(stack.head.toArray)) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_HASH256 :: tail => run(tail, ByteVector.view(Crypto.hash256(stack.head.toArray)) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
+        case OP_HASH160 :: tail => run(tail, Crypto.hash160(stack.head) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
+        case OP_HASH256 :: tail => run(tail, Crypto.hash256(stack.head) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_IFDUP :: tail => stack match {
           case Nil => throw new RuntimeException("Cannot perform OP_IFDUP on an empty stack")
           case head :: _ if castToBoolean(head) => run(tail, head :: stack, state.copy(opCount = opCount + 1), signatureVersion)
@@ -815,9 +815,9 @@ object Script {
           case x1 :: x2 :: x3 :: x4 :: x5 :: x6 :: stacktail => run(tail, x5 :: x6 :: x1 :: x2 :: x3 :: x4 :: stacktail, state.copy(opCount = opCount + 1), signatureVersion)
           case _ => throw new RuntimeException("Cannot perform OP_2ROT on a stack with less than 6 elements")
         }
-        case OP_RIPEMD160 :: tail => run(tail, ByteVector.view(Crypto.ripemd160(stack.head.toArray)) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_SHA1 :: tail => run(tail, ByteVector.view(Crypto.sha1(stack.head.toArray)) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
-        case OP_SHA256 :: tail => run(tail, ByteVector.view(Crypto.sha256(stack.head.toArray)) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
+        case OP_RIPEMD160 :: tail => run(tail, Crypto.ripemd160(stack.head) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
+        case OP_SHA1 :: tail => run(tail, Crypto.sha1(stack.head) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
+        case OP_SHA256 :: tail => run(tail, Crypto.sha256(stack.head) :: stack.tail, state.copy(opCount = opCount + 1), signatureVersion)
         case OP_SUB :: tail => stack match {
           case x1 :: x2 :: stacktail =>
             val result = decodeNumber(x2) - decodeNumber(x1)
@@ -863,8 +863,8 @@ object Script {
           (witness.stack, OP_DUP :: OP_HASH160 :: OP_PUSHDATA(program) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)
         case 0 if program.length == 32 =>
           // P2WPSH, program is the hash of the script, and witness is the stack + the script
-          val check = ByteVector.view(Crypto.sha256(witness.stack.last.toArray))
-          require(check == program, "witness program mismatch")
+          val check = Crypto.sha256(witness.stack.last)
+          require(check.bytes == program, "witness program mismatch")
           (witness.stack.dropRight(1), Script.parse(witness.stack.last))
         case 0 =>
           throw new IllegalArgumentException(s"Invalid witness program length: ${program.length}")
@@ -1043,7 +1043,7 @@ object Script {
     * @param script bitcoin script
     * @return a pay-to-script script
     */
-  def pay2sh(script: ByteVector): Seq[ScriptElt] = OP_HASH160 :: OP_PUSHDATA(ByteVector.view(hash160(script.toArray))) :: OP_EQUAL :: Nil
+  def pay2sh(script: ByteVector): Seq[ScriptElt] = OP_HASH160 :: OP_PUSHDATA(hash160(script)) :: OP_EQUAL :: Nil
 
   /**
     *
@@ -1057,7 +1057,7 @@ object Script {
     * @param script bitcoin script
     * @return a pay-to-witness-script script
     */
-  def pay2wsh(script: ByteVector): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(ByteVector.view(sha256(script.toArray))) :: Nil
+  def pay2wsh(script: ByteVector): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(sha256(script)) :: Nil
 
   /**
     *
