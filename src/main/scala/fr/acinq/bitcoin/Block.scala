@@ -3,7 +3,6 @@ package fr.acinq.bitcoin
 import java.io.{InputStream, OutputStream}
 import java.math.BigInteger
 import java.nio.ByteOrder
-import java.util
 
 import fr.acinq.bitcoin.Protocol._
 import scodec.bits._

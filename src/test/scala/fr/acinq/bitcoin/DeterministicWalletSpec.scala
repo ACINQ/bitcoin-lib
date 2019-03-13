@@ -4,10 +4,9 @@ import java.math.BigInteger
 import java.nio.ByteOrder
 
 import org.scalatest.FlatSpec
+import scodec.bits._
 
 import scala.util.Random
-
-import scodec.bits._
 
 class DeterministicWalletSpec extends FlatSpec {
 

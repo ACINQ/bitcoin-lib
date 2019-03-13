@@ -3,7 +3,6 @@ package fr.acinq.bitcoin
 import com.google.common.io.BaseEncoding
 import fr.acinq.bitcoin.Base58.Prefix
 import org.scalatest.FlatSpec
-
 import scodec.bits._
 
 class ScriptSpec extends FlatSpec {

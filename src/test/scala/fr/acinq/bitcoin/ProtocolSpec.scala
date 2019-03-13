@@ -5,7 +5,6 @@ import java.net.InetAddress
 
 import com.google.common.io.ByteStreams
 import org.scalatest.FlatSpec
-
 import scodec.bits._
 
 class ProtocolSpec extends FlatSpec {

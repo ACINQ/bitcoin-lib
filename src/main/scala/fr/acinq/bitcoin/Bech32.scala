@@ -173,11 +173,11 @@ object Bech32 {
 
   /**
     *
-    * @param hrp human readable prefix
+    * @param hrp   human readable prefix
     * @param int5s 5-bit data
     * @return hrp + data encoded as a Bech32 string
     */
-  def encode(hrp: String, int5s: Array[Int5]) : String = {
+  def encode(hrp: String, int5s: Array[Int5]): String = {
     require(hrp.toLowerCase == hrp || hrp.toUpperCase == hrp, "mixed case strings are not valid bech32 prefixes")
     val checksum = Bech32.checksum(hrp, int5s)
     hrp + "1" + new String((int5s ++ checksum).map(i => alphabet(i)))

@@ -1,7 +1,6 @@
 package fr.acinq.bitcoin
 
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
 
 class PuzzleSpec extends FlatSpec {
 

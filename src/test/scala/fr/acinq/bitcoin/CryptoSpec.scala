@@ -5,11 +5,10 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, 
 import fr.acinq.bitcoin.Base58.Prefix
 import fr.acinq.bitcoin.Crypto._
 import org.scalatest.FlatSpec
+import scodec.bits._
 
 import scala.io.Source
 import scala.util.Random
-
-import scodec.bits._
 
 class CryptoSpec extends FlatSpec {
 

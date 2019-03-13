@@ -26,7 +26,7 @@ class MnemonicCodeSpec extends FunSuite {
     val stream = classOf[MnemonicCodeSpec].getResourceAsStream("/bip39_vectors.json")
     val vectors = JsonMethods.parse(new InputStreamReader(stream)).extract[TestVectors]
     vectors.english.map(_ match {
-      case Array(raw, mnemonics, seed ,xprv) =>
+      case Array(raw, mnemonics, seed, xprv) =>
         val bin = ByteVector.fromValidHex(raw)
         assert(toMnemonics(bin).mkString(" ") === mnemonics)
         assert(toSeed(toMnemonics(bin), "TREZOR") === ByteVector.fromValidHex(seed))

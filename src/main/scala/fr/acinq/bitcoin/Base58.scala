@@ -1,11 +1,8 @@
 package fr.acinq.bitcoin
 
-import java.math.BigInteger
 import java.nio.ByteOrder
 
 import scodec.bits.ByteVector
-
-import scala.annotation.tailrec
 
 /*
  * see https://en.bitcoin.it/wiki/Base58Check_encoding

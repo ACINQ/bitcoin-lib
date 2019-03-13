@@ -184,14 +184,15 @@ object Crypto {
 
   object PublicKey {
     def apply(point: Point) = new PublicKey(point.toBin(true))
+
     def apply(point: Point, compressed: Boolean) = new PublicKey(point.toBin(compressed))
   }
 
   /**
     *
-    * @param raw          serialized value of this public key (a point)
-    * @param checkValid   indicates whether or not we check that this is a valid public key; this should be used
-    *                     carefully for optimization purposes
+    * @param raw        serialized value of this public key (a point)
+    * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
+    *                   carefully for optimization purposes
     */
   case class PublicKey(raw: ByteVector, checkValid: Boolean = true) {
     // we always make this very basic check

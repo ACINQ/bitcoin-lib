@@ -284,10 +284,10 @@ object Script {
   }
 
   def castToBoolean(input: ByteVector): Boolean = input.toSeq.reverse match {
-      case head +: tail if head == 0x80.toByte && tail.forall(_ == 0) => false
-      case something if something.exists(_ != 0) => true
-      case _ => false
-    }
+    case head +: tail if head == 0x80.toByte && tail.forall(_ == 0) => false
+    case something if something.exists(_ != 0) => true
+    case _ => false
+  }
 
 
   def isPushOnly(script: Seq[ScriptElt]): Boolean = !script.exists {

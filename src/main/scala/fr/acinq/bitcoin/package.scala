@@ -3,8 +3,6 @@ package fr.acinq
 import java.math.BigInteger
 
 import fr.acinq.bitcoin.Crypto.PublicKey
-import org.spongycastle.util.encoders.Hex
-import scodec.bits._
 
 /**
   * see https://en.bitcoin.it/wiki/Protocol_specification
@@ -142,7 +140,7 @@ package object bitcoin {
 
   /**
     *
-    * @param pub public key
+    * @param pub       public key
     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
     * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
     */
@@ -158,9 +156,9 @@ package object bitcoin {
 
   def computeBIP49Address(pub: PublicKey, chainHash: ByteVector32) = computeP2ShOfP2WpkhAddress(pub, chainHash)
 
-    /**
+  /**
     *
-    * @param pub public key
+    * @param pub       public key
     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
     * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
     *         understood only by native sewgit wallets

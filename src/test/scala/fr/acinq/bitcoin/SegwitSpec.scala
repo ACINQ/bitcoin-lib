@@ -2,7 +2,6 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.scalatest.FunSuite
-
 import scodec.bits._
 
 class SegwitSpec extends FunSuite {

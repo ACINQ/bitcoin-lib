@@ -45,6 +45,7 @@ object MnemonicCode {
 
   /**
     * validate that a mnemonic seed is valid
+    *
     * @param mnemonics list of mnemomic words
     *
     */
@@ -69,7 +70,7 @@ object MnemonicCode {
 
   def validate(mnemonics: String): Unit = validate(mnemonics.split(" "))
 
-    /**
+  /**
     * BIP39 seed derivation
     *
     * @param mnemonics  mnemonic words
@@ -83,5 +84,5 @@ object MnemonicCode {
     ByteVector.view(keyParams.getKey)
   }
 
-  def toSeed(mnemonics: String, passphrase: String) : ByteVector = toSeed(mnemonics.split(" "), passphrase)
+  def toSeed(mnemonics: String, passphrase: String): ByteVector = toSeed(mnemonics.split(" "), passphrase)
 }

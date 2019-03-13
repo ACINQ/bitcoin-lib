@@ -1,7 +1,6 @@
 package fr.acinq.bitcoin
 
 import org.scalatest.FunSuite
-
 import scodec.bits._
 
 class LexicographicalOrderingSpec extends FunSuite {

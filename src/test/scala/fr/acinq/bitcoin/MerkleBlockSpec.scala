@@ -1,10 +1,10 @@
 package fr.acinq.bitcoin
 
 import org.scalatest.FunSuite
-
 import scodec.bits._
 
 class MerkleBlockSpec extends FunSuite {
+
   import MerkleBlock._
 
   test("compute tree width") {

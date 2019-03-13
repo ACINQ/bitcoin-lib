@@ -3,7 +3,6 @@ package fr.acinq.bitcoin
 import fr.acinq.bitcoin.Base58.Prefix
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.scalatest.{FunSuite, Matchers}
-
 import scodec.bits._
 
 class MultisigSpec extends FunSuite with Matchers {

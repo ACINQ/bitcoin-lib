@@ -2,9 +2,7 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.scalatest.FlatSpec
-import scodec.bits.ByteVector
-
-import scodec.bits._
+import scodec.bits.{ByteVector, _}
 
 class CheckLockTimeVerifySpec extends FlatSpec {
   "Bip65" should "let you initiate payment channels" in {

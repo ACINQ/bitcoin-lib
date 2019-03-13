@@ -422,7 +422,7 @@ object Transaction extends BtcSerializer[Transaction] {
     */
   @deprecated("", since = "0.9.6")
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, privateKey: PrivateKey): ByteVector =
-  signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
+    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
 
   /**
     * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL

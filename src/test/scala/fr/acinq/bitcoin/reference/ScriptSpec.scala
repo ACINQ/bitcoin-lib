@@ -7,7 +7,6 @@ import org.json4s.JsonAST.{JArray, JDouble, JString}
 import org.json4s.jackson.JsonMethods
 import org.json4s.{DefaultFormats, JValue}
 import org.scalatest.FunSuite
-
 import scodec.bits.ByteVector
 
 import scala.util.Try
