@@ -86,6 +86,7 @@
                 <configuration>
                     <source>1.7</source>
                     <target>1.7</target>
+                    <release>7</release>
                     <excludes>
                         <!-- this file is not needed and it contains non-standard imports that are missing from openjdk11 -->
                         <exclude>**/NativeSecp256k1Test.java</exclude>
