@@ -49,9 +49,7 @@ object DeterministicWallet {
 
   def isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-  case class ExtendedPrivateKey(secretkeybytes: ByteVector, chaincode: ByteVector, depth: Int, path: KeyPath, parent: Long) {
-    require(secretkeybytes.length == 32)
-    require(chaincode.length == 32)
+  case class ExtendedPrivateKey(secretkeybytes: ByteVector32, chaincode: ByteVector32, depth: Int, path: KeyPath, parent: Long) {
 
     def privateKey: PrivateKey = PrivateKey(Scalar(secretkeybytes), compressed = true)
 
@@ -65,9 +63,9 @@ object DeterministicWallet {
       val depth = Protocol.uint8(bis)
       val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
       val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
-      val chaincode = Protocol.bytes(bis, 32)
+      val chaincode = ByteVector32(Protocol.bytes(bis, 32))
       require(bis.read() == 0)
-      val secretkeybytes = Protocol.bytes(bis, 32)
+      val secretkeybytes = ByteVector32(Protocol.bytes(bis, 32))
       (prefix, ExtendedPrivateKey(secretkeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
     }
   }
@@ -87,7 +85,7 @@ object DeterministicWallet {
   @deprecated("use encode(priv, prefix (xpriv or tpriv for example)) instead", "v0.9.17")
   def encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
 
-  case class ExtendedPublicKey(publickeybytes: ByteVector, chaincode: ByteVector, depth: Int, path: KeyPath, parent: Long) {
+  case class ExtendedPublicKey(publickeybytes: ByteVector, chaincode: ByteVector32, depth: Int, path: KeyPath, parent: Long) {
     require(publickeybytes.length == 33)
     require(chaincode.length == 32)
 
@@ -101,7 +99,7 @@ object DeterministicWallet {
       val depth = Protocol.uint8(bis)
       val parent = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
       val childNumber = Protocol.uint32(bis, ByteOrder.BIG_ENDIAN)
-      val chaincode = Protocol.bytes(bis, 32)
+      val chaincode = ByteVector32(Protocol.bytes(bis, 32))
       val publickeybytes = Protocol.bytes(bis, 33)
       (prefix.toInt, ExtendedPublicKey(publickeybytes, chaincode, depth, parentPath.derive(childNumber), parent))
     }
@@ -128,8 +126,8 @@ object DeterministicWallet {
     */
   def generate(seed: ByteVector): ExtendedPrivateKey = {
     val I = ByteVector.view(Crypto.hmac512("Bitcoin seed".getBytes("UTF-8"), seed.toArray))
-    val IL = I.take(32)
-    val IR = I.takeRight(32)
+    val IL = ByteVector32(I.take(32))
+    val IR = ByteVector32(I.takeRight(32))
     ExtendedPrivateKey(IL, IR, depth = 0, path = List.empty[Long], parent = 0L)
   }
 
@@ -170,8 +168,8 @@ object DeterministicWallet {
       val pub = publicKey(parent).publickeybytes
       ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, pub.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
     }
-    val IL = I.take(32)
-    val IR = I.takeRight(32)
+    val IL = ByteVector32(I.take(32))
+    val IR = ByteVector32(I.takeRight(32))
     val p = new BigInteger(1, IL.toArray)
     if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child private key")
@@ -181,7 +179,7 @@ object DeterministicWallet {
     if (key.isZero) {
       throw new RuntimeException("cannot generated child private key")
     }
-    val buffer = key.toBin.take(32)
+    val buffer = ByteVector32(key.toBin.take(32))
     ExtendedPrivateKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 
@@ -195,8 +193,8 @@ object DeterministicWallet {
     require(!isHardened(index), "Cannot derive public keys from public hardened keys")
 
     val I = ByteVector.view(Crypto.hmac512(parent.chaincode.toArray, parent.publickeybytes.toArray ++ writeUInt32(index.toInt, ByteOrder.BIG_ENDIAN)))
-    val IL = I.take(32)
-    val IR = I.takeRight(32)
+    val IL = ByteVector32(I.take(32))
+    val IR = ByteVector32(I.takeRight(32))
     val p = new BigInteger(1, IL.toArray)
     if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child public key")

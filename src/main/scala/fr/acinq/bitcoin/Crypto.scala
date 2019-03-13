@@ -256,6 +256,8 @@ object Crypto {
 
   def ripemd160 = hash(new RIPEMD160Digest) _
 
+  def ripemd160(in: ByteVector): ByteVector = ByteVector(ripemd160(in.toArray))
+
   /**
     * 160 bits bitcoin hash, used mostly for address encoding
     * hash160(input) = RIPEMD160(SHA256(input))
