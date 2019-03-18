@@ -58,6 +58,11 @@
                         <goals>
                             <goal>add-source</goal>
                         </goals>
+                        <!--
+                        add secp256k1 java bindings. the entire directory is added, which is why we need to exclude
+                        some files. Path to source files are relative to the directory being added i.e. we will see
+                        org.bitcoin/*.java which makes it a bit awkward when you need to replace a single file (see below)
+                         -->
                         <configuration>
                             <sources>
                                 <source>secp256k1/src/java</source>
@@ -117,6 +122,12 @@
                         <arg>-nobootcp</arg>
                     </args>
                     <excludes>
+                        <!--
+                        we also need to exclude the original Secp256k1Context provided by libsecp256k1, and replace it
+                        with our own. Since it is hardcoded in NativeSecp256k1, and import libsecp256k1 java files are seen
+                        as org/bitcoin/*.java the only "clean" solution I could find was to excluded Secp256k1Context.java here
+                        and replace it by Secp256k1Context.scala
+                        -->
                         <exclude>**/Secp256k1Context.java</exclude>
                     </excludes>
                     <scalaCompatVersion>${scala.version.short}</scalaCompatVersion>
@@ -149,6 +160,7 @@
                 <version>3.0.1</version>
                 <configuration>
                     <excludes>
+                        <!-- we also need to include the original Secp256k1Context.java from our source bundle -->
                         <exclude>**/Secp256k1Context.java</exclude>
                     </excludes>
                 </configuration>
