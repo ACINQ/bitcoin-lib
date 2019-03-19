@@ -184,8 +184,41 @@ object Crypto {
   implicit def ecpoint2point(value: ECPoint): Point = Point(value)
 
   object PublicKey {
+
+    def apply(raw: BinaryData, checkValid: Boolean = true): PublicKey = {
+      val pub = new PublicKey(raw)
+      if (checkValid) {
+        // this is expensive and done only if needed
+        require(pub.value.isInstanceOf[Point])
+      }
+      pub
+    }
+
+    /**
+      * This function initializes a public key from a compressed/uncompressed representation without doing validity checks.
+      *
+      * This will always convert the key to its compressed representation
+      *
+      * Note that this mutates the input array!
+      *
+      * @param raw 33 or 65 bytes public key (will be mutated)
+      * @return an immutable compressed public key
+      */
+    def toCompressedUnsafe(key: Array[Byte]): PublicKey = {
+      key.length match {
+        case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 =>
+          key(0) = if ((key(64) & 0x01) != 0) 0x03.toByte else 0x02.toByte
+          new PublicKey(BinaryData(key.take(33)))
+        case 33 if key(0) == 2 || key(0) == 3 =>
+          new PublicKey(BinaryData(key.take(33)))
+        case _ =>
+          throw new IllegalArgumentException(s"key must be 33 or 65 bytes")
+      }
+    }
+
     def apply(point: Point) = new PublicKey(point.toBin(true))
-    def apply(point: Point, compressed: Boolean) = new PublicKey(point.toBin(compressed))
+
+    def apply(point: Point, compressed: Boolean) = new PublicKey(point.toBin(compressed = compressed))
   }
 
   /**
@@ -194,13 +227,9 @@ object Crypto {
     * @param checkValid   indicates whether or not we check that this is a valid public key; this should be used
     *                     carefully for optimization purposes
     */
-  case class PublicKey(raw: BinaryData, checkValid: Boolean = true) {
+  class PublicKey(val raw: BinaryData) extends Serializable {
     // we always make this very basic check
     require(isPubKeyValid(raw))
-    if (checkValid) {
-      // this is expensive and done only if needed
-      require(value.isInstanceOf[Point])
-    }
 
     lazy val compressed = isPubKeyCompressed(raw)
 
@@ -216,6 +245,13 @@ object Crypto {
     def hash160: BinaryData = Crypto.hash160(raw)
 
     override def toString = toBin.toString
+
+    override def hashCode(): Int = raw.hashCode
+
+    override def equals(obj: Any): Boolean = obj match {
+      case other: PublicKey => this.raw.equals(other.raw)
+      case _ => false
+    }
   }
 
   implicit def publickey2point(pub: PublicKey): Point = pub.value
