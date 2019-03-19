@@ -160,7 +160,7 @@
                 <version>3.0.1</version>
                 <configuration>
                     <excludes>
-                        <!-- we also need to include the original Secp256k1Context.java from our source bundle -->
+                        <!-- we also need to exclude the original Secp256k1Context.java from our source bundle -->
                         <exclude>**/Secp256k1Context.java</exclude>
                     </excludes>
                 </configuration>
