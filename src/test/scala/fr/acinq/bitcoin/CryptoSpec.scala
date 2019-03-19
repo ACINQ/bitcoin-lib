@@ -52,6 +52,19 @@ class CryptoSpec extends FlatSpec {
     PublicKey(hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", checkValid = false)
   }
 
+  it should "allow unsafe initialization of public keys" in {
+    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55", compressed = true)
+    val publicKey = privateKey.publicKey
+    val rawCompressed = publicKey.value.toBin(compressed = true)
+    val rawUncompressed = publicKey.value.toBin(compressed = false)
+    assert(rawCompressed.size == 33)
+    assert(rawUncompressed.size == 65)
+    val publicKeyCompressed1 = PublicKey.toCompressedUnsafe(rawCompressed.toArray)
+    val publicKeyCompressed2 = PublicKey.toCompressedUnsafe(rawUncompressed.toArray)
+    assert(publicKey === publicKeyCompressed1)
+    assert(publicKey === publicKeyCompressed2)
+  }
+
   it should "sign and verify signatures" in {
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
     val publicKey = privateKey.publicKey
