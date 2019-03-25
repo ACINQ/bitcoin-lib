@@ -3,7 +3,6 @@ package fr.acinq
 import java.math.BigInteger
 
 import fr.acinq.bitcoin.Crypto.PublicKey
-import org.spongycastle.util.encoders.Hex
 
 /**
   * see https://en.bitcoin.it/wiki/Protocol_specification
@@ -23,11 +22,6 @@ package object bitcoin {
   val SIGHASH_NONE = 2
   val SIGHASH_SINGLE = 3
   val SIGHASH_ANYONECANPAY = 0x80
-
-  object Hash {
-    val Zeroes: BinaryData = "0000000000000000000000000000000000000000000000000000000000000000"
-    val One: BinaryData = "0100000000000000000000000000000000000000000000000000000000000000"
-  }
 
   object SigVersion {
     val SIGVERSION_BASE = 0
@@ -89,20 +83,6 @@ package object bitcoin {
 
   implicit def millisatoshi2millibtc(input: MilliSatoshi): MilliBtc = satoshi2millibtc(millisatoshi2satoshi(input))
 
-  def toHexString(blob: BinaryData) = Hex.toHexString(blob)
-
-  def fromHexString(hex: String): BinaryData = Hex.decode(hex.stripPrefix("0x"))
-
-  implicit def string2binaryData(input: String): BinaryData = BinaryData(fromHexString(input))
-
-  implicit def seq2binaryData(input: Seq[Byte]): BinaryData = BinaryData(input)
-
-  implicit def array2binaryData(input: Array[Byte]): BinaryData = BinaryData(input)
-
-  implicit def binaryData2array(input: BinaryData): Array[Byte] = input.data.toArray
-
-  implicit def binaryData2Seq(input: BinaryData): Seq[Byte] = input.data
-
   /**
     *
     * @param input compact size encoded integer as used to encode proof-of-work difficulty target
@@ -122,48 +102,68 @@ package object bitcoin {
     (result, isNegative, overflow)
   }
 
+  /**
+    *
+    * @param value input value
+    * @return the compact encoding of the input value. this is used to encode proof-of-work target into the `bits`
+    *         block header field
+    */
+  def encodeCompact(value: BigInteger): Long = {
+    var size = value.toByteArray.length
+    var compact = if (size <= 3) value.longValue << 8 * (3 - size) else value.shiftRight(8 * (size - 3)).longValue
+    // The 0x00800000 bit denotes the sign.
+    // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
+    if ((compact & 0x00800000L) != 0) {
+      compact >>= 8
+      size += 1
+    }
+    compact |= size << 24
+    compact |= (if (value.signum() == -1) 0x00800000 else 0)
+    compact
+  }
+
   def isAnyoneCanPay(sighashType: Int): Boolean = (sighashType & SIGHASH_ANYONECANPAY) != 0
 
   def isHashSingle(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_SINGLE
 
   def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_NONE
 
-  def computeP2PkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+  def computeP2PkhAddress(pub: PublicKey, chainHash: ByteVector32): String = {
     val hash = pub.hash160
-    chainHash match {
+    (chainHash: @unchecked) match {
       case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash)
       case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)
     }
   }
 
-  def computeBIP44Address(pub: PublicKey, chainHash: BinaryData) = computeP2PkhAddress(pub, chainHash)
+  def computeBIP44Address(pub: PublicKey, chainHash: ByteVector32) = computeP2PkhAddress(pub, chainHash)
 
   /**
     *
-    * @param pub public key
+    * @param pub       public key
     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
     * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
     */
-  def computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+  def computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = {
     val script = Script.pay2wpkh(pub)
     val hash = Crypto.hash160(Script.write(script))
-    chainHash match {
+    (chainHash: @unchecked) match {
       case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
       case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddress, hash)
       case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
     }
   }
 
-  def computeBIP49Address(pub: PublicKey, chainHash: BinaryData) = computeP2ShOfP2WpkhAddress(pub, chainHash)
+  def computeBIP49Address(pub: PublicKey, chainHash: ByteVector32) = computeP2ShOfP2WpkhAddress(pub, chainHash)
 
-    /**
+  /**
     *
-    * @param pub public key
+    * @param pub       public key
     * @param chainHash chain hash (i.e. hash of the genesic block of the chain we're on)
     * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
     *         understood only by native sewgit wallets
     */
-  def computeP2WpkhAddress(pub: PublicKey, chainHash: BinaryData): String = {
+  def computeP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = {
     val hash = pub.hash160
     val hrp = chainHash match {
       case Block.LivenetGenesisBlock.hash => "bc"
@@ -174,5 +174,5 @@ package object bitcoin {
     Bech32.encodeWitnessAddress(hrp, 0, hash)
   }
 
-  def computeBIP84Address(pub: PublicKey, chainHash: BinaryData) = computeP2WpkhAddress(pub, chainHash)
+  def computeBIP84Address(pub: PublicKey, chainHash: ByteVector32) = computeP2WpkhAddress(pub, chainHash)
 }

@@ -1,10 +1,7 @@
 package fr.acinq.bitcoin
 
-import org.junit.runner.RunWith
 import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
 class BtcAmountSpec extends FunSuite {
 
   test("btc/satoshi conversions") {

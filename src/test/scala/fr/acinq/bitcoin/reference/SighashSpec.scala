@@ -6,11 +6,9 @@ import fr.acinq.bitcoin._
 import org.json4s.DefaultFormats
 import org.json4s.JsonAST.{JInt, JString, JValue}
 import org.json4s.jackson.JsonMethods
-import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import scodec.bits.ByteVector
 
-@RunWith(classOf[JUnitRunner])
 class SighashSpec extends FlatSpec {
   implicit val format = DefaultFormats
 
@@ -21,8 +19,8 @@ class SighashSpec extends FlatSpec {
     json.extract[List[List[JValue]]].tail.map(_ match {
       case JString(raw_transaction) :: JString(script) :: JInt(input_index) :: JInt(hashType) :: JString(signature_hash) :: Nil => {
         val tx = Transaction.read(raw_transaction)
-        val hash = Transaction.hashForSigning(tx, input_index.intValue, fromHexString(script), hashType.intValue)
-        assert(toHexString(hash.reverse) === signature_hash)
+        val hash = Transaction.hashForSigning(tx, input_index.intValue, ByteVector.fromValidHex(script), hashType.intValue)
+        assert(hash.reverse === ByteVector32(ByteVector.fromValidHex(signature_hash)))
       }
       case _ => println("warning: could not parse sighash.json properly!")
     })

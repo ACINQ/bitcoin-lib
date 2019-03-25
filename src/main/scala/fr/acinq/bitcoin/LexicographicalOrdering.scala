@@ -1,5 +1,7 @@
 package fr.acinq.bitcoin
 
+import scodec.bits.ByteVector
+
 import scala.annotation.tailrec
 
 /**
@@ -9,6 +11,15 @@ import scala.annotation.tailrec
 object LexicographicalOrdering {
   @tailrec
   def isLessThan(a: Seq[Byte], b: Seq[Byte]): Boolean = {
+    if (a.isEmpty && b.isEmpty) false
+    else if (a.isEmpty) true
+    else if (b.isEmpty) false
+    else if (a.head == b.head) isLessThan(a.tail, b.tail)
+    else ((a.head & 0xff) < (b.head & 0xff))
+  }
+
+  @tailrec
+  def isLessThan(a: ByteVector, b: ByteVector): Boolean = {
     if (a.isEmpty && b.isEmpty) false
     else if (a.isEmpty) true
     else if (b.isEmpty) false

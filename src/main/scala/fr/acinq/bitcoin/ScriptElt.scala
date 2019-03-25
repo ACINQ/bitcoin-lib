@@ -1,5 +1,7 @@
 package fr.acinq.bitcoin
 
+import scodec.bits.ByteVector
+
 // @formatter:off
 abstract class ScriptElt
 case object OP_0 extends ScriptElt
@@ -116,21 +118,21 @@ case object OP_NOP10 extends ScriptElt
 case object OP_SMALLINTEGER extends ScriptElt
 case object OP_INVALIDOPCODE extends ScriptElt
 object OP_PUSHDATA {
-  def apply(data: BinaryData) = if (data.length < 0x4c) new OP_PUSHDATA(data, data.length)
+  def apply(data: ByteVector) = if (data.length < 0x4c) new OP_PUSHDATA(data, data.size.toInt)
   else if (data.length < 0xff) new OP_PUSHDATA(data, 0x4c)
   else if (data.length < 0xffff) new OP_PUSHDATA(data, 0x4d)
   else if (data.length < 0xffffffff) new OP_PUSHDATA(data, 0x4e)
   else throw new IllegalArgumentException(s"data is ${data.length}, too big for OP_PUSHDATA")
 
-  def isMinimal(data: BinaryData, code: Int): Boolean = if (data.length == 0) code == ScriptElt.elt2code(OP_0)
-  else if (data.length == 1 && data.data(0) >= 1 && data.data(0) <= 16) code == ScriptElt.elt2code(OP_1) + (data.data(0) - 1)
-  else if (data.length == 1 && data.data(0) == 0x81.toByte) code == ScriptElt.elt2code(OP_1NEGATE)
+  def isMinimal(data: ByteVector, code: Int): Boolean = if (data.length == 0) code == ScriptElt.elt2code(OP_0)
+  else if (data.length == 1 && data(0) >= 1 && data(0) <= 16) code == ScriptElt.elt2code(OP_1) + (data(0) - 1)
+  else if (data.length == 1 && data(0) == 0x81.toByte) code == ScriptElt.elt2code(OP_1NEGATE)
   else if (data.length <= 75) code == data.length
   else if (data.length <= 255) code == ScriptElt.elt2code(OP_PUSHDATA1)
   else if (data.length <= 65535) code == ScriptElt.elt2code(OP_PUSHDATA2)
   else true
 }
-case class OP_PUSHDATA(data: BinaryData, code: Int) extends ScriptElt {
+case class OP_PUSHDATA(data: ByteVector, code: Int) extends ScriptElt {
   override def toString = data.toString
 }
 case class OP_INVALID(code: Int) extends ScriptElt

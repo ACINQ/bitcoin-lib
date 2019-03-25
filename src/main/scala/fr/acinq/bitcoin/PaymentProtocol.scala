@@ -2,9 +2,9 @@ package fr.acinq.bitcoin
 
 import java.security.cert._
 import java.security.{KeyStore, PrivateKey, PublicKey, Signature}
-import javax.naming.ldap.LdapName
 
 import com.google.protobuf.ByteString
+import javax.naming.ldap.LdapName
 import org.bitcoin.protocols.payments.Protos.{PaymentDetails, PaymentRequest, X509Certificates}
 
 import scala.collection.JavaConverters._

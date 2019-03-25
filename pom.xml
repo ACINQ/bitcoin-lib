@@ -3,14 +3,14 @@
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.12</artifactId>
     <packaging>jar</packaging>
-    <version>0.9.18-SNAPSHOT</version>
+    <version>0.12-SNAPSHOT</version>
     <description>Simple Scala Bitcoin library</description>
     <url>https://github.com/ACINQ/bitcoin-lib</url>
     <name>bitcoin-lib</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.version>2.12.4</scala.version>
+        <scala.version>2.12.8</scala.version>
         <scala.version.short>2.12</scala.version.short>
     </properties>
 
@@ -58,10 +58,14 @@
                         <goals>
                             <goal>add-source</goal>
                         </goals>
+                        <!--
+                        add secp256k1 java bindings. the entire directory is added, which is why we need to exclude
+                        some files. Path to source files are relative to the directory being added i.e. we will see
+                        org.bitcoin/*.java which makes it a bit awkward when you need to replace a single file (see below)
+                         -->
                         <configuration>
                             <sources>
                                 <source>secp256k1/src/java</source>
-                                <source>src/main/scala</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -84,8 +88,13 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.6.1</version>
                 <configuration>
-                    <source>1.7</source>
-                    <target>1.7</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <release>8</release>
+                    <excludes>
+                        <!-- this file is not needed and it contains non-standard imports that are missing from openjdk11 -->
+                        <exclude>**/NativeSecp256k1Test.java</exclude>
+                    </excludes>
                 </configuration>
                 <executions>
                     <execution>
@@ -99,14 +108,29 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
-                <version>3.3.1</version>
+                <version>3.4.2</version>
                 <configuration>
                     <args>
                         <arg>-deprecation</arg>
                         <arg>-feature</arg>
                         <arg>-language:postfixOps</arg>
                         <arg>-language:implicitConversions</arg>
+                        <arg>-Xfatal-warnings</arg>
+                        <arg>-unchecked</arg>
+                        <arg>-Xmax-classfile-name</arg>
+                        <arg>140</arg>
+                        <arg>-nobootcp</arg>
                     </args>
+                    <excludes>
+                        <!--
+                        we also need to exclude the original Secp256k1Context provided by libsecp256k1, and replace it
+                        with our own. Since it is hardcoded in NativeSecp256k1, and import libsecp256k1 java files are seen
+                        as org/bitcoin/*.java the only "clean" solution I could find was to excluded Secp256k1Context.java here
+                        and replace it by Secp256k1Context.scala
+                        -->
+                        <exclude>**/Secp256k1Context.java</exclude>
+                        <exclude>**/NativeSecp256k1Test.java</exclude>
+                    </excludes>
                     <scalaCompatVersion>${scala.version.short}</scalaCompatVersion>
                 </configuration>
                 <executions>
@@ -135,6 +159,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>3.0.1</version>
+                <configuration>
+                    <excludes>
+                        <!-- we also need to exclude the original Secp256k1Context.java from our source bundle -->
+                        <exclude>**/Secp256k1Context.java</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -144,21 +174,34 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- disable surefire -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.20</version>
                 <configuration>
-                    <useFile>false</useFile>
-                    <disableXmlReport>false</disableXmlReport>
-                    <!-- If you have classpath issue like NoDefClassError,... -->
-                    <!-- useManifestOnlyJar>false</useManifestOnlyJar -->
-                    <includes>
-                        <include>**/*Spec.*</include>
-                        <include>**/*Test.*</include>
-                        <include>**/*Suite.*</include>
-                    </includes>
+                    <skipTests>true</skipTests>
                 </configuration>
+            </plugin>
+            <!-- enable scalatest -->
+            <plugin>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest-maven-plugin</artifactId>
+                <version>2.0.0</version>
+                <configuration>
+                    <parallel>false</parallel>
+                    <systemProperties>
+                        <buildDirectory>${project.build.directory}</buildDirectory>
+                    </systemProperties>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>test</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -228,6 +271,11 @@
             <version>2.5.0</version>
         </dependency>
         <dependency>
+            <groupId>org.scodec</groupId>
+            <artifactId>scodec-bits_${scala.version.short}</artifactId>
+            <version>1.1.9</version>
+        </dependency>
+        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>1.7.25</version>
@@ -253,19 +301,13 @@
         <dependency>
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.version.short}</artifactId>
-            <version>3.0.3</version>
+            <version>3.0.5</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.json4s</groupId>
             <artifactId>json4s-jackson_${scala.version.short}</artifactId>
             <version>3.5.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

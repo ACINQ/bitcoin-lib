@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import org.spongycastle.crypto.digests.SHA512Digest
 import org.spongycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.spongycastle.crypto.params.KeyParameter
+import scodec.bits.ByteVector
 
 import scala.annotation.tailrec
 import scala.io.Source
@@ -25,7 +26,7 @@ object MnemonicCode {
     zeroes ++ digits
   }
 
-  private def toBinary(x: Seq[Byte]): List[Boolean] = x.flatMap(toBinary).toList
+  private def toBinary(x: ByteVector): List[Boolean] = x.toSeq.flatMap(toBinary).toList
 
   private def fromBinary(bin: Seq[Boolean]): Int = bin.foldLeft(0) { case (acc, flag) => if (flag) 2 * acc + 1 else 2 * acc }
 
@@ -36,14 +37,15 @@ object MnemonicCode {
     * @param wordlist word list (must be 2048 words long)
     * @return a list of mnemonic words that encodes the input entropy
     */
-  def toMnemonics(entropy: Seq[Byte], wordlist: Seq[String] = englishWordlist): List[String] = {
+  def toMnemonics(entropy: ByteVector, wordlist: Seq[String] = englishWordlist): List[String] = {
     require(wordlist.length == 2048, "invalid word list (size should be 2048)")
-    val digits = toBinary(entropy) ++ toBinary(Crypto.sha256(entropy)).take(entropy.length / 4)
+    val digits = toBinary(entropy) ++ toBinary(Crypto.sha256(entropy)).take(entropy.length.toInt / 4)
     digits.grouped(11).map(fromBinary).map(index => wordlist(index)).toList
   }
 
   /**
     * validate that a mnemonic seed is valid
+    *
     * @param mnemonics list of mnemomic words
     *
     */
@@ -61,26 +63,26 @@ object MnemonicCode {
     val bits = indexes.flatMap(i => toBits(i))
     val bitlength = (bits.length * 32) / 33
     val (databits, checksumbits) = bits.splitAt(bitlength)
-    val data: BinaryData = databits.grouped(8).map(fromBinary).map(_.toByte).toSeq
-    val check = toBinary(Crypto.sha256(data)).take(data.length / 4)
+    val data = ByteVector(databits.grouped(8).map(fromBinary).map(_.toByte))
+    val check = toBinary(Crypto.sha256(data)).take(data.length.toInt / 4)
     require(check == checksumbits, "invalid checksum")
   }
 
   def validate(mnemonics: String): Unit = validate(mnemonics.split(" "))
 
-    /**
+  /**
     * BIP39 seed derivation
     *
     * @param mnemonics  mnemonic words
     * @param passphrase passphrase
     * @return a seed derived from the mnemonic words and passphrase
     */
-  def toSeed(mnemonics: Seq[String], passphrase: String): BinaryData = {
+  def toSeed(mnemonics: Seq[String], passphrase: String): ByteVector = {
     val gen = new PKCS5S2ParametersGenerator(new SHA512Digest())
     gen.init(mnemonics.mkString(" ").getBytes("UTF-8"), ("mnemonic" + passphrase).getBytes("UTF-8"), 2048)
     val keyParams = gen.generateDerivedParameters(512).asInstanceOf[KeyParameter]
-    keyParams.getKey
+    ByteVector.view(keyParams.getKey)
   }
 
-  def toSeed(mnemonics: String, passphrase: String) : BinaryData = toSeed(mnemonics.split(" "), passphrase)
+  def toSeed(mnemonics: String, passphrase: String): ByteVector = toSeed(mnemonics.split(" "), passphrase)
 }

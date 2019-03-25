@@ -1,11 +1,9 @@
 package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.PrivateKey
-import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import scodec.bits._
 
-@RunWith(classOf[JUnitRunner])
 class TransactionMalleabilitySpec extends FlatSpec {
   "Transaction" should "not be malleable" in {
     // tx we want to spend
@@ -16,7 +14,7 @@ class TransactionMalleabilitySpec extends FlatSpec {
     //    val (_, privateKey) = Base58Check.decode("cSjAjBx5zSuA16zhG2owyNCzkXLc7qJTz9M8aR6uK9S9QqS9P6gF")
 
     // public key we want to sent btc to
-    val publicKey = BinaryData("03f1c059112166776c70367cc1a83851c6224e45f6fe3944442f7961072212f954")
+    val publicKey = hex"03f1c059112166776c70367cc1a83851c6224e45f6fe3944442f7961072212f954"
     val publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(publicKey)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
 
     // step #1: create an unsigned tx that sends the 2nd output of prevTx to our publicKey
@@ -24,7 +22,7 @@ class TransactionMalleabilitySpec extends FlatSpec {
       txIn = List(
         TxIn(
           OutPoint(prevTx, 1),
-          Array.empty[Byte], // empty sig script
+          ByteVector.empty, // empty sig script
           0xffffffffL
         )),
       txOut = List(
