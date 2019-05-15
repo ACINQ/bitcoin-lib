@@ -184,6 +184,12 @@ object Crypto {
 
   object PublicKey {
 
+    /**
+      * @param raw        serialized value of this public key (a point)
+      * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
+      *                   carefully for optimization purposes
+      * @return
+      */
     def apply(raw: ByteVector, checkValid: Boolean = true): PublicKey = {
       val pub = new PublicKey(raw)
       if (checkValid) {
@@ -200,7 +206,7 @@ object Crypto {
       *
       * Note that this mutates the input array!
       *
-      * @param raw 33 or 65 bytes public key (will be mutated)
+      * @param key 33 or 65 bytes public key (will be mutated)
       * @return an immutable compressed public key
       */
     def toCompressedUnsafe(key: Array[Byte]): PublicKey = {
@@ -223,8 +229,6 @@ object Crypto {
   /**
     *
     * @param raw        serialized value of this public key (a point)
-    * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
-    *                   carefully for optimization purposes
     */
   class PublicKey(val raw: ByteVector) extends Serializable {
     // we always make this very basic check
