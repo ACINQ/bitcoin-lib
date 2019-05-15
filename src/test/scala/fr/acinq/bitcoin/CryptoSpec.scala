@@ -69,9 +69,8 @@ class CryptoSpec extends FlatSpec {
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
     val publicKey = privateKey.publicKey
     val data = Crypto.sha256(ByteVector("this is a test".getBytes("UTF-8")))
-    val (r, s) = Crypto.sign(data, privateKey)
-    val encoded = Crypto.encodeSignature(r, s)
-    assert(Crypto.verifySignature(data, encoded, publicKey))
+    val sig = Crypto.signDER(data, privateKey)
+    assert(Crypto.verifySignatureDER(data, sig, publicKey))
   }
 
   it should "generate deterministic signatures" in {
@@ -110,7 +109,7 @@ class CryptoSpec extends FlatSpec {
 
     dataset.map {
       case (k, m, s) =>
-        val sig: ByteVector = Crypto.encodeSignature(Crypto.sign(Crypto.sha256(ByteVector.view(m.getBytes("UTF-8"))), PrivateKey(k)))
+        val sig: ByteVector = Crypto.signDER(Crypto.sha256(ByteVector.view(m.getBytes("UTF-8"))), PrivateKey(k))
         assert(sig == s)
     }
   }
@@ -148,7 +147,8 @@ class CryptoSpec extends FlatSpec {
     val priv = PrivateKey(hex"0101010101010101010101010101010101010101010101010101010101010101", compressed = true)
     val message = hex"0202020202020202020202020202020202020202020202020202020202020202"
     val pub = priv.publicKey
-    val (r, s) = Crypto.sign(message, priv)
+    val sig64 = Crypto.sign(message, priv)
+    val (r, s) = Crypto.decodeSignatureFrom64(sig64)
     val (pub1, pub2) = recoverPublicKey((r, s), message)
 
     assert(verifySignature(message, (r, s), pub1))
@@ -175,7 +175,8 @@ class CryptoSpec extends FlatSpec {
         case "recid" =>
           recid = rhs.toInt
           assert(priv.publicKey == pub)
-          val (r, s) = Crypto.sign(message, priv)
+          val sig64 = Crypto.sign(message, priv)
+          val (r, s) = Crypto.decodeSignatureFrom64(sig64)
           val (pub1, pub2) = recoverPublicKey((r, s), message)
           recid match {
             case 0 => assert(pub == pub1)
@@ -197,7 +198,8 @@ class CryptoSpec extends FlatSpec {
 
       val priv = PrivateKey(bytesMessage, compressed = true)
       val pub = priv.publicKey
-      val (r, s) = Crypto.sign(ByteVector.view(message), priv)
+      val sig64 = Crypto.sign(ByteVector.view(message), priv)
+      val (r, s) = Crypto.decodeSignatureFrom64(sig64)
       val (pub1, pub2) = recoverPublicKey((r, s), bytesMessage)
 
       assert(verifySignature(bytesMessage, (r, s), pub1))

@@ -29,7 +29,7 @@ class SegwitSpec extends FunSuite {
     val priv = PrivateKey(hex"619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb901")
     val pub = priv.publicKey
     val sig = hex"304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee"
-    assert(Crypto.verifySignature(hash, sig, pub))
+    assert(Crypto.verifySignatureDER(hash, sig, pub))
 
     val sigScript = hex"4830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01"
     val tx1 = tx.updateSigScript(0, sigScript)
