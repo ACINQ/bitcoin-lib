@@ -16,7 +16,6 @@ This is a simple scala library which implements most of the bitcoin protocol:
 * pay to script tx / multisig tx
 * BIP 32 (deterministic wallets)
 * BIP 39 (mnemonic code for generating deterministic keys)
-* BIP 70
 * BIP 173 (Base32 address format for native v0-16 witness outputs)
 
 ## Objectives
