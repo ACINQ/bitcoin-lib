@@ -69,7 +69,7 @@ object Crypto {
       * @return this * G where G is the curve generator
       */
     def toPoint: Point = if (Secp256k1Context.isEnabled) {
-      Point(ByteVector.view(NativeSecp256k1.computePubkey(toBin.toArray, false)))
+      Point(ByteVector.view(NativeSecp256k1.computePubkey(toBin.toArray)))
     } else {
       Point(params.getG() * value)
     }
@@ -142,7 +142,7 @@ object Crypto {
     def substract(point: Point): Point = Point(value.subtract(point.value))
 
     def multiply(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
-      Point(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(toBin(true).toArray, scalar.toBin.toArray, false)))
+      Point(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(toBin(true).toArray, scalar.toBin.toArray)))
     else
       Point(value.multiply(scalar.value))
 
@@ -173,7 +173,7 @@ object Crypto {
 
   object Point {
     def apply(data: ByteVector): Point = if (Secp256k1Context.isEnabled)
-      Point(curve.getCurve.decodePoint(NativeSecp256k1.decompress(data.toArray)))
+      Point(curve.getCurve.decodePoint(NativeSecp256k1.parsePubkey(data.toArray)))
     else
       Point(curve.getCurve.decodePoint(data.toArray))
   }
@@ -184,6 +184,12 @@ object Crypto {
 
   object PublicKey {
 
+    /**
+      * @param raw        serialized value of this public key (a point)
+      * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
+      *                   carefully for optimization purposes
+      * @return
+      */
     def apply(raw: ByteVector, checkValid: Boolean = true): PublicKey = {
       val pub = new PublicKey(raw)
       if (checkValid) {
@@ -200,7 +206,7 @@ object Crypto {
       *
       * Note that this mutates the input array!
       *
-      * @param raw 33 or 65 bytes public key (will be mutated)
+      * @param key 33 or 65 bytes public key (will be mutated)
       * @return an immutable compressed public key
       */
     def toCompressedUnsafe(key: Array[Byte]): PublicKey = {
@@ -223,8 +229,6 @@ object Crypto {
   /**
     *
     * @param raw        serialized value of this public key (a point)
-    * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
-    *                   carefully for optimization purposes
     */
   class PublicKey(val raw: ByteVector) extends Serializable {
     // we always make this very basic check
@@ -308,24 +312,9 @@ object Crypto {
     */
   def hash256(input: ByteVector): ByteVector32 = ByteVector32(sha256(sha256(input)))
 
-  /**
-    * An ECDSA signature is a (r, s) pair. Bitcoin uses DER encoded signatures
-    *
-    * @param r first value
-    * @param s second value
-    * @return (r, s) in DER format
-    */
-  def encodeSignature(r: BigInteger, s: BigInteger): ByteVector = {
-    // Usually 70-72 bytes
-    val bos = new ByteArrayOutputStream(72)
-    val seq = new DERSequenceGenerator(bos)
-    seq.addObject(new ASN1Integer(r))
-    seq.addObject(new ASN1Integer(s))
-    seq.close()
-    ByteVector.view(bos.toByteArray)
+  private def encodeSignatureCompact(r: BigInteger, s: BigInteger): ByteVector64 = {
+      ByteVector64(ByteVector.view(r.toByteArray.dropWhile(_ == 0)).padLeft(32) ++ ByteVector.view(s.toByteArray.dropWhile(_ == 0)).padLeft(32))
   }
-
-  def encodeSignature(t: (BigInteger, BigInteger)): ByteVector = encodeSignature(t._1, t._2)
 
   def isDERSignature(sig: ByteVector): Boolean = {
     // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]
@@ -393,18 +382,13 @@ object Crypto {
   }
 
   def isLowDERSignature(sig: ByteVector): Boolean = isDERSignature(sig) && {
-    val (_, s) = decodeSignature(sig)
+    val (_, s) = decodeSignatureFromDER(sig)
     s.compareTo(halfCurveOrder) <= 0
   }
 
-  def normalizeSignature(r: BigInteger, s: BigInteger): (BigInteger, BigInteger) = {
+  private def normalizeSignature(r: BigInteger, s: BigInteger): (BigInteger, BigInteger) = {
     val s1 = if (s.compareTo(halfCurveOrder) > 0) curve.getN().subtract(s) else s
     (r, s1)
-  }
-
-  def normalizeSignature(sig: ByteVector): ByteVector = {
-    val (r, s) = decodeSignature(sig)
-    encodeSignature(normalizeSignature(r, s))
   }
 
   def checkSignatureEncoding(sig: ByteVector, flags: Int): Boolean = {
@@ -462,11 +446,11 @@ object Crypto {
     * @param blob sigbyte data
     * @return the decoded (r, s) signature
     */
-  def decodeSignature(blob: ByteVector): (BigInteger, BigInteger) = {
-    decodeSignatureLax(blob)
+  private def decodeSignatureFromDER(blob: ByteVector): (BigInteger, BigInteger) = {
+    decodeSignatureFromDERLax(blob)
   }
 
-  def decodeSignatureLax(input: ByteArrayInputStream): (BigInteger, BigInteger) = {
+  private def decodeSignatureFromDERLax(input: ByteArrayInputStream): (BigInteger, BigInteger) = {
     require(input.read() == 0x30)
 
     def readLength: Int = {
@@ -494,10 +478,31 @@ object Crypto {
     (new BigInteger(1, r), new BigInteger(1, s))
   }
 
-  def decodeSignatureLax(input: ByteVector): (BigInteger, BigInteger) = decodeSignatureLax(new ByteArrayInputStream(input.toArray))
+  private def decodeSignatureFromDERLax(input: ByteVector): (BigInteger, BigInteger) = decodeSignatureFromDERLax(new ByteArrayInputStream(input.toArray))
 
-  def verifySignature(data: ByteVector, signature: (BigInteger, BigInteger), publicKey: PublicKey): Boolean =
-    verifySignature(data, encodeSignature(signature), publicKey)
+  private def decodeSignatureCompact(signature: ByteVector64): (BigInteger, BigInteger) = {
+    val r = new BigInteger(1, signature.take(32).toArray)
+    val s = new BigInteger(1, signature.takeRight(32).toArray)
+    (r, s)
+  }
+
+  def compact2der(signature: ByteVector64) : ByteVector = {
+    val r = new BigInteger(1, signature.take(32).toArray)
+    val s = new BigInteger(1, signature.takeRight(32).toArray)
+    val (r1, s1) = normalizeSignature(r, s)
+    val bos = new ByteArrayOutputStream(73)
+    val seq = new DERSequenceGenerator(bos)
+    seq.addObject(new ASN1Integer(r1))
+    seq.addObject(new ASN1Integer(s1))
+    seq.close()
+    ByteVector.view(bos.toByteArray)
+  }
+
+  def der2compact(signature: ByteVector) : ByteVector64 = {
+    val (r, s) = decodeSignatureFromDERLax(signature)
+    val (r1, s1) = normalizeSignature(r, s)
+    ByteVector64(ByteVector.view(r1.toByteArray.dropWhile(_ == 0)).padLeft(32) ++ ByteVector.view(s1.toByteArray.dropWhile(_ == 0)).padLeft(32))
+  }
 
   /**
     * @param data      data
@@ -505,13 +510,11 @@ object Crypto {
     * @param publicKey public key
     * @return true is signature is valid for this data with this public key
     */
-  def verifySignature(data: ByteVector, signature: ByteVector, publicKey: PublicKey): Boolean = {
+  def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = {
     if (Secp256k1Context.isEnabled) {
-      val signature1 = normalizeSignature(signature)
-      val native = NativeSecp256k1.verify(data.toArray, signature1.toArray, publicKey.toBin.toArray)
-      native
+      NativeSecp256k1.verify(data.toArray, signature.toArray, publicKey.toBin.toArray)
     } else {
-      val (r, s) = decodeSignature(signature)
+      val (r, s) = decodeSignatureCompact(signature)
       require(r.compareTo(one) >= 0, "r must be >= 1")
       require(r.compareTo(curve.getN) < 0, "r must be < N")
       require(s.compareTo(one) >= 0, "s must be >= 1")
@@ -539,25 +542,25 @@ object Crypto {
     *                   the key (there is an extra "1" appended to the key)
     * @return a (r, s) ECDSA signature pair
     */
-  def sign(data: Array[Byte], privateKey: PrivateKey): (BigInteger, BigInteger) = {
+  def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = {
     if (Secp256k1Context.isEnabled) {
-      val bin = NativeSecp256k1.sign(data, privateKey.value.toBin.toArray)
-      Crypto.decodeSignature(ByteVector.view(bin))
+      val bin = NativeSecp256k1.signCompact(data, privateKey.value.toBin.toArray)
+      ByteVector64(ByteVector.view(bin))
     } else {
       val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
       val privateKeyParameters = new ECPrivateKeyParameters(privateKey.value, curve)
       signer.init(true, privateKeyParameters)
       val Array(r, s) = signer.generateSignature(data)
-
-      if (s.compareTo(halfCurveOrder) > 0) {
+      val (r1, s1) = if (s.compareTo(halfCurveOrder) > 0) {
         (r, curve.getN().subtract(s)) // if s > N/2 then s = N - s
       } else {
         (r, s)
       }
+      encodeSignatureCompact(r1, s1)
     }
   }
 
-  def sign(data: ByteVector, privateKey: PrivateKey): (BigInteger, BigInteger) = sign(data.toArray, privateKey)
+  def sign(data: ByteVector, privateKey: PrivateKey): ByteVector64 = sign(data.toArray, privateKey)
 
   /**
     *
@@ -584,8 +587,8 @@ object Crypto {
     * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
     *         pub1 if the recovery id is even and pub2 if it is odd
     */
-  def recoverPublicKey(t: (BigInteger, BigInteger), message: ByteVector): (PublicKey, PublicKey) = {
-    val (r, s) = t
+  def recoverPublicKey(signature: ByteVector64, message: ByteVector): (PublicKey, PublicKey) = {
+    val (r, s) = decodeSignatureCompact(signature)
     val m = new BigInteger(1, message.toArray)
 
     val (p1, p2) = recoverPoint(r)
@@ -593,6 +596,4 @@ object Crypto {
     val Q2 = (p2.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
     (PublicKey(Q1), PublicKey(Q2))
   }
-
-  def recoverPublicKey(sig: ByteVector, message: ByteVector): (PublicKey, PublicKey) = recoverPublicKey(Crypto.decodeSignature(sig), message)
 }

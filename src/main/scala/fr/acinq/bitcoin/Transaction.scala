@@ -391,9 +391,8 @@ object Transaction extends BtcSerializer[Transaction] {
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector = {
     if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(privateKey.compressed, "private key must be compressed in segwit")
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-    val (r, s) = Crypto.sign(hash, privateKey)
-    val sig = Crypto.encodeSignature(r, s)
-    sig :+ (sighashType.toByte)
+    val sig = Crypto.sign(hash, privateKey)
+    Crypto.compact2der(sig) :+ (sighashType.toByte)
   }
 
   /**
