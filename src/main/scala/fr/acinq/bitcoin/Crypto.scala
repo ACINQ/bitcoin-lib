@@ -545,7 +545,7 @@ object Crypto {
   def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = {
     if (Secp256k1Context.isEnabled) {
       val bin = NativeSecp256k1.signCompact(data, privateKey.value.toBin.toArray)
-      ByteVector64.apply(ByteVector.view(bin))
+      ByteVector64(ByteVector.view(bin))
     } else {
       val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
       val privateKeyParameters = new ECPrivateKeyParameters(privateKey.value, curve)
