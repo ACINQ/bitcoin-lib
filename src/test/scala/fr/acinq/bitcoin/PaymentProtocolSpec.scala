@@ -7,11 +7,12 @@ import java.security.spec.PKCS8EncodedKeySpec
 
 import com.google.protobuf.ByteString
 import org.bitcoin.protocols.payments.Protos.{Output, PaymentDetails, PaymentRequest}
-import org.scalatest.FlatSpec
+import org.scalatest.{FlatSpec, Ignore}
 import org.spongycastle.util.io.pem.PemReader
 
 import scala.compat.Platform
 
+@Ignore
 class PaymentProtocolSpec extends FlatSpec {
   val keystore = KeyStore.getInstance("JKS")
   keystore.load(classOf[PaymentProtocolSpec].getResourceAsStream("/cacerts"), null)

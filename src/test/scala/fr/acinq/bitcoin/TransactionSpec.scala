@@ -33,7 +33,7 @@ class TransactionSpec extends FunSuite with Matchers {
     val hashed = Crypto.hash256(serialized)
     val pkey_encoded = ByteVector.fromValidBase58("92f9274aR3s6zd1vuAgxquv4KP5S5thJadF3k54NHuTV4fXL1vW")
     val pkey = PrivateKey(pkey_encoded.slice(1, pkey_encoded.size - 4))
-    val sig = Crypto.signDER(hashed, pkey)
+    val sig = Crypto.compact2der(Crypto.sign(hashed, pkey))
     // DER encoded
     val sigOut = new ByteArrayOutputStream()
     writeUInt8(sig.length.toInt + 1, sigOut) // +1 because of the hash code
@@ -98,7 +98,7 @@ class TransactionSpec extends FunSuite with Matchers {
     val hashed = Crypto.hash256(serializedTx1AndHashType)
 
     // step #4: sign transaction hash
-    val sig = Crypto.signDER(hashed, privateKey) // DER encoded
+    val sig = Crypto.compact2der(Crypto.sign(hashed, privateKey)) // DER encoded
 
     // this is the public key that is associated to the private key we used for signing
     val publicKey = privateKey.publicKey
@@ -117,7 +117,7 @@ class TransactionSpec extends FunSuite with Matchers {
     ))
 
     // check signature
-    assert(Crypto.verifySignatureDER(hashed, sig, publicKey))
+    assert(Crypto.verifySignature(hashed, Crypto.der2compact(sig), publicKey))
 
     // check script
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
