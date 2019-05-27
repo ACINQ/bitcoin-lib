@@ -37,18 +37,21 @@ object Crypto {
     *
     * @param value value to initialize this scalar with
     */
-  case class Scalar(value: BigInteger) {
+  case class Scalar(value: ByteVector32) {
     def add(scalar: Scalar): Scalar = if (Secp256k1Context.isEnabled)
       Scalar(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(toBin.toArray, scalar.toBin.toArray)))
     else
-      Scalar(value.add(scalar.value)).mod(Crypto.curve.getN)
+      Scalar(bigInt.add(scalar.bigInt).mod(Crypto.curve.getN))
 
-    def substract(scalar: Scalar): Scalar = Scalar(value.subtract(scalar.value)).mod(Crypto.curve.getN)
+    def substract(scalar: Scalar): Scalar = if (Secp256k1Context.isEnabled)
+      Scalar(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(toBin.toArray, NativeSecp256k1.privKeyNegate(scalar.toBin.toArray))))
+    else
+      Scalar(bigInt.subtract(scalar.bigInt).mod(Crypto.curve.getN))
 
     def multiply(scalar: Scalar): Scalar = if (Secp256k1Context.isEnabled)
       Scalar(ByteVector.view(NativeSecp256k1.privKeyTweakMul(toBin.toArray, scalar.toBin.toArray)))
     else
-      Scalar(value.multiply(scalar.value).mod(Crypto.curve.getN))
+      Scalar(bigInt.multiply(scalar.bigInt).mod(Crypto.curve.getN))
 
     def +(that: Scalar): Scalar = add(that)
 
@@ -56,14 +59,16 @@ object Crypto {
 
     def *(that: Scalar): Scalar = multiply(that)
 
-    def isZero: Boolean = value == BigInteger.ZERO
+    def isZero: Boolean = bigInt == BigInteger.ZERO
 
     /**
       *
       * @return a 32 bytes binary representation of this value
       */
-    def toBin: ByteVector32 = fixSize(ByteVector.view(value.toByteArray.dropWhile(_ == 0)))
+    def toBin: ByteVector32 = value
 
+    // used only if secp256k1 is not available
+    lazy val bigInt = new BigInteger(1, toBin.toArray)
     /**
       *
       * @return this * G where G is the curve generator
@@ -71,7 +76,7 @@ object Crypto {
     def toPoint: Point = if (Secp256k1Context.isEnabled) {
       Point(ByteVector.view(NativeSecp256k1.computePubkey(toBin.toArray)))
     } else {
-      Point(params.getG() * value)
+      Point(params.getG().multiply(bigInt))
     }
 
     override def toString = this.toBin.toHex
@@ -80,17 +85,12 @@ object Crypto {
   object Scalar {
     def apply(data: ByteVector): Scalar = {
       require(data.length == 32, "scalar must be initialized with a 32 bytes value")
-      new Scalar(new BigInteger(1, data.toArray))
+      new Scalar(ByteVector32(data))
+    }
+    def apply(data: BigInteger): Scalar = {
+      new Scalar(fixSize(ByteVector.view(data.toByteArray.dropWhile(_ == 0.toByte))))
     }
   }
-
-  implicit def scalar2biginteger(scalar: Scalar): BigInteger = scalar.value
-
-  implicit def biginteger2scalar(value: BigInteger): Scalar = Scalar(value)
-
-  implicit def bin2scalar(value: ByteVector): Scalar = Scalar(value)
-
-  implicit def scalar2bin(scalar: Scalar): ByteVector = scalar.toBin
 
   object PrivateKey {
     def apply(data: ByteVector): PrivateKey = data.length match {
@@ -131,22 +131,48 @@ object Crypto {
 
   implicit def privatekey2scalar(priv: PrivateKey): Scalar = priv.value
 
+  private def compress(point: ByteVector): ByteVector = point.size match {
+    case 33 => point
+    case 65 if point(64) % 2 == 0 => point.take(33).update(0, 2.toByte)
+    case 65 => point.take(33).update(0, 3.toByte)
+  }
+
+  private def decompress(point: ByteVector) : ByteVector = point.size match {
+    case 65 => point
+    case 33 =>
+      if (Secp256k1Context.isEnabled)
+        ByteVector.view(NativeSecp256k1.parsePubkey(point.toArray))
+      else
+        ByteVector.view(Crypto.curve.getCurve.decodePoint(point.toArray).getEncoded(false))
+  }
+
   /**
     * Curve point
     *
     * @param value ecPoint to initialize this point with
     */
-  case class Point(value: ECPoint) {
-    def add(point: Point): Point = Point(value.add(point.value))
+  case class Point(value: ByteVector) {
+    require(isPubKeyValid(value))
 
-    def substract(point: Point): Point = Point(value.subtract(point.value))
+    def add(point: Point): Point = if (Secp256k1Context.isEnabled)
+      Point(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, point.value.toArray)))
+    else
+      Point(ecpoint.add(point.ecpoint).normalize())
+
+    def add(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
+      Point(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, scalar.toBin.toArray)))
+    else
+      add(scalar.toPoint)
+
+    def substract(point: Point): Point = if (Secp256k1Context.isEnabled)
+      Point(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(point.value.toArray))))
+    else
+      Point(ecpoint.subtract(point.ecpoint).normalize())
 
     def multiply(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
-      Point(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(toBin(true).toArray, scalar.toBin.toArray)))
+      Point(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(toBin(false).toArray, scalar.toBin.toArray)))
     else
-      Point(value.multiply(scalar.value))
-
-    def normalize = Point(value.normalize())
+      Point(ecpoint.multiply(scalar.bigInt).normalize())
 
     def +(that: Point): Point = add(that)
 
@@ -154,17 +180,29 @@ object Crypto {
 
     def *(that: Scalar): Point = multiply(that)
 
+    // used only if secp256k1 is not available
+    lazy val ecpoint = curve.getCurve.decodePoint(value.toArray)
     /**
       *
       * @return a binary representation of this point in DER format
       */
-    def toBin(compressed: Boolean): ByteVector = ByteVector.view(value.getEncoded(compressed))
+    def toBin(compressed: Boolean): ByteVector = compressed match {
+      case false => decompress(value)
+      case true => compress(value)
+    }
 
     // because ECPoint is not serializable
-    protected def writeReplace: Object = PointProxy(toBin(true))
+    protected def writeReplace: Object = PointProxy(toBin(false))
 
     override def toString = toBin(true).toHex
 
+    override def hashCode(): Int = toBin(true).hashCode
+
+    override def equals(obj: Any): Boolean = obj match {
+      case null => false
+      case p: Point => toBin(true) == p.toBin(true)
+      case _ => false
+    }
   }
 
   case class PointProxy(bin: ByteVector) {
@@ -172,15 +210,15 @@ object Crypto {
   }
 
   object Point {
-    def apply(data: ByteVector): Point = if (Secp256k1Context.isEnabled)
-      Point(curve.getCurve.decodePoint(NativeSecp256k1.parsePubkey(data.toArray)))
-    else
-      Point(curve.getCurve.decodePoint(data.toArray))
+    def apply(data: ECPoint): Point = new Point(ByteVector.view(data.getEncoded(false)))
+
+    def isValid(point: ByteVector): Boolean = isPubKeyValid(point) && {
+      if (Secp256k1Context.isEnabled)
+        NativeSecp256k1.parsePubkey(point.toArray).length == 65
+      else
+        curve.getCurve.decodePoint(point.toArray).normalize().isValid
+    }
   }
-
-  implicit def point2ecpoint(point: Point): ECPoint = point.value
-
-  implicit def ecpoint2point(value: ECPoint): Point = Point(value)
 
   object PublicKey {
 
@@ -194,7 +232,7 @@ object Crypto {
       val pub = new PublicKey(raw)
       if (checkValid) {
         // this is expensive and done only if needed
-        require(pub.value.isInstanceOf[Point])
+        require(Point.isValid(raw))
       }
       pub
     }
@@ -269,7 +307,7 @@ object Crypto {
     * @return ecdh(priv, pub) as computed by libsecp256k1
     */
   def ecdh(priv: Scalar, pub: Point): ByteVector32 = {
-    Crypto.sha256(ByteVector.view(pub.multiply(priv).getEncoded(true)))
+    Crypto.sha256(ByteVector.view(pub.multiply(priv).ecpoint.getEncoded(true)))
   }
 
   def hmac512(key: ByteVector, data: ByteVector): ByteVector = {
@@ -521,7 +559,7 @@ object Crypto {
       require(s.compareTo(curve.getN) < 0, "s must be < N")
 
       val signer = new ECDSASigner
-      val params = new ECPublicKeyParameters(publicKey.value, curve)
+      val params = new ECPublicKeyParameters(publicKey.ecpoint, curve)
       signer.init(false, params)
       signer.verifySignature(data.toArray, r, s)
     }
@@ -540,7 +578,7 @@ object Crypto {
     * @param data       data to sign
     * @param privateKey private key. If you are using bitcoin "compressed" private keys make sure to only use the first 32 bytes of
     *                   the key (there is an extra "1" appended to the key)
-    * @return a (r, s) ECDSA signature pair
+    * @return a signature in compact format (64 bytes)
     */
   def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = {
     if (Secp256k1Context.isEnabled) {
@@ -548,7 +586,7 @@ object Crypto {
       ByteVector64(ByteVector.view(bin))
     } else {
       val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
-      val privateKeyParameters = new ECPrivateKeyParameters(privateKey.value, curve)
+      val privateKeyParameters = new ECPrivateKeyParameters(privateKey.bigInt, curve)
       signer.init(true, privateKeyParameters)
       val Array(r, s) = signer.generateSignature(data)
       val (r1, s1) = if (s.compareTo(halfCurveOrder) > 0) {
@@ -568,7 +606,7 @@ object Crypto {
     * @return a tuple (p1, p2) where p1 and p2 are points on the curve and p1.x = p2.x = x
     *         p1.y is even, p2.y is odd
     */
-  def recoverPoint(x: BigInteger): (Point, Point) = {
+  private def recoverPoint(x: BigInteger): (ECPoint, ECPoint) = {
     val x1 = Crypto.curve.getCurve.fromBigInteger(x)
     val square = x1.square().add(Crypto.curve.getCurve.getA).multiply(x1).add(Crypto.curve.getCurve.getB)
     val y1 = square.sqrt()
@@ -582,7 +620,7 @@ object Crypto {
     * Recover public keys from a signature and the message that was signed. This method will return 2 public keys, and the signature
     * can be verified with both, but only one of them matches that private key that was used to generate the signature.
     *
-    * @param t       signature
+    * @param signature signature
     * @param message message that was signed
     * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
     *         pub1 if the recovery id is even and pub2 if it is odd
@@ -594,6 +632,6 @@ object Crypto {
     val (p1, p2) = recoverPoint(r)
     val Q1 = (p1.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
     val Q2 = (p2.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
-    (PublicKey(Q1), PublicKey(Q2))
+    (PublicKey(Point(Q1)), PublicKey(Point(Q2)))
   }
 }

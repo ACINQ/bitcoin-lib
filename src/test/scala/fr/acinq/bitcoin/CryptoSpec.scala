@@ -127,6 +127,20 @@ class CryptoSpec extends FlatSpec {
     osi.readObject().asInstanceOf[T]
   }
 
+  it should "compare points correctly" in {
+    val secret = Scalar(hex"0101010101010101010101010101010101010101010101010101010101010101")
+    val p1 = secret.toPoint
+    val p2 = Point(p1.toBin(false))
+    val p3 = Point(p1.toBin(true))
+    assert(p1 == p2)
+    assert(p1 == p3)
+
+    val map = Map(p1 -> 1)
+    val map1 = map ++ Map(p2 -> 2)
+    val map2 = map1 ++ Map(p3 -> 3)
+    assert(map2 == Map(p1 -> 3))
+  }
+
   it should "serialize points and scalars" in {
     val secret = Scalar(hex"0101010101010101010101010101010101010101010101010101010101010101")
     val point = secret.toPoint

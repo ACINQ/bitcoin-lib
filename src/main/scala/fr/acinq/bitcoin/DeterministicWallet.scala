@@ -201,10 +201,10 @@ object DeterministicWallet {
       throw new RuntimeException("cannot generated child public key")
     }
     val Ki = Scalar(p).toPoint.add(parent.publicKey)
-    if (Ki.isInfinity) {
+    if (Ki.ecpoint.isInfinity) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val buffer = ByteVector.view(Ki.getEncoded(true))
+    val buffer = Ki.toBin(true)
     ExtendedPublicKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 
