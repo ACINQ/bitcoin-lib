@@ -208,14 +208,16 @@ object Crypto {
 
   object PublicKey {
 
-    /**
+    def apply(point: Point): PublicKey = new PublicKey(point, true)
+
+      /**
       * @param raw        serialized value of this public key (a point)
       * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
       *                   carefully for optimization purposes
       * @return
       */
     def apply(raw: ByteVector, checkValid: Boolean = true): PublicKey = {
-      val pub = new PublicKey(raw)
+      val pub = PublicKey(Point.fromDER(raw), isPubKeyCompressed(raw))
       if (checkValid) {
         // this is expensive and done only if needed
         require(Point.isValid(raw))
@@ -237,48 +239,33 @@ object Crypto {
       key.length match {
         case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 =>
           key(0) = if ((key(64) & 0x01) != 0) 0x03.toByte else 0x02.toByte
-          new PublicKey(ByteVector(key, 0, 33))
+          new PublicKey(Point(ByteVector(key, 0, 33)), true)
         case 33 if key(0) == 2 || key(0) == 3 =>
-          new PublicKey(ByteVector(key, 0, 33))
+          new PublicKey(Point(ByteVector(key, 0, 33)), true)
         case _ =>
           throw new IllegalArgumentException(s"key must be 33 or 65 bytes")
       }
     }
-
-    def apply(point: Point) = new PublicKey(point.toBin(true))
-
-    def apply(point: Point, compressed: Boolean) = new PublicKey(point.toBin(compressed = compressed))
   }
+
 
   /**
     *
-    * @param raw        serialized value of this public key (a point)
+    * @param value EC point
+    * @param compressed if true, key will be serialized in compressed DER format
     */
-  class PublicKey(val raw: ByteVector) extends Serializable {
-    // we always make this very basic check
-    require(isPubKeyValid(raw))
+  case class PublicKey(value: Point, compressed: Boolean) extends Serializable {
 
-    lazy val compressed = isPubKeyCompressed(raw)
-
-    lazy val value: Point = Point(raw)
-
-    def toBin: ByteVector = raw
+    def toBin: ByteVector = value.toBin(compressed)
 
     /**
       *
       * @return the hash160 of the binary representation of this point. This can be used to generated addresses (the address
       *         of a public key is he base58 encoding of its hash)
       */
-    def hash160: ByteVector = Crypto.hash160(raw)
+    def hash160: ByteVector = Crypto.hash160(toBin)
 
     override def toString = toBin.toHex
-
-    override def hashCode(): Int = raw.hashCode
-
-    override def equals(obj: Any): Boolean = obj match {
-      case other: PublicKey => this.raw.equals(other.raw)
-      case _ => false
-    }
   }
 
   implicit def publickey2point(pub: PublicKey): Point = pub.value
@@ -293,7 +280,10 @@ object Crypto {
     * @return ecdh(priv, pub) as computed by libsecp256k1
     */
   def ecdh(priv: Scalar, pub: Point): ByteVector32 = {
-    Crypto.sha256(ByteVector.view(pub.multiply(priv).ecpoint.getEncoded(true)))
+    if (Secp256k1Context.isEnabled)
+      ByteVector32(ByteVector.view(NativeSecp256k1.createECDHSecret(priv.value.toArray, pub.value.toArray)))
+    else
+      Crypto.sha256(ByteVector.view(pub.multiply(priv).ecpoint.getEncoded(true)))
   }
 
   def hmac512(key: ByteVector, data: ByteVector): ByteVector = {
