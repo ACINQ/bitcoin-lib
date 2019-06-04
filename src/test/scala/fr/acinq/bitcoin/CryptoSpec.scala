@@ -130,8 +130,8 @@ class CryptoSpec extends FlatSpec {
   it should "compare points correctly" in {
     val secret = Scalar(hex"0101010101010101010101010101010101010101010101010101010101010101")
     val p1 = secret.toPoint
-    val p2 = Point(p1.toBin(false))
-    val p3 = Point(p1.toBin(true))
+    val p2 = Point.fromDER(p1.toBin(false))
+    val p3 = Point.fromDER(p1.toBin(true))
     assert(p1 == p2)
     assert(p1 == p3)
 

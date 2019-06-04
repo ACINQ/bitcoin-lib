@@ -74,7 +74,7 @@ object Crypto {
       * @return this * G where G is the curve generator
       */
     def toPoint: Point = if (Secp256k1Context.isEnabled) {
-      Point(ByteVector.view(NativeSecp256k1.computePubkey(toBin.toArray)))
+      Point.fromDER(ByteVector.view(NativeSecp256k1.computePubkey(toBin.toArray)))
     } else {
       Point(params.getG().multiply(bigInt))
     }
@@ -152,25 +152,26 @@ object Crypto {
     * @param value ecPoint to initialize this point with
     */
   case class Point(value: ByteVector) {
+    require(value.length == 33)
     require(isPubKeyValid(value))
 
     def add(point: Point): Point = if (Secp256k1Context.isEnabled)
-      Point(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, point.value.toArray)))
+      Point.fromDER(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, point.value.toArray)))
     else
       Point(ecpoint.add(point.ecpoint).normalize())
 
     def add(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
-      Point(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, scalar.toBin.toArray)))
+      Point.fromDER(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, scalar.toBin.toArray)))
     else
       add(scalar.toPoint)
 
     def substract(point: Point): Point = if (Secp256k1Context.isEnabled)
-      Point(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(point.value.toArray))))
+      Point.fromDER(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(point.value.toArray))))
     else
       Point(ecpoint.subtract(point.ecpoint).normalize())
 
     def multiply(scalar: Scalar): Point = if (Secp256k1Context.isEnabled)
-      Point(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(toBin(false).toArray, scalar.toBin.toArray)))
+      Point.fromDER(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(toBin(true).toArray, scalar.toBin.toArray)))
     else
       Point(ecpoint.multiply(scalar.bigInt).normalize())
 
@@ -188,29 +189,14 @@ object Crypto {
       */
     def toBin(compressed: Boolean): ByteVector = compressed match {
       case false => decompress(value)
-      case true => compress(value)
+      case true => value
     }
-
-    // because ECPoint is not serializable
-    protected def writeReplace: Object = PointProxy(toBin(false))
-
-    override def toString = toBin(true).toHex
-
-    override def hashCode(): Int = toBin(true).hashCode
-
-    override def equals(obj: Any): Boolean = obj match {
-      case null => false
-      case p: Point => toBin(true) == p.toBin(true)
-      case _ => false
-    }
-  }
-
-  case class PointProxy(bin: ByteVector) {
-    def readResolve: Object = Point(bin)
   }
 
   object Point {
-    def apply(data: ECPoint): Point = new Point(ByteVector.view(data.getEncoded(false)))
+    def apply(data: ECPoint): Point = new Point(ByteVector.view(data.getEncoded(true)))
+
+    def fromDER(der: ByteVector)= Point(compress(der))
 
     def isValid(point: ByteVector): Boolean = isPubKeyValid(point) && {
       if (Secp256k1Context.isEnabled)
