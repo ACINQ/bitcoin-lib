@@ -46,7 +46,7 @@ class CryptoSpec extends FlatSpec {
   it should "validate public key at instantiation" in {
     intercept[Throwable] { // can be IllegalArgumentException or AssertFailException depending on whether spongycastle or libsecp256k1 is used
       // by default we check
-      PublicKey(hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+      PublicKey(hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", checkValid = true)
     }
     // key is invalid but we don't check it
     PublicKey(hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", checkValid = false)
@@ -55,8 +55,8 @@ class CryptoSpec extends FlatSpec {
   it should "allow unsafe initialization of public keys" in {
     val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55", compressed = true)
     val publicKey = privateKey.publicKey
-    val rawCompressed = publicKey.value.toBin(compressed = true)
-    val rawUncompressed = publicKey.value.toBin(compressed = false)
+    val rawCompressed = publicKey.value
+    val rawUncompressed = publicKey.decompress.value
     assert(rawCompressed.size == 33)
     assert(rawUncompressed.size == 65)
     val publicKeyCompressed1 = PublicKey.toCompressedUnsafe(rawCompressed.toArray)
@@ -127,26 +127,12 @@ class CryptoSpec extends FlatSpec {
     osi.readObject().asInstanceOf[T]
   }
 
-  it should "compare points correctly" in {
-    val secret = Scalar(hex"0101010101010101010101010101010101010101010101010101010101010101")
-    val p1 = secret.toPoint
-    val p2 = Point.fromDER(p1.toBin(false))
-    val p3 = Point.fromDER(p1.toBin(true))
-    assert(p1 == p2)
-    assert(p1 == p3)
-
-    val map = Map(p1 -> 1)
-    val map1 = map ++ Map(p2 -> 2)
-    val map2 = map1 ++ Map(p3 -> 3)
-    assert(map2 == Map(p1 -> 3))
-  }
-
   it should "serialize points and scalars" in {
-    val secret = Scalar(hex"0101010101010101010101010101010101010101010101010101010101010101")
-    val point = secret.toPoint
+    val secret = PrivateKey(hex"0101010101010101010101010101010101010101010101010101010101010101")
+    val point = secret.publicKey
 
-    assert(deserialize[Scalar](serialize(secret)) == secret)
-    assert(deserialize[Point](serialize(point)) == point)
+    assert(deserialize[PrivateKey](serialize(secret)) == secret)
+    assert(deserialize[PublicKey](serialize(point)) == point)
   }
 
   it should "serialize public and private keys" in {

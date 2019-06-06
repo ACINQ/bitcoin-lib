@@ -41,7 +41,7 @@ class TransactionSpec extends FunSuite with Matchers {
     writeUInt8(1, sigOut)
     // hash code type
     val pub = pkey.publicKey
-    writeUInt8(pub.length.toInt, sigOut)
+    writeUInt8(pub.value.length.toInt, sigOut)
     sigOut.write(pub.toBin.toArray)
     val sigScript = sigOut.toByteArray
 

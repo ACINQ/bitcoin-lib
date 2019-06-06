@@ -4,7 +4,7 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 import java.nio.ByteOrder
 
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, Scalar}
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.Protocol._
 import scodec.bits.ByteVector
 
@@ -52,7 +52,7 @@ object DeterministicWallet {
 
   case class ExtendedPrivateKey(secretkeybytes: ByteVector32, chaincode: ByteVector32, depth: Int, path: KeyPath, parent: Long) {
 
-    def privateKey: PrivateKey = PrivateKey(Scalar(secretkeybytes), compressed = true)
+    def privateKey: PrivateKey = PrivateKey(secretkeybytes, compressed = true)
 
     def publicKey: PublicKey = privateKey.publicKey
   }
@@ -176,7 +176,7 @@ object DeterministicWallet {
       throw new RuntimeException("cannot generated child private key")
     }
 
-    val key = Scalar(IL).add(parent.privateKey)
+    val key = PrivateKey(IL).add(parent.privateKey)
     if (key.isZero) {
       throw new RuntimeException("cannot generated child private key")
     }
@@ -200,11 +200,11 @@ object DeterministicWallet {
     if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val Ki = Scalar(p).toPoint.add(parent.publicKey)
+    val Ki = PrivateKey(p, true).publicKey.add(parent.publicKey)
     if (Ki.ecpoint.isInfinity) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val buffer = Ki.toBin(true)
+    val buffer = Ki.toBin
     ExtendedPublicKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 
