@@ -170,6 +170,8 @@ object Crypto {
 
     def toBin: ByteVector = value
 
+    override def toString = toBin.toHex
+
     // used only if secp256k1 is not available
     lazy val ecpoint = curve.getCurve.decodePoint(value.toArray)
   }
