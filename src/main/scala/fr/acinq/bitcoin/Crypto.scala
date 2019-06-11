@@ -76,16 +76,13 @@ object Crypto {
       * @return the binary representation of this private key. It is either 32 bytes, or 33 bytes with final 0x1 if the
       *         key is compressed
       */
-    def toBin: ByteVector = if (compressed) value :+ 1.toByte else value
+    def toBin: ByteVector = PrivateKey.serialize(this)
 
     override def toString = toBin.toHex
   }
 
   object PrivateKey {
-    def apply(data: ByteVector): PrivateKey = data.length match {
-      case 32 => new PrivateKey(ByteVector32(data), compressed = false)
-      case 33 if data.last == 1 => new PrivateKey(ByteVector32(data.take(32)), compressed = true)
-    }
+    def apply(data: ByteVector): PrivateKey = apply(data, true)
 
     def apply(data: ByteVector, compressed: Boolean): PrivateKey = new PrivateKey(ByteVector32(data.take(32)), compressed)
 
@@ -93,10 +90,31 @@ object Crypto {
       new PrivateKey(fixSize(ByteVector.view(data.toByteArray.dropWhile(_ == 0.toByte))), compressed)
     }
 
+    /**
+      *
+      * @param priv private key
+      * @return the serialized representation of this key in bitcoin format (32 bytes for uncompressed keys, 33 bytes with
+      *         a trailing 1 for compressed key).
+      */
+    def serialize(priv: PrivateKey): ByteVector = priv.compressed match {
+      case false => priv.value.bytes
+      case true => priv.value.bytes :+ 1.toByte
+    }
+
+    /**
+      *
+      * @param data serialized private key in bitcoin format
+      * @return the de-serialized key
+      */
+    def deserialize(data: ByteVector): PrivateKey = data.length match {
+      case 32 => PrivateKey(data, false)
+      case 33 if data.last == 1 => PrivateKey(data, true)
+    }
+
     def fromBase58(value: String, prefix: Byte): PrivateKey = {
       require(Set(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix), "invalid base 58 prefix for a private key")
       val (`prefix`, data) = Base58Check.decode(value)
-      PrivateKey(data)
+      deserialize(data)
     }
   }
 

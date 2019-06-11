@@ -26,7 +26,7 @@ class CryptoSpec extends FlatSpec {
 
   // see https://en.bitcoin.it/wiki/Technical_background_of_Bitcoin_addresses
   it should "generate public keys from private keys" in {
-    val privateKey = PrivateKey(hex"18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725")
+    val privateKey = PrivateKey(hex"18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725", false)
     val publicKey = privateKey.publicKey
     assert(publicKey.toBin === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
 
@@ -35,7 +35,7 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "generate public keys from private keys 2" in {
-    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55", false)
     val publicKey = privateKey.publicKey
     assert(publicKey.toBin === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
 
