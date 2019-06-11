@@ -52,7 +52,7 @@ object DeterministicWallet {
 
   case class ExtendedPrivateKey(secretkeybytes: ByteVector32, chaincode: ByteVector32, depth: Int, path: KeyPath, parent: Long) {
 
-    def privateKey: PrivateKey = PrivateKey(secretkeybytes, compressed = true)
+    def privateKey: PrivateKey = PrivateKey(secretkeybytes)
 
     def publicKey: PublicKey = privateKey.publicKey
   }
@@ -200,7 +200,7 @@ object DeterministicWallet {
     if (p.compareTo(Crypto.curve.getN) >= 0) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val Ki = PrivateKey(p, true).publicKey.add(parent.publicKey)
+    val Ki = PrivateKey(p).publicKey.add(parent.publicKey)
     if (Ki.ecpoint.isInfinity) {
       throw new RuntimeException("cannot generated child public key")
     }

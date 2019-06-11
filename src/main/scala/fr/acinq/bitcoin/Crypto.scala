@@ -37,21 +37,21 @@ object Crypto {
     *
     * @param value value to initialize this scalar with
     */
-  case class PrivateKey(value: ByteVector32, compressed: Boolean = true) {
+  case class PrivateKey(value: ByteVector32) {
     def add(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
-      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.value.toArray)), compressed)
+      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.value.toArray)))
     else
-      PrivateKey(bigInt.add(that.bigInt).mod(Crypto.curve.getN), compressed)
+      PrivateKey(bigInt.add(that.bigInt).mod(Crypto.curve.getN))
 
     def substract(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
-      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, NativeSecp256k1.privKeyNegate(that.value.toArray))), compressed)
+      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, NativeSecp256k1.privKeyNegate(that.value.toArray))))
     else
-      PrivateKey(bigInt.subtract(that.bigInt).mod(Crypto.curve.getN), compressed)
+      PrivateKey(bigInt.subtract(that.bigInt).mod(Crypto.curve.getN))
 
     def multiply(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
-      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakMul(value.toArray, that.value.toArray)), compressed)
+      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakMul(value.toArray, that.value.toArray)))
     else
-      PrivateKey(bigInt.multiply(that.bigInt).mod(Crypto.curve.getN), compressed)
+      PrivateKey(bigInt.multiply(that.bigInt).mod(Crypto.curve.getN))
 
     def +(that: PrivateKey): PrivateKey = add(that)
 
@@ -65,10 +65,9 @@ object Crypto {
     lazy val bigInt = new BigInteger(1, value.toArray)
 
     def publicKey: PublicKey = if (Secp256k1Context.isEnabled) {
-      val pub = PublicKey(ByteVector.view(NativeSecp256k1.computePubkey(value.toArray)))
-      if (compressed) pub.compress else pub
+      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.computePubkey(value.toArray)))
     } else {
-      PublicKey(params.getG().multiply(bigInt), compressed)
+      PublicKey(ByteVector.view(params.getG().multiply(bigInt).getEncoded(true)))
     }
 
     /**
@@ -82,12 +81,10 @@ object Crypto {
   }
 
   object PrivateKey {
-    def apply(data: ByteVector): PrivateKey = apply(data, true)
+    def apply(data: ByteVector): PrivateKey = new PrivateKey(ByteVector32(data.take(32)))
 
-    def apply(data: ByteVector, compressed: Boolean): PrivateKey = new PrivateKey(ByteVector32(data.take(32)), compressed)
-
-    def apply(data: BigInteger, compressed: Boolean): PrivateKey = {
-      new PrivateKey(fixSize(ByteVector.view(data.toByteArray.dropWhile(_ == 0.toByte))), compressed)
+    def apply(data: BigInteger): PrivateKey = {
+      new PrivateKey(fixSize(ByteVector.view(data.toByteArray.dropWhile(_ == 0.toByte))))
     }
 
     /**
@@ -96,22 +93,22 @@ object Crypto {
       * @return the serialized representation of this key in bitcoin format (32 bytes for uncompressed keys, 33 bytes with
       *         a trailing 1 for compressed key).
       */
-    def serialize(priv: PrivateKey): ByteVector = priv.compressed match {
-      case false => priv.value.bytes
-      case true => priv.value.bytes :+ 1.toByte
-    }
+    def serialize(priv: PrivateKey): ByteVector = priv.value.bytes :+ 1.toByte
 
     /**
       *
       * @param data serialized private key in bitcoin format
       * @return the de-serialized key
       */
-    def deserialize(data: ByteVector): PrivateKey = data.length match {
-      case 32 => PrivateKey(data, false)
-      case 33 if data.last == 1 => PrivateKey(data, true)
+    def deserialize(data: ByteVector): (PrivateKey, Boolean) = {
+      val compressed = data.length match {
+        case 32 => false
+        case 33 if data.last == 1.toByte => true
+      }
+      (PrivateKey(data.take(32)), compressed)
     }
 
-    def fromBase58(value: String, prefix: Byte): PrivateKey = {
+    def fromBase58(value: String, prefix: Byte): (PrivateKey, Boolean) = {
       require(Set(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix), "invalid base 58 prefix for a private key")
       val (`prefix`, data) = Base58Check.decode(value)
       deserialize(data)
@@ -140,44 +137,36 @@ object Crypto {
     * @param value ecPoint to initialize this point with
     */
   case class PublicKey(value: ByteVector) {
+    require(value.length == 33)
     require(isPubKeyValid(value))
 
-    def compressed = value.length == 33
 
     def hash160: ByteVector = Crypto.hash160(value)
 
     def isValid: Boolean = PublicKey.isValid(value)
 
-    def compress = if (compressed) this else PublicKey(Crypto.compress(value))
-
-    def decompress = if (!compressed) this else PublicKey(Crypto.decompress(value))
-
     def add(that: PublicKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      val pub = PublicKey(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, that.value.toArray)))
-      if (compressed) pub.compress else pub
+      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, that.value.toArray)))
     } else {
-      PublicKey(ecpoint.add(that.ecpoint).normalize(), compressed)
+      PublicKey(ecpoint.add(that.ecpoint).normalize())
     }
 
     def add(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      val pub = PublicKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.toBin.toArray)))
-      if (compressed) pub.compress else pub
+      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.toBin.toArray)))
     } else {
       add(that.publicKey)
     }
 
     def substract(that: PublicKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      val pub = PublicKey(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(that.value.toArray))))
-      if (compressed) pub.compress else pub
+       PublicKey.deserialize(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(that.value.toArray))))
     } else {
-      PublicKey(ecpoint.subtract(that.ecpoint).normalize(), compressed)
+      PublicKey(ecpoint.subtract(that.ecpoint).normalize())
     }
 
     def multiply(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      val pub = PublicKey(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(value.toArray, that.toBin.toArray)))
-      if (compressed) pub.compress else pub
+      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(value.toArray, that.toBin.toArray)))
     } else {
-      PublicKey(ecpoint.multiply(that.bigInt).normalize(), compressed)
+      PublicKey(ecpoint.multiply(that.bigInt).normalize())
     }
 
     def +(that: PublicKey): PublicKey = add(that)
@@ -188,6 +177,12 @@ object Crypto {
 
     def toBin: ByteVector = value
 
+    def serialize(compressed: Boolean): ByteVector = compressed match {
+      case true => value
+      case false if Secp256k1Context.isEnabled => ByteVector.view(NativeSecp256k1.parsePubkey(value.toArray))
+      case false => ByteVector.view(ecpoint.getEncoded(false))
+    }
+
     override def toString = toBin.toHex
 
     // used only if secp256k1 is not available
@@ -195,7 +190,7 @@ object Crypto {
   }
 
   object PublicKey {
-    def apply(data: ECPoint, compressed: Boolean): PublicKey = new PublicKey(ByteVector.view(data.getEncoded(compressed)))
+    def apply(data: ECPoint): PublicKey = new PublicKey(ByteVector.view(data.getEncoded(true)))
 
     /**
       * @param raw        serialized value of this public key (a point)
@@ -203,14 +198,7 @@ object Crypto {
       *                   carefully for optimization purposes
       * @return
       */
-    def apply(raw: ByteVector, checkValid: Boolean): PublicKey = {
-      val pub = new PublicKey(raw)
-      if (checkValid) {
-        // this is expensive and done only if needed
-        require(pub.isValid)
-      }
-      pub
-    }
+    def apply(raw: ByteVector, checkValid: Boolean): PublicKey = deserialize(raw, checkValid)
 
     def isValid(pub: ByteVector): Boolean = isPubKeyValid(pub) && {
       if (Secp256k1Context.isEnabled)
@@ -219,6 +207,14 @@ object Crypto {
         curve.getCurve.decodePoint(pub.toArray).normalize().isValid
     }
 
+    def deserialize(input: ByteVector, checkValid: Boolean = true) : PublicKey = {
+      if (checkValid) require(isValid(input))
+
+      input.length match {
+        case 33 => PublicKey(input)
+        case 65 => toCompressedUnsafe(input.toArray)
+      }
+    }
     /**
       * This function initializes a public key from a compressed/uncompressed representation without doing validity checks.
       *
@@ -418,7 +414,7 @@ object Crypto {
     case _ => false
   }
 
-  def isPrivateKeyCompressed(key: PrivateKey): Boolean = key.compressed
+  //def isPrivateKeyCompressed(key: PrivateKey): Boolean = key.compressed
 
   def isDefinedHashtypeSignature(sig: ByteVector): Boolean = if (sig.isEmpty) false
   else {
@@ -580,6 +576,6 @@ object Crypto {
     val (p1, p2) = recoverPoint(r)
     val Q1 = (p1.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
     val Q2 = (p2.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
-    (PublicKey(Q1, true), PublicKey(Q2, true))
+    (PublicKey(Q1), PublicKey(Q2))
   }
 }

@@ -24,7 +24,7 @@ class Secp256k1Spec extends FunSuite {
     for (i <- 0 until 1000) {
       Random.nextBytes(priv)
       Random.nextBytes(data)
-      val sig1: ByteVector = Crypto.sign(ByteVector.view(data), PrivateKey(ByteVector.view(priv), true))
+      val sig1: ByteVector = Crypto.sign(ByteVector.view(data), PrivateKey(ByteVector.view(priv)))
       val sig2: ByteVector = ByteVector.view(NativeSecp256k1.signCompact(data, priv))
       assert(sig1 == sig2)
     }

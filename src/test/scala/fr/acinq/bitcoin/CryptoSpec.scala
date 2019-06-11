@@ -26,20 +26,20 @@ class CryptoSpec extends FlatSpec {
 
   // see https://en.bitcoin.it/wiki/Technical_background_of_Bitcoin_addresses
   it should "generate public keys from private keys" in {
-    val privateKey = PrivateKey(hex"18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725", false)
+    val privateKey = PrivateKey(hex"18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725")
     val publicKey = privateKey.publicKey
-    assert(publicKey.toBin === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
+    assert(publicKey.serialize(false) === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
 
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toBin))
+    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.serialize(false)))
     assert(address === "16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM")
   }
 
   it should "generate public keys from private keys 2" in {
-    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55", false)
+    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
     val publicKey = privateKey.publicKey
-    assert(publicKey.toBin === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
+    assert(publicKey.serialize(false) === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
 
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toBin))
+    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.serialize(false)))
     assert(address === "19FgFQGZy47NcGTJ4hfNdGMwS8EATqoa1X")
   }
 
@@ -53,10 +53,10 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "allow unsafe initialization of public keys" in {
-    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55", compressed = true)
+    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
     val publicKey = privateKey.publicKey
     val rawCompressed = publicKey.value
-    val rawUncompressed = publicKey.decompress.value
+    val rawUncompressed = publicKey.serialize(false)
     assert(rawCompressed.size == 33)
     assert(rawUncompressed.size == 65)
     val publicKeyCompressed1 = PublicKey.toCompressedUnsafe(rawCompressed.toArray)
@@ -66,7 +66,7 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "sign and verify signatures" in {
-    val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
+    val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
     val publicKey = privateKey.publicKey
     val data = Crypto.sha256(ByteVector("this is a test".getBytes("UTF-8")))
     val sig = Crypto.sign(data, privateKey)
@@ -144,7 +144,7 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "recover public keys from signatures (basic test)" in {
-    val priv = PrivateKey(hex"0101010101010101010101010101010101010101010101010101010101010101", compressed = true)
+    val priv = PrivateKey(hex"0101010101010101010101010101010101010101010101010101010101010101")
     val message = hex"0202020202020202020202020202020202020202020202020202020202020202"
     val pub = priv.publicKey
     val sig64 = Crypto.sign(message, priv)
@@ -167,7 +167,7 @@ class CryptoSpec extends FlatSpec {
       val line = iterator.next()
       val Array(lhs, rhs) = line.split(" = ")
       lhs match {
-        case "privkey" => priv = PrivateKey(ByteVector.fromValidHex(rhs), compressed = true)
+        case "privkey" => priv = PrivateKey(ByteVector.fromValidHex(rhs))
         case "message" => message = ByteVector.fromValidHex(rhs)
         case "pubkey" => pub = PublicKey(ByteVector.fromValidHex(rhs))
         case "sig" => sig = ByteVector.fromValidHex(rhs)
@@ -194,7 +194,7 @@ class CryptoSpec extends FlatSpec {
 
       val bytesMessage = ByteVector.view(message)
 
-      val priv = PrivateKey(bytesMessage, compressed = true)
+      val priv = PrivateKey(bytesMessage)
       val pub = priv.publicKey
       val sig64 = Crypto.sign(ByteVector.view(message), priv)
       val (pub1, pub2) = recoverPublicKey(sig64, bytesMessage)
