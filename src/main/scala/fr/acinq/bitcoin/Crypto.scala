@@ -33,9 +33,10 @@ object Crypto {
   def fixSize(data: ByteVector): ByteVector32 = ByteVector32(data.padLeft(32))
 
   /**
-    * A scalar is a 256 bit number
+    * Secp256k1 private key, which a 32 bytes value
+    * We assume that private keys are compressed i.e. that the corresponding public key is compressed
     *
-    * @param value value to initialize this scalar with
+    * @param value value to initialize this key with
     */
   case class PrivateKey(value: ByteVector32) {
     def add(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
@@ -132,9 +133,10 @@ object Crypto {
   }
 
   /**
-    * Curve point
+    * Secp256k1 Public key
+    * We assume that public keys are always compressed
     *
-    * @param value ecPoint to initialize this point with
+    * @param value serialized public key, in compressed format (33 bytes)
     */
   case class PublicKey(value: ByteVector) {
     require(value.length == 33)
@@ -413,8 +415,6 @@ object Crypto {
     case 33 if key(0) == 2 || key(0) == 3 => true
     case _ => false
   }
-
-  //def isPrivateKeyCompressed(key: PrivateKey): Boolean = key.compressed
 
   def isDefinedHashtypeSignature(sig: ByteVector): Boolean = if (sig.isEmpty) false
   else {
