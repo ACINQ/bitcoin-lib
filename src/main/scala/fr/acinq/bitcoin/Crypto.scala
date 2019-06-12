@@ -44,7 +44,7 @@ object Crypto {
     else
       PrivateKey(bigInt.add(that.bigInt).mod(Crypto.curve.getN))
 
-    def substract(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
+    def subtract(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
       PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, NativeSecp256k1.privKeyNegate(that.value.toArray))))
     else
       PrivateKey(bigInt.subtract(that.bigInt).mod(Crypto.curve.getN))
@@ -56,7 +56,7 @@ object Crypto {
 
     def +(that: PrivateKey): PrivateKey = add(that)
 
-    def -(that: PrivateKey): PrivateKey = substract(that)
+    def -(that: PrivateKey): PrivateKey = subtract(that)
 
     def *(that: PrivateKey): PrivateKey = multiply(that)
 
@@ -66,17 +66,17 @@ object Crypto {
     lazy val bigInt = new BigInteger(1, value.toArray)
 
     def publicKey: PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.computePubkey(value.toArray)))
+      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.computePubkey(value.toArray)))
     } else {
       PublicKey(ByteVector.view(params.getG().multiply(bigInt).getEncoded(true)))
     }
 
     /**
       *
-      * @return the binary representation of this private key. It is either 32 bytes, or 33 bytes with final 0x1 if the
-      *         key is compressed
+      * @return the binary representation of this private key. It is either 33 bytes, with last byte set to 1 to indicate
+      *         that tje key is compressed
       */
-    def toBin: ByteVector = PrivateKey.serialize(this)
+    def toBin: ByteVector = value.bytes :+ 1.toByte
 
     override def toString = toBin.toHex
   }
@@ -90,18 +90,10 @@ object Crypto {
 
     /**
       *
-      * @param priv private key
-      * @return the serialized representation of this key in bitcoin format (32 bytes for uncompressed keys, 33 bytes with
-      *         a trailing 1 for compressed key).
-      */
-    def serialize(priv: PrivateKey): ByteVector = priv.value.bytes :+ 1.toByte
-
-    /**
-      *
       * @param data serialized private key in bitcoin format
       * @return the de-serialized key
       */
-    def deserialize(data: ByteVector): (PrivateKey, Boolean) = {
+    def fromBin(data: ByteVector): (PrivateKey, Boolean) = {
       val compressed = data.length match {
         case 32 => false
         case 33 if data.last == 1.toByte => true
@@ -112,24 +104,8 @@ object Crypto {
     def fromBase58(value: String, prefix: Byte): (PrivateKey, Boolean) = {
       require(Set(Base58.Prefix.SecretKey, Base58.Prefix.SecretKeyTestnet, Base58.Prefix.SecretKeySegnet).contains(prefix), "invalid base 58 prefix for a private key")
       val (`prefix`, data) = Base58Check.decode(value)
-      deserialize(data)
+      fromBin(data)
     }
-  }
-
-
-  private def compress(point: ByteVector): ByteVector = point.size match {
-    case 33 => point
-    case 65 if point(64) % 2 == 0 => point.take(33).update(0, 2.toByte)
-    case 65 => point.take(33).update(0, 3.toByte)
-  }
-
-  private def decompress(point: ByteVector) : ByteVector = point.size match {
-    case 65 => point
-    case 33 =>
-      if (Secp256k1Context.isEnabled)
-        ByteVector.view(NativeSecp256k1.parsePubkey(point.toArray))
-      else
-        ByteVector.view(Crypto.curve.getCurve.decodePoint(point.toArray).getEncoded(false))
   }
 
   /**
@@ -140,49 +116,49 @@ object Crypto {
     */
   case class PublicKey(value: ByteVector) {
     require(value.length == 33)
-    require(isPubKeyValid(value))
+    require(isPubKeyValidLax(value))
 
 
     def hash160: ByteVector = Crypto.hash160(value)
 
-    def isValid: Boolean = PublicKey.isValid(value)
+    def isValid: Boolean = isPubKeyValidStrict(this.value)
 
     def add(that: PublicKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, that.value.toArray)))
+      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, that.value.toArray)))
     } else {
       PublicKey(ecpoint.add(that.ecpoint).normalize())
     }
 
     def add(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.toBin.toArray)))
+      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.toBin.toArray)))
     } else {
       add(that.publicKey)
     }
 
-    def substract(that: PublicKey): PublicKey = if (Secp256k1Context.isEnabled) {
-       PublicKey.deserialize(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(that.value.toArray))))
+    def subtract(that: PublicKey): PublicKey = if (Secp256k1Context.isEnabled) {
+      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(that.value.toArray))))
     } else {
       PublicKey(ecpoint.subtract(that.ecpoint).normalize())
     }
 
     def multiply(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.deserialize(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(value.toArray, that.toBin.toArray)))
+      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(value.toArray, that.toBin.toArray)))
     } else {
       PublicKey(ecpoint.multiply(that.bigInt).normalize())
     }
 
     def +(that: PublicKey): PublicKey = add(that)
 
-    def -(that: PublicKey): PublicKey = substract(that)
+    def -(that: PublicKey): PublicKey = subtract(that)
 
     def *(that: PrivateKey): PublicKey = multiply(that)
 
     def toBin: ByteVector = value
 
-    def serialize(compressed: Boolean): ByteVector = compressed match {
-      case true => value
-      case false if Secp256k1Context.isEnabled => ByteVector.view(NativeSecp256k1.parsePubkey(value.toArray))
-      case false => ByteVector.view(ecpoint.getEncoded(false))
+    def toUncompressedBin: ByteVector = if (Secp256k1Context.isEnabled) {
+      ByteVector.view(NativeSecp256k1.parsePubkey(value.toArray))
+    } else {
+      ByteVector.view(ecpoint.getEncoded(false))
     }
 
     override def toString = toBin.toHex
@@ -200,23 +176,17 @@ object Crypto {
       *                   carefully for optimization purposes
       * @return
       */
-    def apply(raw: ByteVector, checkValid: Boolean): PublicKey = deserialize(raw, checkValid)
+    def apply(raw: ByteVector, checkValid: Boolean): PublicKey = fromBin(raw, checkValid)
 
-    def isValid(pub: ByteVector): Boolean = isPubKeyValid(pub) && {
-      if (Secp256k1Context.isEnabled)
-        NativeSecp256k1.parsePubkey(pub.toArray).length == 65
-      else
-        curve.getCurve.decodePoint(pub.toArray).normalize().isValid
-    }
-
-    def deserialize(input: ByteVector, checkValid: Boolean = true) : PublicKey = {
-      if (checkValid) require(isValid(input))
+    def fromBin(input: ByteVector, checkValid: Boolean = true): PublicKey = {
+      if (checkValid) require(isPubKeyValidStrict(input))
 
       input.length match {
         case 33 => PublicKey(input)
         case 65 => toCompressedUnsafe(input.toArray)
       }
     }
+
     /**
       * This function initializes a public key from a compressed/uncompressed representation without doing validity checks.
       *
@@ -227,7 +197,7 @@ object Crypto {
       * @param key 33 or 65 bytes public key (will be mutated)
       * @return an immutable compressed public key
       */
-    def toCompressedUnsafe(key: Array[Byte]): PublicKey = {
+    private def toCompressedUnsafe(key: Array[Byte]): PublicKey = {
       key.length match {
         case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 =>
           key(0) = if ((key(64) & 0x01) != 0) 0x03.toByte else 0x02.toByte
@@ -239,7 +209,6 @@ object Crypto {
       }
     }
   }
-
 
 
   /**
@@ -297,7 +266,7 @@ object Crypto {
   def hash256(input: ByteVector): ByteVector32 = ByteVector32(sha256(sha256(input)))
 
   private def encodeSignatureCompact(r: BigInteger, s: BigInteger): ByteVector64 = {
-      ByteVector64(ByteVector.view(r.toByteArray.dropWhile(_ == 0)).padLeft(32) ++ ByteVector.view(s.toByteArray.dropWhile(_ == 0)).padLeft(32))
+    ByteVector64(ByteVector.view(r.toByteArray.dropWhile(_ == 0)).padLeft(32) ++ ByteVector.view(s.toByteArray.dropWhile(_ == 0)).padLeft(32))
   }
 
   def isDERSignature(sig: ByteVector): Boolean = {
@@ -399,10 +368,23 @@ object Crypto {
     * @return true if the key is valid. Please not that this performs very basic tests and does not check that the
     *         point represented by this key is actually valid.
     */
-  def isPubKeyValid(key: ByteVector): Boolean = key.length match {
+  def isPubKeyValidLax(key: ByteVector): Boolean = key.length match {
     case 65 if key(0) == 4 || key(0) == 6 || key(0) == 7 => true
     case 33 if key(0) == 2 || key(0) == 3 => true
     case _ => false
+  }
+
+  /**
+    *
+    * @param key serialized public key
+    * @return true if the key is valid. This check is much more expensive than its lax version since here we check that
+    *         the public key is a valid point on the secp256k1 curve
+    */
+  def isPubKeyValidStrict(key: ByteVector): Boolean = isPubKeyValidLax(key) && {
+    if (Secp256k1Context.isEnabled)
+      NativeSecp256k1.parsePubkey(key.toArray).length == 65
+    else
+      curve.getCurve.decodePoint(key.toArray).normalize().isValid
   }
 
   def isPubKeyCompressedOrUncompressed(key: ByteVector): Boolean = key.length match {
@@ -468,7 +450,7 @@ object Crypto {
     (r, s)
   }
 
-  def compact2der(signature: ByteVector64) : ByteVector = {
+  def compact2der(signature: ByteVector64): ByteVector = {
     val r = new BigInteger(1, signature.take(32).toArray)
     val s = new BigInteger(1, signature.takeRight(32).toArray)
     val (r1, s1) = normalizeSignature(r, s)
@@ -480,7 +462,7 @@ object Crypto {
     ByteVector.view(bos.toByteArray)
   }
 
-  def der2compact(signature: ByteVector) : ByteVector64 = {
+  def der2compact(signature: ByteVector): ByteVector64 = {
     val (r, s) = decodeSignatureFromDERLax(signature)
     val (r1, s1) = normalizeSignature(r, s)
     ByteVector64(ByteVector.view(r1.toByteArray.dropWhile(_ == 0)).padLeft(32) ++ ByteVector.view(s1.toByteArray.dropWhile(_ == 0)).padLeft(32))
@@ -565,7 +547,7 @@ object Crypto {
     * can be verified with both, but only one of them matches that private key that was used to generate the signature.
     *
     * @param signature signature
-    * @param message message that was signed
+    * @param message   message that was signed
     * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
     *         pub1 if the recovery id is even and pub2 if it is odd
     */

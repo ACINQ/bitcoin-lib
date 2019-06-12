@@ -28,18 +28,18 @@ class CryptoSpec extends FlatSpec {
   it should "generate public keys from private keys" in {
     val privateKey = PrivateKey(hex"18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725")
     val publicKey = privateKey.publicKey
-    assert(publicKey.serialize(false) === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
+    assert(publicKey.toUncompressedBin === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
 
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.serialize(false)))
+    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin))
     assert(address === "16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM")
   }
 
   it should "generate public keys from private keys 2" in {
     val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
     val publicKey = privateKey.publicKey
-    assert(publicKey.serialize(false) === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
+    assert(publicKey.toUncompressedBin === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
 
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.serialize(false)))
+    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin))
     assert(address === "19FgFQGZy47NcGTJ4hfNdGMwS8EATqoa1X")
   }
 
@@ -55,12 +55,12 @@ class CryptoSpec extends FlatSpec {
   it should "allow unsafe initialization of public keys" in {
     val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
     val publicKey = privateKey.publicKey
-    val rawCompressed = publicKey.value
-    val rawUncompressed = publicKey.serialize(false)
+    val rawCompressed = publicKey.toBin
+    val rawUncompressed = publicKey.toUncompressedBin
     assert(rawCompressed.size == 33)
     assert(rawUncompressed.size == 65)
-    val publicKeyCompressed1 = PublicKey.toCompressedUnsafe(rawCompressed.toArray)
-    val publicKeyCompressed2 = PublicKey.toCompressedUnsafe(rawUncompressed.toArray)
+    val publicKeyCompressed1 = PublicKey.fromBin(rawCompressed)
+    val publicKeyCompressed2 = PublicKey.fromBin(rawUncompressed)
     assert(publicKey === publicKeyCompressed1)
     assert(publicKey === publicKeyCompressed2)
   }

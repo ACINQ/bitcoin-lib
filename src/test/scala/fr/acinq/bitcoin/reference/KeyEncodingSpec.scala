@@ -43,7 +43,7 @@ object KeyEncodingSpec {
   def isValidBase58(input: String): Boolean = Try {
     val (prefix, bin) = Base58Check.decode(input)
     prefix match {
-      case Base58.Prefix.SecretKey | Base58.Prefix.SecretKeyTestnet => Try(PrivateKey.deserialize(bin)).isSuccess
+      case Base58.Prefix.SecretKey | Base58.Prefix.SecretKeyTestnet => Try(PrivateKey.fromBin(bin)).isSuccess
       case Base58.Prefix.PubkeyAddress | Base58.Prefix.PubkeyAddressTestnet => bin.length == 20
       case _ => false
     }
