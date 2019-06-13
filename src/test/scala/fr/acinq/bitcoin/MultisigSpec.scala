@@ -41,11 +41,9 @@ class MultisigSpec extends FunSuite with Matchers {
     // create a tx with empty)put signature scripts
     val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
 
-    val signData = SignData(
-      hex"76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac", // PK script of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
-      PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet))
-
-    val signedTx = Transaction.sign(tx, List(signData))
+    val priv = PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet)._1
+    val sig = Transaction.signInput(tx, 0, hex"76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac", SIGHASH_ALL, txOut.amount, SigVersion.SIGVERSION_BASE, priv)
+    val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(priv.publicKey.toUncompressedBin) :: Nil)
 
     //this works because signature is not randomized
     assert(signedTx.toString == "0100000001ea1df27ca8a897c985f163407e2c20cbc310ca891ca361c207ba8f4b7073e541000000008b483045022100940f7bcb380fb6db698f71928bda8926f76305ff868919e8ef7729647606bf7702200d32f1231860cb7e6777447c4038627bee7f47bc54005f681b62ce71d4a6a7f10141042adeabf9817a4d34adf1fe8e0fd457a3c0c6378afd63325dbaaaccd4f254002f9cc4148f603beb0e874facd3a3e68f5d002a65c0d3658452a4e55a57f5c3b768ffffffff01a0bb0d000000000017a914a90003b4ddef4be46fc61e7f2167da9d234944e28700000000")

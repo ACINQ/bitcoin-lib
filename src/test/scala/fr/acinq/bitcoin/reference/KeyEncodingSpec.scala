@@ -23,6 +23,8 @@ class KeyEncodingSpec extends FunSuite {
   }
 
   test("invalid keys") {
+    val result = KeyEncodingSpec.isValidBase58("KxuACDviz8Xvpn1xAh9MfopySZNuyajYMZWz16Dv2mHHryznWUp3")
+
     val stream = classOf[KeyEncodingSpec].getResourceAsStream("/data/key_io_invalid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
 
@@ -41,7 +43,7 @@ object KeyEncodingSpec {
   def isValidBase58(input: String): Boolean = Try {
     val (prefix, bin) = Base58Check.decode(input)
     prefix match {
-      case Base58.Prefix.SecretKey | Base58.Prefix.SecretKeyTestnet => Try(PrivateKey(bin)).isSuccess
+      case Base58.Prefix.SecretKey | Base58.Prefix.SecretKeyTestnet => Try(PrivateKey.fromBin(bin)).isSuccess
       case Base58.Prefix.PubkeyAddress | Base58.Prefix.PubkeyAddressTestnet => bin.length == 20
       case _ => false
     }

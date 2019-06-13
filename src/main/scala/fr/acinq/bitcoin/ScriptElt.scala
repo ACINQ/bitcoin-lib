@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin
 
+import fr.acinq.bitcoin.Crypto.PublicKey
 import scodec.bits.ByteVector
 
 // @formatter:off
@@ -123,6 +124,8 @@ object OP_PUSHDATA {
   else if (data.length < 0xffff) new OP_PUSHDATA(data, 0x4d)
   else if (data.length < 0xffffffff) new OP_PUSHDATA(data, 0x4e)
   else throw new IllegalArgumentException(s"data is ${data.length}, too big for OP_PUSHDATA")
+
+  def apply(pub: PublicKey): OP_PUSHDATA = OP_PUSHDATA(pub.value)
 
   def isMinimal(data: ByteVector, code: Int): Boolean = if (data.length == 0) code == ScriptElt.elt2code(OP_0)
   else if (data.length == 1 && data(0) >= 1 && data(0) <= 16) code == ScriptElt.elt2code(OP_1) + (data(0) - 1)
