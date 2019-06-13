@@ -20,7 +20,7 @@ class BIP49Spec extends FunSuite {
 
     val key = DeterministicWallet.derivePrivateKey(accountKey, 0L :: 0L :: Nil)
     assert(key.secretkeybytes == DeterministicWallet.derivePrivateKey(master, KeyPath("m/49'/1'/0'/0/0")).secretkeybytes)
-    assert(Base58Check.encode(Base58.Prefix.SecretKeyTestnet, key.privateKey.toBin) == "cULrpoZGXiuC19Uhvykx7NugygA3k86b3hmdCeyvHYQZSxojGyXJ")
+    assert(key.privateKey.toBase58(Base58.Prefix.SecretKeyTestnet) == "cULrpoZGXiuC19Uhvykx7NugygA3k86b3hmdCeyvHYQZSxojGyXJ")
     assert(key.privateKey == PrivateKey(hex"0xc9bdb49cfbaedca21c4b1f3a7803c34636b1d7dc55a717132443fc3f4c5867e801"))
     assert(key.publicKey == PublicKey(hex"0x03a1af804ac108a8a51782198c2d034b28bf90c8803f5a53f76276fa69a4eae77f"))
     assert(computeBIP49Address(key.publicKey, Block.TestnetGenesisBlock.hash) == "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2")

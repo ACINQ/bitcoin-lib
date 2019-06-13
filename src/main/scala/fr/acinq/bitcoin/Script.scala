@@ -1011,7 +1011,7 @@ object Script {
     val op_m = ScriptElt.code2elt(m + 0x50)
     // 1 -> OP_1, 2 -> OP_2, ... 16 -> OP_16
     val op_n = ScriptElt.code2elt(pubkeys.size + 0x50)
-    op_m :: pubkeys.toList.map(pub => OP_PUSHDATA(pub.toBin)) ::: op_n :: OP_CHECKMULTISIG :: Nil
+    op_m :: pubkeys.toList.map(pub => OP_PUSHDATA(pub.value)) ::: op_n :: OP_CHECKMULTISIG :: Nil
   }
 
   /**

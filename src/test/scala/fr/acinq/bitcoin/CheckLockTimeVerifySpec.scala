@@ -21,9 +21,9 @@ class CheckLockTimeVerifySpec extends FlatSpec {
     // by Alice alone, in a tx which locktime is > 100
     // or by Alice and Bob, anytime
     val scriptPubKey = OP_IF ::
-      OP_PUSHDATA(ByteVector(100: Byte)) :: OP_CHECKLOCKTIMEVERIFY :: OP_DROP :: OP_PUSHDATA(pubAlice.toBin) :: OP_CHECKSIG ::
+      OP_PUSHDATA(ByteVector(100: Byte)) :: OP_CHECKLOCKTIMEVERIFY :: OP_DROP :: OP_PUSHDATA(pubAlice.value) :: OP_CHECKSIG ::
       OP_ELSE ::
-      OP_2 :: OP_PUSHDATA(pubAlice.toBin) :: OP_PUSHDATA(pubBob.toBin) :: OP_2 :: OP_CHECKMULTISIG :: OP_ENDIF :: Nil
+      OP_2 :: OP_PUSHDATA(pubAlice.value) :: OP_PUSHDATA(pubBob.value) :: OP_2 :: OP_CHECKMULTISIG :: OP_ENDIF :: Nil
 
     // create a tx that sends money to scriptPubKey
     val tx = {

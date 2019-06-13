@@ -68,7 +68,7 @@ class SighashSpec extends FunSuite {
     val tx1 = {
       val tmp = tx.addInput(TxIn(OutPoint(previousTx(0), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
       val sig: ByteVector = Transaction.signInput(tmp, 0, Script.pay2pkh(publicKeys(0)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(0).txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys(0))
-      tmp.updateWitness(0, ScriptWitness(sig :: publicKeys(0).toBin :: Nil))
+      tmp.updateWitness(0, ScriptWitness(sig :: publicKeys(0).value :: Nil))
     }
     Transaction.correctlySpends(tx1, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
@@ -76,7 +76,7 @@ class SighashSpec extends FunSuite {
     val tx2 = {
       val tmp = tx1.addInput(TxIn(OutPoint(previousTx(1), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
       val sig: ByteVector = Transaction.signInput(tmp, 1, Script.pay2pkh(publicKeys(1)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(1).txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys(1))
-      tmp.updateWitness(1, ScriptWitness(sig :: publicKeys(1).toBin :: Nil))
+      tmp.updateWitness(1, ScriptWitness(sig :: publicKeys(1).value :: Nil))
     }
     Transaction.correctlySpends(tx2, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 

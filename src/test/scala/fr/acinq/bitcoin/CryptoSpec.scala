@@ -20,7 +20,7 @@ class CryptoSpec extends FlatSpec {
     val (version, data) = Base58Check.decode(privateKey)
     val priv = PrivateKey(data)
     val publicKey = priv.publicKey
-    val computedAddress = Base58Check.encode(Prefix.PubkeyAddressTestnet, Crypto.hash160(publicKey.toBin))
+    val computedAddress = Base58Check.encode(Prefix.PubkeyAddressTestnet, Crypto.hash160(publicKey.value))
     assert(computedAddress === address)
   }
 
@@ -55,7 +55,7 @@ class CryptoSpec extends FlatSpec {
   it should "allow unsafe initialization of public keys" in {
     val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
     val publicKey = privateKey.publicKey
-    val rawCompressed = publicKey.toBin
+    val rawCompressed = publicKey.value
     val rawUncompressed = publicKey.toUncompressedBin
     assert(rawCompressed.size == 33)
     assert(rawUncompressed.size == 65)

@@ -138,7 +138,7 @@ object DeterministicWallet {
     * @return the public key for this private key
     */
   def publicKey(input: ExtendedPrivateKey): ExtendedPublicKey = {
-    ExtendedPublicKey(input.publicKey.toBin, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
+    ExtendedPublicKey(input.publicKey.value, input.chaincode, depth = input.depth, path = input.path, parent = input.parent)
   }
 
   /**
@@ -180,7 +180,7 @@ object DeterministicWallet {
     if (key.isZero) {
       throw new RuntimeException("cannot generated child private key")
     }
-    val buffer = ByteVector32(key.toBin.take(32))
+    val buffer = key.value
     ExtendedPrivateKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 
@@ -204,7 +204,7 @@ object DeterministicWallet {
     if (Ki.ecpoint.isInfinity) {
       throw new RuntimeException("cannot generated child public key")
     }
-    val buffer = Ki.toBin
+    val buffer = Ki.value
     ExtendedPublicKey(buffer, chaincode = IR, depth = parent.depth + 1, path = parent.path.derive(index), parent = fingerprint(parent))
   }
 

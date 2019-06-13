@@ -73,12 +73,10 @@ object Crypto {
 
     /**
       *
-      * @return the binary representation of this private key. It is either 33 bytes, with last byte set to 1 to indicate
-      *         that tje key is compressed
+      * @param prefix Private key prefix
+      * @return the private key in Base58 (WIF) compressed format
       */
-    def toBin: ByteVector = value.bytes :+ 1.toByte
-
-    override def toString = toBin.toHex
+    def toBase58(prefix: Byte) = Base58Check.encode(prefix, value.bytes :+ 1.toByte)
   }
 
   object PrivateKey {
@@ -130,7 +128,7 @@ object Crypto {
     }
 
     def add(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.toBin.toArray)))
+      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.value.toArray)))
     } else {
       add(that.publicKey)
     }
@@ -142,7 +140,7 @@ object Crypto {
     }
 
     def multiply(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(value.toArray, that.toBin.toArray)))
+      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(value.toArray, that.value.toArray)))
     } else {
       PublicKey(ecpoint.multiply(that.bigInt).normalize())
     }
@@ -153,15 +151,13 @@ object Crypto {
 
     def *(that: PrivateKey): PublicKey = multiply(that)
 
-    def toBin: ByteVector = value
-
     def toUncompressedBin: ByteVector = if (Secp256k1Context.isEnabled) {
       ByteVector.view(NativeSecp256k1.parsePubkey(value.toArray))
     } else {
       ByteVector.view(ecpoint.getEncoded(false))
     }
 
-    override def toString = toBin.toHex
+    override def toString = value.toHex
 
     // used only if secp256k1 is not available
     lazy val ecpoint = curve.getCurve.decodePoint(value.toArray)
@@ -476,7 +472,7 @@ object Crypto {
     */
   def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = {
     if (Secp256k1Context.isEnabled) {
-      NativeSecp256k1.verify(data.toArray, signature.toArray, publicKey.toBin.toArray)
+      NativeSecp256k1.verify(data.toArray, signature.toArray, publicKey.value.toArray)
     } else {
       val (r, s) = decodeSignatureCompact(signature)
       require(r.compareTo(one) >= 0, "r must be >= 1")
