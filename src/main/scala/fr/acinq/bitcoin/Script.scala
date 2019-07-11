@@ -431,7 +431,7 @@ object Script {
       if (sigBytes.isEmpty) false
       else if (!Crypto.checkSignatureEncoding(sigBytes, scriptFlag)) throw new RuntimeException("invalid signature")
       else if (!Crypto.checkPubKeyEncoding(pubKey, scriptFlag, signatureVersion)) throw new RuntimeException("invalid public key")
-      else if (!Crypto.isPubKeyValid(pubKey)) false // see how this is different from above ?
+      else if (!Crypto.isPubKeyValidLax(pubKey)) false // see how this is different from above ?
       else {
         val sigHashFlags = sigBytes.last & 0xff
         // sig hash is the last byte
@@ -439,7 +439,7 @@ object Script {
         if (sigBytes1.isEmpty) false
         else {
           val hash = Transaction.hashForSigning(context.tx, context.inputIndex, scriptCode, sigHashFlags, context.amount, signatureVersion)
-          val result = Crypto.verifySignature(hash, sigBytes1, PublicKey(pubKey))
+          val result = Crypto.verifySignature(hash, Crypto.der2compact(sigBytes1), PublicKey.fromBin(pubKey))
           result
         }
       }
@@ -1011,7 +1011,7 @@ object Script {
     val op_m = ScriptElt.code2elt(m + 0x50)
     // 1 -> OP_1, 2 -> OP_2, ... 16 -> OP_16
     val op_n = ScriptElt.code2elt(pubkeys.size + 0x50)
-    op_m :: pubkeys.toList.map(pub => OP_PUSHDATA(pub.toBin)) ::: op_n :: OP_CHECKMULTISIG :: Nil
+    op_m :: pubkeys.toList.map(pub => OP_PUSHDATA(pub.value)) ::: op_n :: OP_CHECKMULTISIG :: Nil
   }
 
   /**

@@ -26,7 +26,21 @@ object ByteVector32 {
 
   def fromValidHex(str: String) = ByteVector32(ByteVector.fromValidHex(str))
 
-  implicit def hash32toByteVector(h: ByteVector32): ByteVector = h.bytes
+  implicit def byteVector32toByteVector(h: ByteVector32): ByteVector = h.bytes
+}
+
+case class ByteVector64(bytes: ByteVector) {
+  require(bytes.size == 64, s"size must be 64 bytes, is ${bytes.size} bytes")
+
+  override def toString: String = bytes.toHex
+}
+
+object ByteVector64 {
+  val Zeroes = ByteVector64(hex"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+
+  def fromValidHex(str: String) = ByteVector64(ByteVector.fromValidHex(str))
+
+  implicit def byteVector64toByteVector(h: ByteVector64): ByteVector = h.bytes
 }
 
 object Protocol {

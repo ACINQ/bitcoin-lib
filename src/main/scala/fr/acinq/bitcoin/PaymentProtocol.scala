@@ -11,15 +11,22 @@ import scala.collection.JavaConverters._
 
 /**
   * see https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki
+  * @deprecated will be dropped in the next release
   */
 object PaymentProtocol {
 
+  /**
+    * @deprecated
+    */
   def displayName(certificate: X509Certificate): String = {
     val dn = certificate.getSubjectX500Principal().getName()
     val ldapDN = new LdapName(dn)
     ldapDN.getRdns.asScala.find(_.getType == "CN").map(_.getValue.asInstanceOf[String]).getOrElse("")
   }
 
+  /**
+    * @deprecated
+    */
   def verifySignature(request: PaymentRequest, keystore: KeyStore): (String, PublicKey, TrustAnchor) = {
     val details = PaymentDetails.parseFrom(request.getSerializedPaymentDetails)
 
@@ -50,6 +57,9 @@ object PaymentProtocol {
     (displayName(certificates(0)), publicKey, result.getTrustAnchor)
   }
 
+  /**
+    * @deprecated
+    */
   def sign(request: PaymentRequest, certificates: Seq[X509Certificate], privateKey: PrivateKey): PaymentRequest = {
     def toByteString(cert: X509Certificate) = ByteString.copyFrom(cert.getEncoded)
 

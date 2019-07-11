@@ -389,11 +389,10 @@ object Transaction extends BtcSerializer[Transaction] {
     * @return the encoded signature of this tx for this specific tx input
     */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector = {
-    if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(privateKey.compressed, "private key must be compressed in segwit")
+    //if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(privateKey.compressed, "private key must be compressed in segwit")
     val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-    val (r, s) = Crypto.sign(hash, privateKey)
-    val sig = Crypto.encodeSignature(r, s)
-    sig :+ (sighashType.toByte)
+    val sig = Crypto.sign(hash, privateKey)
+    Crypto.compact2der(sig) :+ (sighashType.toByte)
   }
 
   /**
@@ -410,46 +409,7 @@ object Transaction extends BtcSerializer[Transaction] {
     */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
-
-  /**
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type, which will be appended to the signature
-    * @param privateKey           private key
-    * @return the encoded signature of this tx for this specific tx input
-    */
-  @deprecated("", since = "0.9.6")
-  def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, privateKey: PrivateKey): ByteVector =
-    signInput(tx, inputIndex, previousOutputScript, sighashType, amount = 0 satoshi, signatureVersion = SigVersion.SIGVERSION_BASE, privateKey)
-
-  /**
-    * Sign a transaction. Cannot partially sign. All the input are signed with SIGHASH_ALL
-    *
-    * @param input    transaction to sign
-    * @param signData list of data for signing: previous tx output script and associated private key
-    * @return a new signed transaction
-    */
-  def sign(input: Transaction, signData: Seq[SignData]): Transaction = {
-
-    require(signData.length == input.txIn.length, "There should be signing data for every transaction")
-
-    // sign each input
-    val signedInputs = for (i <- input.txIn.indices) yield {
-      val sig = signInput(input, i, signData(i).prevPubKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, signData(i).privateKey)
-
-      // this is the public key that is associated with the private key we used for signing
-      val publicKey = signData(i).privateKey.publicKey
-
-      // signature script: push signature and public key
-      val sigScript = Script.write(OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
-      input.txIn(i).copy(signatureScript = sigScript)
-    }
-
-    input.copy(txIn = signedInputs)
-  }
-
+  
   def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
     for (i <- tx.txIn.indices if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
       val prevOutput = previousOutputs(tx.txIn(i).outPoint)
@@ -476,18 +436,6 @@ object Transaction extends BtcSerializer[Transaction] {
   def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit =
     correctlySpends(tx, inputs, scriptFlags, None)
 }
-
-object SignData {
-  def apply(prevPubKeyScript: Seq[ScriptElt], privateKey: PrivateKey): SignData = new SignData(Script.write(prevPubKeyScript), privateKey)
-}
-
-/**
-  * data for signing pay2pk transaction
-  *
-  * @param prevPubKeyScript previous output public key script
-  * @param privateKey       private key associated with the previous output public key
-  */
-case class SignData(prevPubKeyScript: ByteVector, privateKey: PrivateKey)
 
 /**
   * Transaction
