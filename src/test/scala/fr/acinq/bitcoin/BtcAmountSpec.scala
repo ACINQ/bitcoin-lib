@@ -66,6 +66,22 @@ class BtcAmountSpec extends FunSuite {
     assert(MilliSatoshi(32) > MilliSatoshi(31))
   }
 
+  test("lossless comparisons") {
+    assert(Satoshi(2) < MilliSatoshi(2999))
+    assert(Satoshi(3) > MilliSatoshi(2999))
+    assert(!(Satoshi(2) >= MilliSatoshi(2999)))
+    assert(!(Satoshi(3) < MilliSatoshi(2999)))
+    assert(MilliSatoshi(2999) >= Satoshi(2))
+    assert(!(MilliSatoshi(2999) < Satoshi(2)))
+    assert(MilliSatoshi(2001).toBtc >= Satoshi(2).toBtc)
+    assert(!(MilliSatoshi(2001).toBtc < Satoshi(2).toBtc))
+    assert(Satoshi(2000001).compare(MilliSatoshi(2000001000)) == 0)
+    assert(Satoshi(2000001) > MilliSatoshi(2000000001))
+    assert(MilliBtc(20) < Satoshi(2000001))
+    assert(MilliBtc(20) < MilliSatoshi(2000000001))
+    assert(Satoshi(2000001) > MilliBtc(20))
+  }
+
   test("negate amount") {
     assert(Satoshi(-20) == -Satoshi(20))
   }
