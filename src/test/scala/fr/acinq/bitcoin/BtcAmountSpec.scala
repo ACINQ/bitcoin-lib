@@ -16,16 +16,6 @@ class BtcAmountSpec extends FunSuite {
     assert(x1 === x)
     val x2: MilliBtc = z1
     assert(x2 === y)
-
-    val z3: MilliSatoshi = x
-
-    val z4: MilliSatoshi = y
-    assert(z3 == z4)
-    assert(z3.amount == 1234567000000L)
-
-    val z5 = 1234567000000L millisatoshi
-    val x4: Btc = z5
-    assert(x4 == x)
   }
 
   test("conversions overflow") {
@@ -47,7 +37,6 @@ class BtcAmountSpec extends FunSuite {
     assert(Btc(1) + Btc(2) == Btc(3))
     assert(MilliBtc(1) + MilliBtc(2) == MilliBtc(3))
     assert(Satoshi(1) + Satoshi(2) == Satoshi(3))
-    assert(MilliSatoshi(1) + MilliSatoshi(2) == MilliSatoshi(3))
   }
 
   test("basic comparisons") {
@@ -63,7 +52,6 @@ class BtcAmountSpec extends FunSuite {
     assert(x == y + z)
     assert(Btc(32) > Btc(31))
     assert(MilliBtc(32) > MilliBtc(31))
-    assert(MilliSatoshi(32) > MilliSatoshi(31))
   }
 
   test("negate amount") {

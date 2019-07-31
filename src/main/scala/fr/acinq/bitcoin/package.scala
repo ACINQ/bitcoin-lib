@@ -47,10 +47,6 @@ package object bitcoin {
     def satoshi = Satoshi(n)
   }
 
-  implicit final class MilliSatoshiLong(private val n: Long) extends AnyVal {
-    def millisatoshi = MilliSatoshi(n)
-  }
-
   implicit final class BtcDouble(private val n: Double) extends AnyVal {
     def btc = Btc(n)
   }
@@ -70,18 +66,6 @@ package object bitcoin {
   implicit def btc2millibtc(input: Btc): MilliBtc = MilliBtc(input.amount * 1000L)
 
   implicit def millibtc2btc(input: MilliBtc): Btc = Btc(input.amount / 1000L)
-
-  implicit def satoshi2millisatoshi(input: Satoshi): MilliSatoshi = MilliSatoshi(input.amount * 1000L)
-
-  implicit def millisatoshi2satoshi(input: MilliSatoshi): Satoshi = Satoshi(input.amount / 1000L)
-
-  implicit def btc2millisatoshi(input: Btc): MilliSatoshi = satoshi2millisatoshi(btc2satoshi(input))
-
-  implicit def millisatoshi2btc(input: MilliSatoshi): Btc = satoshi2btc(millisatoshi2satoshi(input))
-
-  implicit def millibtc2millisatoshi(input: MilliBtc): MilliSatoshi = satoshi2millisatoshi(millibtc2satoshi(input))
-
-  implicit def millisatoshi2millibtc(input: MilliSatoshi): MilliBtc = satoshi2millibtc(millisatoshi2satoshi(input))
 
   /**
     *

@@ -49,20 +49,3 @@ case class Btc(amount: BigDecimal) extends BtcAmount {
     def unary_-() = Btc(-amount)
     // @formatter:on
 }
-
-case class MilliSatoshi(amount: Long) extends BtcAmount {
-  // @formatter:off
-    def toLong = amount
-    def +(other: MilliSatoshi) = MilliSatoshi(amount + other.amount)
-    def -(other: MilliSatoshi) = MilliSatoshi(amount - other.amount)
-    def *(m: Long) = MilliSatoshi(amount * m)
-    def /(d: Long) = MilliSatoshi(amount / d)
-    def compare(other: MilliSatoshi): Int = if (amount == other.amount) 0 else if (amount < other.amount) -1 else 1
-    def <= (that: MilliSatoshi): Boolean = compare(that) <= 0
-    def >= (that: MilliSatoshi): Boolean = compare(that) >= 0
-    def <  (that: MilliSatoshi): Boolean = compare(that) <  0
-    def >  (that: MilliSatoshi): Boolean = compare(that) > 0
-    def unary_-() = MilliSatoshi(-amount)
-    // @formatter:on
-}
-
