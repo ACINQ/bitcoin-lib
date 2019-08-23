@@ -146,7 +146,7 @@ This sample demonstrates how to serialize, create and verify simple P2PKH transa
   // we have a tx that was sent to a public key that we own
   val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
   val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
-  val amount = 10000 satoshi
+  val amount = 10000 sat
 
   val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)
   val publicKey = privateKey.publicKey

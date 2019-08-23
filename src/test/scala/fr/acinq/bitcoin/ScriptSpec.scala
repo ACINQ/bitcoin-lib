@@ -33,9 +33,9 @@ class ScriptSpec extends FlatSpec {
   it should "parse if/else/endif" in {
     val tx = Transaction(version = 1,
       txIn = TxIn(OutPoint(ByteVector32.Zeroes, 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
-      txOut = TxOut(0x12a05f200L satoshi, ByteVector.empty) :: Nil,
+      txOut = TxOut(0x12a05f200L sat, ByteVector.empty) :: Nil,
       lockTime = 0)
-    val ctx = Script.Context(tx, 0, 0 satoshi)
+    val ctx = Script.Context(tx, 0, 0 sat)
     val runner = new Script.Runner(ctx)
     val script = OP_1 :: OP_2 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
     val stack = runner.run(script)
@@ -49,7 +49,7 @@ class ScriptSpec extends FlatSpec {
   }
   it should "encode/decode simple numbers" in {
     for (i <- -1 to 16) {
-      assert(Script.decodeNumber(Script.encodeNumber(i), true) === i)
+      assert(Script.decodeNumber(Script.encodeNumber(i), checkMinimalEncoding = true) === i)
     }
   }
   it should "encode/decode booleans" in {

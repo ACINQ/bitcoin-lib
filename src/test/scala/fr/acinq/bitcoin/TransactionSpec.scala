@@ -65,7 +65,7 @@ class TransactionSpec extends FunSuite with Matchers {
   }
   test("create and verify pay2pk transactions with 1)put/1 output") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
-    val amount = 10000 satoshi
+    val amount = 10000 sat
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
 
     val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
@@ -125,7 +125,7 @@ class TransactionSpec extends FunSuite with Matchers {
   test("create and verify pay2pk transactions with 1)put/1 output using helper method") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
-    val amount = 10000 satoshi
+    val amount = 10000 sat
 
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
     val publicKey = privateKey.publicKey
@@ -149,7 +149,7 @@ class TransactionSpec extends FunSuite with Matchers {
     )
 
     // step #2: sign the tx
-    val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val tx2 = tx1.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
 
     // redeem the tx
@@ -157,10 +157,10 @@ class TransactionSpec extends FunSuite with Matchers {
   }
   test("create and verify sign pay2pk transactions with multiple)puts and outputs") {
     val destAddress = "moKHwpsxovDtfBJyoXpof21vvWooBExutV"
-    val destAmount = 3000000 satoshi
+    val destAmount = 3000000 sat
 
     val changeAddress = "mvHPesWqLXXy7hntNa7vbAoVwqN5PnrwJd"
-    val changeAmount = 1700000 satoshi
+    val changeAmount = 1700000 sat
 
     val previousTx = List(
       Transaction.read("0100000001bb4f5a244b29dc733c56f80c0fed7dd395367d9d3b416c01767c5123ef124f82000000006b4830450221009e6ed264343e43dfee2373b925915f7a4468e0bc68216606e40064561e6c097a022030f2a50546a908579d0fab539d5726a1f83cfd48d29b89ab078d649a8e2131a0012103c80b6c289bf0421d010485cec5f02636d18fb4ed0f33bfa6412e20918ebd7a34ffffffff0200093d00000000001976a9145dbf52b8d7af4fb5f9b75b808f0a8284493531b388acf0b0b805000000001976a914807c74c89592e8a260f04b5a3bc63e7bef8c282588ac00000000"),
@@ -186,8 +186,8 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L
     )
 
-    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keys(0))
-    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keys(1))
+    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(0))
+    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
     val tx1 = tx
       .updateSigScript(0, OP_PUSHDATA(sig1) :: OP_PUSHDATA(keys(0).publicKey.value) :: Nil)
       .updateSigScript(1, OP_PUSHDATA(sig2) :: OP_PUSHDATA(keys(1).publicKey.toUncompressedBin) :: Nil)
@@ -228,12 +228,12 @@ class TransactionSpec extends FunSuite with Matchers {
       version = 1L,
       txIn = TxIn(OutPoint(previousTx.hash, 0), signatureScript = Nil, sequence = 0xFFFFFFFFL) :: Nil,
       txOut = TxOut(
-        amount = 900000 satoshi, // 0.009 BTC) satoshi, meaning the fee will be 0.01-0.009 = 0.001
+        amount = 900000 sat, // 0.009 BTC) satoshi, meaning the fee will be 0.01-0.009 = 0.001
         publicKeyScript = OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil) :: Nil,
       lockTime = 0L)
 
     // and sign it
-    val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey.toUncompressedBin) :: Nil)
     Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
@@ -241,13 +241,13 @@ class TransactionSpec extends FunSuite with Matchers {
     val spendingTx = Transaction(version = 1L,
       txIn = TxIn(OutPoint(signedTx.hash, 0), signatureScript = ByteVector.empty, sequence = 0xFFFFFFFFL) :: Nil,
       txOut = TxOut(
-        amount = 900000 satoshi,
+        amount = 900000 sat,
         publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Crypto.hash160(publicKey.value)) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
       lockTime = 0L)
 
     // we need at least 2 signatures
-    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key1)
-    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key2)
+    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
+    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
 
     // update our tx with the correct sig script
     val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
@@ -274,8 +274,8 @@ class TransactionSpec extends FunSuite with Matchers {
     val dest2 = "mk6kmMF5EEXksBkZxi7FniwwRgWuZuwDpo"
     //priv: 91r7coHBdzfgfm2p3ToJ3Bu6kcqL3BvSo5m4ENzMZzsimRKH8aq
     // 0.03 and 0.07 BTC) satoshi, meaning the fee will be (0.01+0.002+0.09)-(0.03+0.07) = 0.002
-    val amount1 = 3000000 satoshi
-    val amount2 = 7000000 satoshi
+    val amount1 = 3000000 sat
+    val amount2 = 7000000 sat
 
     // create a tx with empty)put signature scripts
     val tx = Transaction(
@@ -294,9 +294,9 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L
     )
 
-    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(1).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keys(0))
-    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keys(1))
-    val sig3 = Transaction.signInput(tx, 2, previousTx(2).txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keys(2))
+    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(1).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(0))
+    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
+    val sig3 = Transaction.signInput(tx, 2, previousTx(2).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(2))
 
     val signedTx = tx
       .updateSigScript(0, OP_PUSHDATA(sig1) :: OP_PUSHDATA(keys(0).publicKey.value) :: Nil)

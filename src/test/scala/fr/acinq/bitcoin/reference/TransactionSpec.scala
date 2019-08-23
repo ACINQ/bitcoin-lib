@@ -37,7 +37,7 @@ object TransactionSpec {
           Transaction.validate(tx)
           for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
             val prevOutputScript = prevoutMap(tx.txIn(i).outPoint)
-            val amount = prevamountMap.get(tx.txIn(i).outPoint).getOrElse(0 satoshi)
+            val amount = prevamountMap.get(tx.txIn(i).outPoint).getOrElse(0 sat)
             val ctx = new Script.Context(tx, i, amount)
             val runner = new Script.Runner(ctx, ScriptSpec.parseScriptFlags(verifyFlags))
             if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.txIn(i).witness)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")

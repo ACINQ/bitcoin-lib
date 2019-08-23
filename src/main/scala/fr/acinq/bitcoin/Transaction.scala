@@ -114,14 +114,14 @@ object TxOut extends BtcSerializer[TxOut] {
   override def read(input: InputStream, protocolVersion: Long): TxOut = TxOut(Satoshi(uint64(input)), script(input))
 
   override def write(input: TxOut, out: OutputStream, protocolVersion: Long) = {
-    writeUInt64(input.amount.amount, out)
+    writeUInt64(input.amount.toLong, out)
     writeScript(input.publicKeyScript.toArray, out)
   }
 
   override def validate(input: TxOut): Unit = {
     import input._
-    require(amount.amount >= 0, s"invalid txout amount: $amount")
-    require(amount.amount <= MaxMoney, s"invalid txout amount: $amount")
+    require(amount.toLong >= 0, s"invalid txout amount: $amount")
+    require(amount.toLong <= BtcAmount.MaxMoney, s"invalid txout amount: $amount")
     require(publicKeyScript.length < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
   }
 }
@@ -216,7 +216,7 @@ object Transaction extends BtcSerializer[Transaction] {
     require(input.txIn.nonEmpty, "input list cannot be empty")
     require(input.txOut.nonEmpty, "output list cannot be empty")
     require(Transaction.write(input).size <= MaxBlockSize)
-    require(input.txOut.map(_.amount.amount).sum <= MaxMoney, "sum of outputs amount is invalid")
+    require(input.txOut.map(_.amount.toLong).sum <= BtcAmount.MaxMoney, "sum of outputs amount is invalid")
     input.txIn.foreach(TxIn.validate)
     input.txOut.foreach(TxOut.validate)
     val outPoints = input.txIn.map(_.outPoint)
@@ -409,7 +409,7 @@ object Transaction extends BtcSerializer[Transaction] {
     */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
-  
+
   def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
     for (i <- tx.txIn.indices if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
       val prevOutput = previousOutputs(tx.txIn(i).outPoint)

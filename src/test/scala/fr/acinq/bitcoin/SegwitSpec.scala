@@ -23,7 +23,7 @@ class SegwitSpec extends FunSuite {
 
   test("tx hash") {
     val tx = Transaction.read("0100000002fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f0000000000eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac11000000")
-    val hash: ByteVector = Transaction.hashForSigning(tx, 1, hex"76a9141d0f172a0ecb48aee1be1f2687d2963ae33f71a188ac", SIGHASH_ALL, 600000000 satoshi, 1)
+    val hash: ByteVector = Transaction.hashForSigning(tx, 1, hex"76a9141d0f172a0ecb48aee1be1f2687d2963ae33f71a188ac", SIGHASH_ALL, 600000000 sat, 1)
     assert(hash == hex"c37af31116d1b27caf68aae9e3ac82f1477929014d5b917657d0eb49478cb670")
 
     val priv = PrivateKey(hex"619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb901")
@@ -42,7 +42,7 @@ class SegwitSpec extends FunSuite {
     val priv = PrivateKey(hex"619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb901")
     val pub = priv.publicKey
     val pubKeyScript = Script.write(Script.pay2wpkh(pub))
-    val runner = new Script.Runner(new Script.Context(tx, 1, 600000000 satoshi), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    val runner = new Script.Runner(new Script.Context(tx, 1, 600000000 sat), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(runner.verifyScripts(tx.txIn(1).signatureScript, pubKeyScript, tx.txIn(1).witness))
   }
 
@@ -78,7 +78,7 @@ class SegwitSpec extends FunSuite {
         txOut = TxOut(0.39 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
-      val sig = Transaction.signInput(tmp, 0, tx1.txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, priv1)
+      val sig = Transaction.signInput(tmp, 0, tx1.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, priv1)
       tmp.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(priv1.publicKey) :: Nil)
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -130,7 +130,7 @@ class SegwitSpec extends FunSuite {
         txOut = TxOut(0.49 btc, Script.pay2wsh(redeemScript)) :: Nil,
         lockTime = 0
       )
-      val sig = Transaction.signInput(tmp, 0, tx1.txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, priv1)
+      val sig = Transaction.signInput(tmp, 0, tx1.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, priv1)
       tmp.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(priv1.publicKey) :: Nil)
       //Transaction.sign(tmp, Seq(SignData(tx1.txOut(0).publicKeyScript, priv1)))
     }
