@@ -35,7 +35,7 @@ class MultisigSpec extends FunSuite with Matchers {
 
     // and we want to sent the output to our multisig address
     val txOut = TxOut(
-      amount = 900000 satoshi, // 0.009 BTC) satoshi, meaning the fee will be 0.01-0.009 = 0.001
+      amount = 900000 sat, // 0.009 BTC) satoshi, meaning the fee will be 0.01-0.009 = 0.001
       publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil))
 
     // create a tx with empty)put signature scripts
@@ -58,7 +58,7 @@ class MultisigSpec extends FunSuite with Matchers {
     val dest = "msCMyGGJ5eRcUgM5SQkwirVQGbGcr9oaYv"
     //priv: 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
     // 0.008 BTC) satoshi, meaning the fee will be 0.009-0.008 = 0.001
-    val amount = 800000 satoshi
+    val amount = 800000 sat
 
     // create a tx with empty)put signature scripts
     val tx = Transaction(
@@ -71,8 +71,8 @@ class MultisigSpec extends FunSuite with Matchers {
     )
 
     // we only need 2 signatures because this is a 2-on-3 multisig
-    val sig1 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key1)
-    val sig2 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key2)
+    val sig1 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
+    val sig2 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
 
     // OP_0 because of a bug) OP_CHECKMULTISIG
     val scriptSig = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil

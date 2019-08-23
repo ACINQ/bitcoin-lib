@@ -30,10 +30,10 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(previousTx.hash, 0), sequence = 0L, signatureScript = ByteVector.empty) :: Nil,
-        txOut = TxOut(amount = 100 satoshi, publicKeyScript = scriptPubKey) :: Nil,
+        txOut = TxOut(amount = 100 sat, publicKeyScript = scriptPubKey) :: Nil,
         lockTime = 100L
       )
-      val sig = Transaction.signInput(tmpTx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, key)
+      val sig = Transaction.signInput(tmpTx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key)
       tmpTx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(key.publicKey) :: Nil)
     }
 
@@ -49,11 +49,11 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = ByteVector.empty) :: Nil,
-        txOut = TxOut(amount = 100 satoshi, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 100L
       )
 
-      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyAlice)
+      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
 
       // our script sig is simple our signature followed by "true"
       val sigScript = OP_PUSHDATA(sig) :: OP_1 :: Nil
@@ -69,11 +69,11 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = ByteVector.empty) :: Nil,
-        txOut = TxOut(amount = 100 satoshi, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 99L
       )
 
-      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyAlice)
+      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
 
       // our script sig is simple our signature followed by "true"
       val sigScript = OP_PUSHDATA(sig) :: OP_1 :: Nil
@@ -91,12 +91,12 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = ByteVector.empty) :: Nil,
-        txOut = TxOut(amount = 100 satoshi, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 0L
       )
 
-      val sig1 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyAlice)
-      val sig2 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, keyBob)
+      val sig1 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
+      val sig2 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyBob)
       val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_0 :: Nil
 
       tmpTx.updateSigScript(0, sigScript)

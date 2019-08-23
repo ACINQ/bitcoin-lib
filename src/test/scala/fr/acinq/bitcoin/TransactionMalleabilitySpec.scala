@@ -27,7 +27,7 @@ class TransactionMalleabilitySpec extends FlatSpec {
         )),
       txOut = List(
         TxOut(
-          amount = 1000 satoshi,
+          amount = 1000 sat,
           publicKeyScript = publicKeyScript)
       ),
       lockTime = 0)
@@ -35,7 +35,7 @@ class TransactionMalleabilitySpec extends FlatSpec {
 
     // step #2: sign the unsigned tx
     // signature script: push signature and public key
-    val sig = Transaction.signInput(unsignedTx, 0, prevTx.txOut(1).publicKeyScript, SIGHASH_ALL, 0 satoshi, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = Transaction.signInput(unsignedTx, 0, prevTx.txOut(1).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val signatureScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey) :: Nil
 
     val tx1 = Transaction(version = 1,
