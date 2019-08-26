@@ -83,9 +83,6 @@ object DeterministicWallet {
     Base58Check.encode(prefix, buffer)
   }
 
-  @deprecated("use encode(priv, prefix (xpriv or tpriv for example)) instead", "v0.9.17")
-  def encode(input: ExtendedPrivateKey, testnet: Boolean): String = encode(input, if (testnet) tprv else xprv)
-
   case class ExtendedPublicKey(publickeybytes: ByteVector, chaincode: ByteVector32, depth: Int, path: KeyPath, parent: Long) {
     require(publickeybytes.length == 33)
     require(chaincode.length == 32)
@@ -116,9 +113,6 @@ object DeterministicWallet {
     val buffer = ByteVector.view(out.toByteArray)
     Base58Check.encode(prefix, buffer)
   }
-
-  @deprecated("use encode(pub, prefix (xpub or tpub for example)) instead", "v0.9.17")
-  def encode(input: ExtendedPublicKey, testnet: Boolean): String = encode(input, if (testnet) tpub else xpub)
 
   /**
     *

@@ -194,11 +194,6 @@
             <version>1.58.0.0</version>
         </dependency>
         <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>2.5.0</version>
-        </dependency>
-        <dependency>
             <groupId>org.scodec</groupId>
             <artifactId>scodec-bits_${scala.version.short}</artifactId>
             <version>1.1.12</version>
