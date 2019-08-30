@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>fr.acinq</groupId>
-    <artifactId>bitcoin-lib_2.11</artifactId>
+    <artifactId>bitcoin-lib_2.12</artifactId>
     <packaging>jar</packaging>
     <version>0.16-SNAPSHOT</version>
     <description>Simple Scala Bitcoin library</description>
@@ -10,8 +10,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.version>2.11.12</scala.version>
-        <scala.version.short>2.11</scala.version.short>
+        <scala.version>2.12.9</scala.version>
+        <scala.version.short>2.12</scala.version.short>
     </properties>
 
     <licenses>
@@ -52,9 +52,9 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.0</version>
                 <configuration>
-                    <source>1.7</source>
-                    <target>1.7</target>
-                    <release>7</release>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <release>8</release>
                 </configuration>
                 <executions>
                     <execution>
@@ -80,7 +80,7 @@
                         <arg>-Xmax-classfile-name</arg>
                         <arg>140</arg>
                         <arg>-nobootcp</arg>
-                        <arg>-target:jvm-1.7</arg>
+                        <arg>-target:jvm-1.8</arg>
                     </args>
                     <scalaCompatVersion>${scala.version.short}</scalaCompatVersion>
                 </configuration>
