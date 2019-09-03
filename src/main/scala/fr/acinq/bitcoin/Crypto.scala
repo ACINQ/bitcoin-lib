@@ -3,7 +3,7 @@ package fr.acinq.bitcoin
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 
-import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
+import org.bitcoin.NativeSecp256k1
 import org.slf4j.LoggerFactory
 import org.spongycastle.asn1.sec.SECNamedCurves
 import org.spongycastle.asn1.{ASN1Integer, DERSequenceGenerator}
@@ -22,9 +22,10 @@ object Crypto {
   val halfCurveOrder = params.getN().shiftRight(1)
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
+  val nativeSecp256k1 = new NativeSecp256k1()
 
-  private val logger = LoggerFactory.getLogger(classOf[Secp256k1Context])
-  if (Secp256k1Context.isEnabled) {
+  private val logger = LoggerFactory.getLogger(classOf[NativeSecp256k1])
+  if (nativeSecp256k1.isEnabled) {
     logger.info("secp256k1 library successfully loaded")
   } else {
     logger.info("couldn't find secp256k1 library, defaulting to spongycastle")
@@ -39,18 +40,18 @@ object Crypto {
     * @param value value to initialize this key with
     */
   case class PrivateKey(value: ByteVector32) {
-    def add(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
-      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.value.toArray)))
+    def add(that: PrivateKey): PrivateKey = if (nativeSecp256k1.isEnabled)
+      PrivateKey(ByteVector.view(nativeSecp256k1.privKeyTweakAdd(value.toArray, that.value.toArray)))
     else
       PrivateKey(bigInt.add(that.bigInt).mod(Crypto.curve.getN))
 
-    def subtract(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
-      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, NativeSecp256k1.privKeyNegate(that.value.toArray))))
+    def subtract(that: PrivateKey): PrivateKey = if (nativeSecp256k1.isEnabled)
+      PrivateKey(ByteVector.view(nativeSecp256k1.privKeyTweakAdd(value.toArray, nativeSecp256k1.privKeyNegate(that.value.toArray))))
     else
       PrivateKey(bigInt.subtract(that.bigInt).mod(Crypto.curve.getN))
 
-    def multiply(that: PrivateKey): PrivateKey = if (Secp256k1Context.isEnabled)
-      PrivateKey(ByteVector.view(NativeSecp256k1.privKeyTweakMul(value.toArray, that.value.toArray)))
+    def multiply(that: PrivateKey): PrivateKey = if (nativeSecp256k1.isEnabled)
+      PrivateKey(ByteVector.view(nativeSecp256k1.privKeyTweakMul(value.toArray, that.value.toArray)))
     else
       PrivateKey(bigInt.multiply(that.bigInt).mod(Crypto.curve.getN))
 
@@ -65,8 +66,8 @@ object Crypto {
     // used only if secp256k1 is not available
     lazy val bigInt = new BigInteger(1, value.toArray)
 
-    def publicKey: PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.computePubkey(value.toArray)))
+    def publicKey: PublicKey = if (nativeSecp256k1.isEnabled) {
+      PublicKey.fromBin(ByteVector.view(nativeSecp256k1.computePubkey(value.toArray)))
     } else {
       PublicKey(ByteVector.view(params.getG().multiply(bigInt).getEncoded(true)))
     }
@@ -121,26 +122,26 @@ object Crypto {
 
     def isValid: Boolean = isPubKeyValidStrict(this.value)
 
-    def add(that: PublicKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, that.value.toArray)))
+    def add(that: PublicKey): PublicKey = if (nativeSecp256k1.isEnabled) {
+      PublicKey.fromBin(ByteVector.view(nativeSecp256k1.pubKeyAdd(value.toArray, that.value.toArray)))
     } else {
       PublicKey(ecpoint.add(that.ecpoint).normalize())
     }
 
-    def add(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.privKeyTweakAdd(value.toArray, that.value.toArray)))
+    def add(that: PrivateKey): PublicKey = if (nativeSecp256k1.isEnabled) {
+      PublicKey.fromBin(ByteVector.view(nativeSecp256k1.privKeyTweakAdd(value.toArray, that.value.toArray)))
     } else {
       add(that.publicKey)
     }
 
-    def subtract(that: PublicKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyAdd(value.toArray, NativeSecp256k1.pubKeyNegate(that.value.toArray))))
+    def subtract(that: PublicKey): PublicKey = if (nativeSecp256k1.isEnabled) {
+      PublicKey.fromBin(ByteVector.view(nativeSecp256k1.pubKeyAdd(value.toArray, nativeSecp256k1.pubKeyNegate(that.value.toArray))))
     } else {
       PublicKey(ecpoint.subtract(that.ecpoint).normalize())
     }
 
-    def multiply(that: PrivateKey): PublicKey = if (Secp256k1Context.isEnabled) {
-      PublicKey.fromBin(ByteVector.view(NativeSecp256k1.pubKeyTweakMul(value.toArray, that.value.toArray)))
+    def multiply(that: PrivateKey): PublicKey = if (nativeSecp256k1.isEnabled) {
+      PublicKey.fromBin(ByteVector.view(nativeSecp256k1.pubKeyTweakMul(value.toArray, that.value.toArray)))
     } else {
       PublicKey(ecpoint.multiply(that.bigInt).normalize())
     }
@@ -151,8 +152,8 @@ object Crypto {
 
     def *(that: PrivateKey): PublicKey = multiply(that)
 
-    def toUncompressedBin: ByteVector = if (Secp256k1Context.isEnabled) {
-      ByteVector.view(NativeSecp256k1.parsePubkey(value.toArray))
+    def toUncompressedBin: ByteVector = if (nativeSecp256k1.isEnabled) {
+      ByteVector.view(nativeSecp256k1.parsePubkey(value.toArray))
     } else {
       ByteVector.view(ecpoint.getEncoded(false))
     }
@@ -215,8 +216,8 @@ object Crypto {
     * @return ecdh(priv, pub) as computed by libsecp256k1
     */
   def ecdh(priv: PrivateKey, pub: PublicKey): ByteVector32 = {
-    if (Secp256k1Context.isEnabled)
-      ByteVector32(ByteVector.view(NativeSecp256k1.createECDHSecret(priv.value.toArray, pub.value.toArray)))
+    if (nativeSecp256k1.isEnabled)
+      ByteVector32(ByteVector.view(nativeSecp256k1.createECDHSecret(priv.value.toArray, pub.value.toArray)))
     else
       Crypto.sha256(ByteVector.view(pub.multiply(priv).ecpoint.getEncoded(true)))
   }
@@ -377,8 +378,8 @@ object Crypto {
     *         the public key is a valid point on the secp256k1 curve
     */
   def isPubKeyValidStrict(key: ByteVector): Boolean = isPubKeyValidLax(key) && {
-    if (Secp256k1Context.isEnabled)
-      NativeSecp256k1.parsePubkey(key.toArray).length == 65
+    if (nativeSecp256k1.isEnabled)
+      nativeSecp256k1.parsePubkey(key.toArray).length == 65
     else
       curve.getCurve.decodePoint(key.toArray).normalize().isValid
   }
@@ -471,8 +472,8 @@ object Crypto {
     * @return true is signature is valid for this data with this public key
     */
   def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = {
-    if (Secp256k1Context.isEnabled) {
-      NativeSecp256k1.verify(data.toArray, signature.toArray, publicKey.value.toArray)
+    if (nativeSecp256k1.isEnabled) {
+      nativeSecp256k1.verify(data.toArray, signature.toArray, publicKey.value.toArray)
     } else {
       val (r, s) = decodeSignatureCompact(signature)
       require(r.compareTo(one) >= 0, "r must be >= 1")
@@ -503,8 +504,8 @@ object Crypto {
     * @return a signature in compact format (64 bytes)
     */
   def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = {
-    if (Secp256k1Context.isEnabled) {
-      val bin = NativeSecp256k1.signCompact(data, privateKey.value.toArray)
+    if (nativeSecp256k1.isEnabled) {
+      val bin = nativeSecp256k1.signCompact(data, privateKey.value.toArray)
       ByteVector64(ByteVector.view(bin))
     } else {
       val signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest))
