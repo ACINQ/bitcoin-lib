@@ -3,6 +3,7 @@ package fr.acinq.bitcoin
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 
+import fr.acinq.Secp256k1Loader
 import org.bitcoin.NativeSecp256k1
 import org.slf4j.LoggerFactory
 import org.spongycastle.asn1.sec.SECNamedCurves
@@ -15,21 +16,14 @@ import org.spongycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
 import org.spongycastle.math.ec.ECPoint
 import scodec.bits.ByteVector
 
-
 object Crypto {
   val params = SECNamedCurves.getByName("secp256k1")
   val curve = new ECDomainParameters(params.getCurve, params.getG, params.getN, params.getH)
   val halfCurveOrder = params.getN().shiftRight(1)
   val zero = BigInteger.valueOf(0)
   val one = BigInteger.valueOf(1)
-  val nativeSecp256k1 = new NativeSecp256k1()
-
   private val logger = LoggerFactory.getLogger(classOf[NativeSecp256k1])
-  if (nativeSecp256k1.isEnabled) {
-    logger.info("secp256k1 library successfully loaded")
-  } else {
-    logger.info("couldn't find secp256k1 library, defaulting to spongycastle")
-  }
+  val nativeSecp256k1 = new NativeSecp256k1()
 
   def fixSize(data: ByteVector): ByteVector32 = ByteVector32(data.padLeft(32))
 

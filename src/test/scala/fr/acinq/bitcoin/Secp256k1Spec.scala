@@ -1,11 +1,12 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.Crypto.PrivateKey
+import fr.acinq.Secp256k1Loader
+import fr.acinq.bitcoin.Crypto.{PrivateKey, logger}
 import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
 
-import scala.util.Random
+import scala.util.{Failure, Random, Success, Try}
 
 /**
   * run this test with -Djava.library.path=$PATH_LIBSECP256K1_DIR where $PATH_LIBSECP256K1_DIR is a directory that
