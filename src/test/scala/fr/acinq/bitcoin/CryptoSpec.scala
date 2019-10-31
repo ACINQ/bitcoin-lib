@@ -175,11 +175,8 @@ class CryptoSpec extends FlatSpec {
           recid = rhs.toInt
           assert(priv.publicKey == pub)
           val sig64 = Crypto.sign(message, priv)
-          val (pub1, pub2) = recoverPublicKey(sig64, message)
-          recid match {
-            case 0 => assert(pub == pub1)
-            case 1 => assert(pub == pub2)
-          }
+          val check = recoverPublicKey(sig64, message, recid)
+          assert(check == pub)
       }
     }
   }

@@ -544,9 +544,18 @@ object Crypto {
     *
     * @param signature signature
     * @param message   message that was signed
-    * @return a (pub1, pub2) tuple where pub1 and pub2 are candidates public keys. If you have the recovery id  then use
-    *         pub1 if the recovery id is even and pub2 if it is odd
+    * @return a recovered public key
     */
+  def recoverPublicKey(signature: ByteVector64, message: ByteVector, recoveryId: Int): PublicKey = {
+    if (Secp256k1Context.isEnabled) {
+      val bin = NativeSecp256k1.ecdsaRecover(signature.toArray, message.toArray, recoveryId)
+      PublicKey.fromBin(ByteVector.view(bin))
+    } else {
+      val (pub0, pub1) = recoverPublicKey(signature, message)
+      if (recoveryId % 2 == 0) pub0 else pub1
+    }
+  }
+
   def recoverPublicKey(signature: ByteVector64, message: ByteVector): (PublicKey, PublicKey) = {
     val (r, s) = decodeSignatureCompact(signature)
     val m = new BigInteger(1, message.toArray)
