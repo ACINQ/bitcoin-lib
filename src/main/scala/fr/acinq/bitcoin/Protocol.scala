@@ -198,7 +198,7 @@ object Protocol {
     for (_ <- 1L to count) {
       items += reader(input, protocolVersion)
     }
-    items
+    items.toSeq
   }
 
   def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, protocolVersion: Long): Seq[T] = readCollection(input, reader, None, protocolVersion)

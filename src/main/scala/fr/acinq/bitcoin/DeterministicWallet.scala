@@ -34,7 +34,7 @@ object DeterministicWallet {
       def toNumber(value: String): Long = if (value.last == '\'') hardened(value.dropRight(1).toLong) else value.toLong
 
       val path1 = path.stripPrefix("m").stripPrefix("/")
-      if (path1.isEmpty) KeyPath.Root else new KeyPath(path1.split('/').map(toNumber))
+      if (path1.isEmpty) KeyPath.Root else new KeyPath(path1.split('/').map(toNumber).toSeq)
     }
 
     def childNumberToString(childNumber: Long) = if (isHardened(childNumber)) ((childNumber - hardenedKeyIndex).toString + "'") else childNumber.toString

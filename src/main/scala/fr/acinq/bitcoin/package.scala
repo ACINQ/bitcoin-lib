@@ -37,6 +37,7 @@ package object bitcoin {
     override def toInt(x: Satoshi): Int = x.toLong.toInt
     override def toLong(x: Satoshi): Long = x.toLong
     override def fromInt(x: Int): Satoshi = Satoshi(x)
+    override def parseString(str: String): Option[Satoshi] = None
     // @formatter:on
   }
 
@@ -111,6 +112,7 @@ package object bitcoin {
     chainHash match {
       case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash)
       case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)
+      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
     }
   }
 

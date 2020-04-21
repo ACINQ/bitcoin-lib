@@ -68,7 +68,7 @@ object MnemonicCode {
     require(check == checksumbits, "invalid checksum")
   }
 
-  def validate(mnemonics: String): Unit = validate(mnemonics.split(" "))
+  def validate(mnemonics: String): Unit = validate(mnemonics.split(" ").toSeq)
 
   /**
     * BIP39 seed derivation
@@ -83,6 +83,8 @@ object MnemonicCode {
     val keyParams = gen.generateDerivedParameters(512).asInstanceOf[KeyParameter]
     ByteVector.view(keyParams.getKey)
   }
+
+  def toSeed(mnemonics: Array[String], passphrase: String): ByteVector = toSeed(mnemonics.toSeq, passphrase)
 
   def toSeed(mnemonics: String, passphrase: String): ByteVector = toSeed(mnemonics.split(" "), passphrase)
 }

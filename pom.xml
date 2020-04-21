@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>fr.acinq</groupId>
-    <artifactId>bitcoin-lib_2.11</artifactId>
+    <artifactId>bitcoin-lib_2.13</artifactId>
     <packaging>jar</packaging>
     <version>0.18-SNAPSHOT</version>
     <description>Simple Scala Bitcoin library</description>
@@ -10,8 +10,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.version>2.11.12</scala.version>
-        <scala.version.short>2.11</scala.version.short>
+        <scala.version>2.13.1</scala.version>
+        <scala.version.short>2.13</scala.version.short>
     </properties>
 
     <licenses>
@@ -50,7 +50,7 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
-                <version>4.3.0</version>
+                <version>4.3.1</version>
                 <configuration>
                     <args>
                         <arg>-deprecation</arg>
@@ -59,10 +59,8 @@
                         <arg>-language:implicitConversions</arg>
                         <arg>-Xfatal-warnings</arg>
                         <arg>-unchecked</arg>
-                        <arg>-Xmax-classfile-name</arg>
-                        <arg>140</arg>
                         <arg>-nobootcp</arg>
-                        <arg>-target:jvm-1.7</arg>
+                        <arg>-target:jvm-1.8</arg>
                     </args>
                     <scalaCompatVersion>${scala.version.short}</scalaCompatVersion>
                 </configuration>
@@ -212,7 +210,7 @@
         <dependency>
             <groupId>org.json4s</groupId>
             <artifactId>json4s-jackson_${scala.version.short}</artifactId>
-            <version>3.5.2</version>
+            <version>3.6.7</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

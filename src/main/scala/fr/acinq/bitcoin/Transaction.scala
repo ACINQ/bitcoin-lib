@@ -188,7 +188,7 @@ object Transaction extends BtcSerializer[Transaction] {
       case 1 =>
         val witnesses = new ArrayBuffer[ScriptWitness]()
         for (_ <- tx1.txIn.indices) witnesses += ScriptWitness.read(input, protocolVersion)
-        tx1.updateWitnesses(witnesses).copy(lockTime = uint32(input))
+        tx1.updateWitnesses(witnesses.toSeq).copy(lockTime = uint32(input))
       case _ => throw new RuntimeException(s"Unknown transaction optional data $flags")
     }
 
