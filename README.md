@@ -17,18 +17,21 @@ This is a simple scala library which implements most of the bitcoin protocol:
 * BIP 32 (deterministic wallets)
 * BIP 39 (mnemonic code for generating deterministic keys)
 * BIP 173 (Base32 address format for native v0-16 witness outputs)
+* BIP 174 (Partially Signed Bitcoin Transaction Format)
 
 ## Objectives
 
 Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes. And, of course, we use it for our own work on Lightning (see https://github.com/ACINQ/eclair).
 
 ## Status
-- [X] Message parsing (blocks, transactions, inv, ...)
-- [X] Building transactions (P2PK, P2PKH, P2SH, P2WPK, P2WSH)
-- [X] Signing transactions
-- [X] Verifying signatures
-- [X] Passing core reference tests (scripts & transactions)
-- [X] Passing core reference segwit tests
+
+* [X] Message parsing (blocks, transactions, inv, ...)
+* [X] Building transactions (P2PK, P2PKH, P2SH, P2WPK, P2WSH)
+* [X] Signing transactions
+* [X] Verifying signatures
+* [X] Passing core reference tests (scripts & transactions)
+* [X] Passing core reference segwit tests
+* [ ] Passing core reference psbt tests
 
 ## Configuring maven/sbt
 
@@ -52,27 +55,25 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.17-SNAPSHOT, the latest released version is 0.16
+The latest snapshot (development) version is 0.17-SNAPSHOT, the latest released version is 0.16.
 
 ## Segwit support
 
 Bitcoin-lib, starting with version 0.9.7, fully supports segwit (see below for more information) and is on par with the segwit code in Bitcoin Core 0.13.1.
 
-## libscp256k1 support
+## libsecp256k1 support
 
-bitcoin-lib embeds JNI bindings for libsecp256k1, which is must faster than BouncyCastle. It will extract and load native bindings for your operating system
-in a temporary directory. If this process fails it will fallback to BouncyCastle.
+Bitcoin-lib embeds JNI bindings for libsecp256k1, which is must faster than BouncyCastle. It will extract and load native bindings for your operating system in a temporary directory. If this process fails it will fallback to BouncyCastle.
 
 JNI libraries are included for:
-- Linux 64 bits
-- Windows 64 bits
-- Osx 64 bits
 
-You can use your own library native library by specifying its path with `-Dfr.acinq.secp256k1.lib.path` and optionally its name with `-Dfr.acinq.secp256k1.lib.name` (if unspecified
-bitcoin-lib will use the standard name for your OS i.e. libsecp256k1.so on Linux, secp256k1.dll on Windows, ...)
+* Linux 64 bits
+* Windows 64 bits
+* Osx 64 bits
 
-You can also specify the temporary directory where the library will be extracted with `-Djava.io.tmpdir` or `-Dfr.acinq.secp256k1.tmpdir` (if you want to use a different
-directory from `-Djava.io.tmpdir`).
+You can use your own library native library by specifying its path with `-Dfr.acinq.secp256k1.lib.path` and optionally its name with `-Dfr.acinq.secp256k1.lib.name` (if unspecified bitcoin-lib will use the standard name for your OS i.e. libsecp256k1.so on Linux, secp256k1.dll on Windows, ...).
+
+You can also specify the temporary directory where the library will be extracted with `-Djava.io.tmpdir` or `-Dfr.acinq.secp256k1.tmpdir` (if you want to use a different directory from `-Djava.io.tmpdir`).
 
 ## Usage
 
@@ -120,20 +121,24 @@ The Transaction class can be used to create, serialize, deserialize, sign and va
 #### P2PKH transactions
 
 A P2PKH transactions sends bitcoins to a public key hash, using a standard P2PKH script:
+
 ``` scala
 val pkh = pubKey.hash160
 val pubKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pkh) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil
 ```
+
 To spend it, just provide a signature and the public key:
+
 ```scala
 val sigScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(pubKey.toBin) :: Nil
 ```
+
 This sample demonstrates how to serialize, create and verify simple P2PKH transactions.
 
 ```scala
-  // simple pay to PK tx
+    // simple pay to PK tx
 
-  // we have a tx that was sent to a public key that we own
+    // we have a tx that was sent to a public key that we own
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
     val amount = 10000 sat
@@ -170,13 +175,16 @@ This sample demonstrates how to serialize, create and verify simple P2PKH transa
 #### P2SH transactions
 
 A P2SH transactions sends bitcoins to a script hash:
+
 ```scala
 val redeemScript = Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3 ))
 val multisigAddress = Crypto.hash160(redeemScript)
 val publicKeyScript = OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil
 ```
+
 To spend it, you must provide data that will match the public key script, and the actual public key script. In our case,
 we need 2 valid signatures:
+
 ```scala
 val redeemScript = Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3 ))
 val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
@@ -246,6 +254,7 @@ val pubKeyScript = OP_0 :: OP_PUSHDATA(pkh) :: Nil
 ```
 
 To spend them, you provide a witness that is just a push of a signature and the actual public key:
+
 ```scala
 val witness = ScriptWitness(sig :: pubKey :: Nil))
 ```
@@ -253,7 +262,7 @@ val witness = ScriptWitness(sig :: pubKey :: Nil))
 This sample demonstrates how to serialize, create and verify a P2WPK transaction
 
 ```scala
-   val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
     val pub1 = priv1.publicKey
     val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.value))
 
@@ -299,11 +308,14 @@ This sample demonstrates how to serialize, create and verify a P2WPK transaction
 #### P2WSH transactions
 
 P2WSH transactions are the segwit version of P2SH transactions:
+
 ```scala
 val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
 val pubKeyScript = OP_0 :: OP_PUSHDATA(Crypto.sha256(redeemScript)) :: Nil) :: Nil,
 ```
+
 To spend them, you provide data that wil match the publick key script, and the actual public key script:
+
 ```scala
 val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
 val witness = ScriptWitness(Seq(ByteVector.empty, sig2, sig3, redeemScript))
@@ -312,7 +324,7 @@ val witness = ScriptWitness(Seq(ByteVector.empty, sig2, sig3, redeemScript))
 This sample demonstrates how to serialize, create and verify a P2WPSH transaction
 
 ```scala
-     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
+    val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
     val pub1 = priv1.publicKey
     val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.value))
 
@@ -396,6 +408,18 @@ This sample demonstrates how to serialize, create and verify a P2WPSH transactio
     Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx1.txid === ByteVector32(hex"98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
     // this tx was published on segnet as 98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5
+```
+
+#### Partial Signed Transactions
+
+Bitcoin-lib provides support for reading and writing PSBTs:
+
+```scala
+    val Success(psbt) = Psbt.fromBase64("cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7OtZGQXE8pCFxv2AAAAAAD+////AtPf9QUAAAAAGXapFNDFmQPFusKGh2DpD9UhpGZap2UgiKwA4fUFAAAAABepFDVF5uM7gyxHBQ8k0+65PJwDlIvHh7MuEwAAAQD9pQEBAAAAAAECiaPHHqtNIOA3G7ukzGmPopXJRjr6Ljl/hTPMti+VZ+UBAAAAFxYAFL4Y0VKpsBIDna89p95PUzSe7LmF/////4b4qkOnHf8USIk6UwpyN+9rRgi7st0tAXHmOuxqSJC0AQAAABcWABT+Pp7xp0XpdNkCxDVZQ6vLNL1TU/////8CAMLrCwAAAAAZdqkUhc/xCX/Z4Ai7NK9wnGIZeziXikiIrHL++E4sAAAAF6kUM5cluiHv1irHU6m80GfWx6ajnQWHAkcwRAIgJxK+IuAnDzlPVoMR3HyppolwuAJf3TskAinwf4pfOiQCIAGLONfc0xTnNMkna9b7QPZzMlvEuqFEyADS8vAtsnZcASED0uFWdJQbrUqZY3LLh+GFbTZSYG2YVi/jnF6efkE/IQUCSDBFAiEA0SuFLYXc2WHS9fSrZgZU327tzHlMDDPOXMMJ/7X85Y0CIGczio4OFyXBl/saiK9Z9R5E5CVbIBZ8hoQDHAXR8lkqASECI7cr7vCWXRC+B3jv7NYfysb3mk6haTkzgHNEZPhPKrMAAAAAAAAA")
+    assert(psbt.global.version === 0)
+    assert(psbt.global.tx.txIn.length === 1)
+
+    val bin = Psbt.write(psbt)
 ```
 
 ### Wallet features
