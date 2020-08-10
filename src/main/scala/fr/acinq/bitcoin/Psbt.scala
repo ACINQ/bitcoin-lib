@@ -331,11 +331,11 @@ object Psbt {
     private def writeInputs(inputs: Seq[Psbt.PartiallySignedInput], output: OutputStream): Unit = inputs.foreach(input => {
       input.nonWitnessUtxo.foreach(tx => writeDataEntry(DataEntry(Array(0x00), Transaction.write(tx).toArray), output))
       input.witnessUtxo.foreach(txOut => writeDataEntry(DataEntry(Array(0x01), TxOut.write(txOut).toArray), output))
-      input.partialSigs.foreach { case (publicKey, signature) => writeDataEntry(DataEntry(0x02.toByte +: publicKey.value.toArray, signature), output) }
+      sortPublicKeys(input.partialSigs).foreach { case (publicKey, signature) => writeDataEntry(DataEntry(0x02.toByte +: publicKey.value.toArray, signature), output) }
       input.sighashType.foreach(sighashType => writeDataEntry(DataEntry(Array(0x03), Protocol.writeUInt32(sighashType, ByteOrder.LITTLE_ENDIAN).toArray), output))
       input.redeemScript.foreach(redeemScript => writeDataEntry(DataEntry(Array(0x04), Script.write(redeemScript).toArray), output))
       input.witnessScript.foreach(witnessScript => writeDataEntry(DataEntry(Array(0x05), Script.write(witnessScript).toArray), output))
-      input.derivationPaths.foreach {
+      sortPublicKeys(input.derivationPaths).foreach {
         case (publicKey, path) =>
           val key = 0x06.toByte +: publicKey.value.toArray
           val value = Protocol.writeUInt32(path.masterKeyFingerprint, ByteOrder.BIG_ENDIAN).toArray ++ path.keyPath.flatMap(childNumber => Protocol.writeUInt32(childNumber, ByteOrder.LITTLE_ENDIAN).toArray)
@@ -350,7 +350,7 @@ object Psbt {
     private def writeOutputs(outputs: Seq[Psbt.PartiallySignedOutput], out: OutputStream): Unit = outputs.foreach(output => {
       output.redeemScript.foreach(redeemScript => writeDataEntry(DataEntry(Array(0x00), Script.write(redeemScript).toArray), out))
       output.witnessScript.foreach(witnessScript => writeDataEntry(DataEntry(Array(0x01), Script.write(witnessScript).toArray), out))
-      output.derivationPaths.foreach {
+      sortPublicKeys(output.derivationPaths).foreach {
         case (publicKey, path) =>
           val key = 0x02.toByte +: publicKey.value.toArray
           val value = Protocol.writeUInt32(path.masterKeyFingerprint, ByteOrder.BIG_ENDIAN).toArray ++ path.keyPath.flatMap(childNumber => Protocol.writeUInt32(childNumber, ByteOrder.LITTLE_ENDIAN).toArray)
@@ -365,6 +365,11 @@ object Psbt {
       Protocol.writeBytes(entry.key, output)
       Protocol.writeVarint(entry.value.length, output)
       Protocol.writeBytes(entry.value, output)
+    }
+
+    /** We use lexicographic ordering on the public keys. */
+    private def sortPublicKeys[T](publicKeys: Map[PublicKey, T]): Seq[(PublicKey, T)] = publicKeys.toSeq.sortWith {
+      case ((pk1, _), (pk2, _)) => LexicographicalOrdering.isLessThan(pk1.value, pk2.value)
     }
 
   }

@@ -199,8 +199,7 @@ class PsbtSpec extends FunSuite {
       assert(input.witnessUtxo.map(_.publicKeyScript) === Some(Script.write(Script.pay2sh(Script.write(input.redeemScript.get)))))
       assert(psbt.outputs.length === 1)
       verifyEmptyOutput(psbt.outputs.head)
-      // NB: we don't fully compare the encoded values because the order of the derivationPaths map elements is unpredictable.
-      assert(Psbt.write(psbt).length === bin.length)
+      assert(Psbt.write(psbt) === bin.toArray, bin.toHex)
     }
     {
       // PSBT with one P2WSH input of a 2-of-2 multisig. witnessScript, keypaths, and global xpubs are available. Contains no signatures. Outputs filled.
@@ -222,7 +221,8 @@ class PsbtSpec extends FunSuite {
       assert(output.redeemScript.isEmpty)
       assert(output.witnessScript.isEmpty)
       assert(output.derivationPaths.keySet === Set(PublicKey(hex"039eff1f547a1d5f92dfa2ba7af6ac971a4bd03ba4a734b03156a256b8ad3a1ef9")))
-      // NB: we don't fully compare the encoded values because the order of the derivationPaths map elements is unpredictable.
+      // NB: we don't fully compare the encoded values because in this particular test vector, the BIP doesn't sort public keys lexicographically
+      // so our result differs in the `derivationPaths` section.
       assert(Psbt.write(psbt).length === bin.length)
     }
     {
