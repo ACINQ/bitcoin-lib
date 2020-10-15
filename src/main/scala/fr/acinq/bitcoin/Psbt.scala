@@ -172,6 +172,28 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.PartiallySignedInput], out
       Transaction.correctlySpends(finalTx, utxos.toMap, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }.map(_ => finalTx)
   }
+
+  /**
+   * Compute the fees paid by the PSBT.
+   * Note that if some inputs have not been updated yet, the fee cannot be computed.
+   */
+  def computeFees(): Try[Satoshi] = {
+    val amountOut = global.tx.txOut match {
+      case Nil => 0 sat
+      case txOut => txOut.map(_.amount).sum
+    }
+    val amountIn = inputs.zip(global.tx.txIn).foldLeft(Success(0 sat): Try[Satoshi]) {
+      case (Failure(ex), _) => Failure(ex)
+      case (Success(amount), (input, txIn)) =>
+        val inputAmount_opt = input.witnessUtxo.map(_.amount).orElse(input.nonWitnessUtxo.map(tx => tx.txOut(txIn.outPoint.index.toInt).amount))
+        inputAmount_opt match {
+          case Some(inputAmount) => Success(amount + inputAmount)
+          case None => Failure(new IllegalArgumentException(s"input ${txIn.outPoint} has not been updated: amount unknown"))
+        }
+    }
+    amountIn.map(_ - amountOut)
+  }
+
 }
 
 /**

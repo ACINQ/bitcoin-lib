@@ -482,6 +482,23 @@ class PsbtSpec extends FunSuite {
     assert(Psbt.join(psbt1, Psbt(psbt2.global.tx.copy(lockTime = 1))).isFailure) // tx lockTime mismatch
   }
 
+  test("compute fees") {
+    val inputTx1 = Transaction(2, Nil, Seq(TxOut(500 sat, Nil), TxOut(750 sat, Nil)), 0)
+    val inputTx2 = Transaction(2, Nil, Seq(TxOut(800 sat, Nil), TxOut(600 sat, Nil)), 0)
+    val psbt = Psbt(Transaction(
+      version = 2,
+      txIn = Seq(TxIn(OutPoint(inputTx1, 1), Nil, 0), TxIn(OutPoint(inputTx2, 0), Nil, 6)),
+      txOut = Seq(TxOut(300 sat, Nil), TxOut(1000 sat, Nil)),
+      lockTime = 3
+    ))
+
+    assert(psbt.computeFees().isFailure) // inputs have not been updated yet
+    val Success(oneInput) = psbt.update(inputTx1, 1, witnessScript = Some(Seq(OP_RETURN)))
+    assert(oneInput.computeFees().isFailure) // second input has not been updated yet
+    val Success(bothInputs) = oneInput.update(inputTx2, 0, redeemScript = Some(Seq(OP_RETURN)))
+    assert(bothInputs.computeFees() === Success(250 sat))
+  }
+
   private def verifyNoUnknown(psbt: Psbt): Unit = {
     assert(psbt.global.unknown.isEmpty)
     psbt.inputs.foreach(input => assert(input.unknown.isEmpty))
