@@ -375,6 +375,41 @@ object Psbt {
     combineUnknown(outputs.map(_.unknown))
   )
 
+  /**
+   * Joins multiple distinct PSBTs with different inputs and outputs into one PSBT with inputs and outputs from all of
+   * the PSBTs. No input in any of the PSBTs can be in more than one of the PSBTs.
+   *
+   * @param psbts partially signed bitcoin transactions to join.
+   * @return a psbt that contains data from all the input psbts.
+   */
+  def join(psbts: Psbt*): Try[Psbt] = {
+    if (psbts.isEmpty) {
+      Failure(new IllegalArgumentException("cannot join psbts: no psbt provided"))
+    } else if (psbts.map(_.global.version).toSet.size != 1) {
+      Failure(new IllegalArgumentException("cannot join psbts with different versions"))
+    } else if (psbts.map(_.global.tx.version).toSet.size != 1) {
+      Failure(new IllegalArgumentException("cannot join psbts with different tx versions"))
+    } else if (psbts.map(_.global.tx.lockTime).toSet.size != 1) {
+      Failure(new IllegalArgumentException("cannot join psbts with different tx lockTime"))
+    } else if (psbts.flatMap(_.global.tx.txIn.map(_.outPoint)).toSet.size != psbts.map(_.global.tx.txIn.size).sum) {
+      Failure(new IllegalArgumentException("cannot join psbts that spend the same input"))
+    } else {
+      val global = psbts.head.global.copy(
+        tx = psbts.head.global.tx.copy(
+          txIn = psbts.flatMap(_.global.tx.txIn),
+          txOut = psbts.flatMap(_.global.tx.txOut)
+        ),
+        extendedPublicKeys = psbts.flatMap(_.global.extendedPublicKeys).distinct,
+        unknown = psbts.flatMap(_.global.unknown).distinct
+      )
+      Success(psbts.head.copy(
+        global = global,
+        inputs = psbts.flatMap(_.inputs),
+        outputs = psbts.flatMap(_.outputs)
+      ))
+    }
+  }
+
   private def isFinal(in: PartiallySignedInput): Boolean = {
     // Everything except the utxo, the scriptSigs and unknown keys must be empty.
     val emptied = in.redeemScript.isEmpty && in.witnessScript.isEmpty && in.partialSigs.isEmpty && in.derivationPaths.isEmpty && in.sighashType.isEmpty
