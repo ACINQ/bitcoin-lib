@@ -321,7 +321,7 @@ object Psbt {
     redeemScript.map(script => {
       val amount = utxo.txOut(txIn.outPoint.index.toInt).amount
       val sig = Transaction.signInput(global.tx, inputIndex, script, input.sighashType.getOrElse(SIGHASH_ALL), amount, SigVersion.SIGVERSION_BASE, priv)
-      input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig.toArray))
+      input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig))
     })
   }
 
@@ -342,11 +342,11 @@ object Psbt {
         Failure(new IllegalArgumentException("witness script does not match redeemScript or scriptPubKey"))
       } else {
         val sig = Transaction.signInput(global.tx, inputIndex, witnessScript, input.sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
-        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig.toArray)))
+        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig)))
       }
       case None =>
         val sig = Transaction.signInput(global.tx, inputIndex, script, input.sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
-        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig.toArray)))
+        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig)))
     })
   }
 
@@ -372,7 +372,7 @@ object Psbt {
   }
 
   private def combineUnknown(unknowns: Seq[Seq[DataEntry]]): Seq[DataEntry] =
-    unknowns.flatten.map(unknown => ByteVector(unknown.key) -> unknown).toMap.values.toSeq
+    unknowns.flatten.map(unknown => unknown.key -> unknown).toMap.values.toSeq
 
   private def combineExtendedPublicKeys(keys: Seq[Seq[ExtendedPublicKeyWithMaster]]): Seq[ExtendedPublicKeyWithMaster] =
     keys.flatten.map(key => key.extendedPublicKey -> key).toMap.values.toSeq
@@ -464,7 +464,7 @@ object Psbt {
       _ <- readMagicBytes(input)
       _ <- readSeparator(input)
       global <- readGlobal(input)
-      inputs <- readInputs(input, global.tx.txIn.length)
+      inputs <- readInputs(input, global.tx.txIn)
       outputs <- readOutputs(input, global.tx.txOut.length)
     } yield Psbt(global, inputs, outputs)
 
@@ -532,14 +532,20 @@ object Psbt {
       } yield Global(version, tx, xpubs, unknown)
     })
 
-    private def readInputs(input: InputStream, expectedCount: Int): Try[Seq[PartiallySignedInput]] = trySequence((0 until expectedCount).map(_ => readInput(input)))
+    private def readInputs(input: InputStream, txsIn: Seq[TxIn]): Try[Seq[PartiallySignedInput]] = trySequence(txsIn.map(txIn => readInput(input, txIn)))
 
-    private def readInput(input: InputStream): Try[PartiallySignedInput] = readDataMap(input).flatMap(entries => {
+    private def readInput(input: InputStream, txIn: TxIn): Try[PartiallySignedInput] = readDataMap(input).flatMap(entries => {
       val keyTypes = Set(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08).map(_.toByte)
       val (known, unknown) = entries.partition(entry => entry.key.headOption.exists(keyTypes.contains))
       val nonWitnessUtxo_opt: Try[Option[Transaction]] = known.find(_.key.head == 0x00).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt non-witness utxo key must contain exactly 1 byte"))
-        case DataEntry(_, value) => Success(Some(Transaction.read(value.toArray)))
+        case DataEntry(_, value) =>
+          val inputTx = Transaction.read(value.toArray)
+          if (inputTx.txid == txIn.outPoint.txid && txIn.outPoint.index < inputTx.txOut.length) {
+            Success(Some(inputTx))
+          } else {
+            Failure(new IllegalArgumentException("psbt non-witness utxo does not match psbt outpoint"))
+          }
       }.getOrElse(Success(None))
       val witnessUtxo_opt: Try[Option[TxOut]] = known.find(_.key.head == 0x01).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt witness utxo key must contain exactly 1 byte"))
