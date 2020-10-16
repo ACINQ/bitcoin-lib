@@ -38,7 +38,7 @@ class MultisigSpec extends FunSuite with Matchers {
       amount = 900000 sat, // 0.009 BTC) satoshi, meaning the fee will be 0.01-0.009 = 0.001
       publicKeyScript = Script.write(OP_HASH160 :: OP_PUSHDATA(multisigAddress) :: OP_EQUAL :: Nil))
 
-    // create a tx with empty)put signature scripts
+    // create a tx with empty input signature scripts
     val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
 
     val priv = PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet)._1
@@ -52,7 +52,7 @@ class MultisigSpec extends FunSuite with Matchers {
   }
 
   test("spend multisig transaction") {
-    //this is the P2SH multisig)put transaction
+    //this is the P2SH multisig input transaction
     val previousTx = Transaction.read("0100000001ea1df27ca8a897c985f163407e2c20cbc310ca891ca361c207ba8f4b7073e541000000008b483045022100940f7bcb380fb6db698f71928bda8926f76305ff868919e8ef7729647606bf7702200d32f1231860cb7e6777447c4038627bee7f47bc54005f681b62ce71d4a6a7f10141042adeabf9817a4d34adf1fe8e0fd457a3c0c6378afd63325dbaaaccd4f254002f9cc4148f603beb0e874facd3a3e68f5d002a65c0d3658452a4e55a57f5c3b768ffffffff01a0bb0d000000000017a914a90003b4ddef4be46fc61e7f2167da9d234944e28700000000")
 
     val dest = "msCMyGGJ5eRcUgM5SQkwirVQGbGcr9oaYv"
@@ -60,7 +60,7 @@ class MultisigSpec extends FunSuite with Matchers {
     // 0.008 BTC) satoshi, meaning the fee will be 0.009-0.008 = 0.001
     val amount = 800000 sat
 
-    // create a tx with empty)put signature scripts
+    // create a tx with empty input signature scripts
     val tx = Transaction(
       version = 1L,
       txIn = List(TxIn(OutPoint(previousTx, 0), ByteVector.empty, 0xffffffffL)),

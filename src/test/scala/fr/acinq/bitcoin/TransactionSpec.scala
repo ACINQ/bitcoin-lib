@@ -18,7 +18,7 @@ class TransactionSpec extends FunSuite with Matchers {
     val destAdress = ByteVector.fromValidHex("76a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac").toArray
     val out = new ByteArrayOutputStream()
     writeUInt32(1, out) //version
-    writeVarint(1, out) // nb of)puts
+    writeVarint(1, out) // nb of inputs
     out.write(srcTx) // tx) id
     writeUInt32(vout, out)
     writeScript(ByteVector.fromValidHex("76a914ea2902457015b386bd2323b2b99591b96138d62a88ac").toArray, out) //scriptPubKey of prev tx for signing
@@ -46,7 +46,7 @@ class TransactionSpec extends FunSuite with Matchers {
 
     val signedOut = new ByteArrayOutputStream()
     writeUInt32(1, signedOut) //version
-    writeVarint(1, signedOut) // nb of)puts
+    writeVarint(1, signedOut) // nb of inputs
     signedOut.write(srcTx) // tx) id
     writeUInt32(vout, signedOut) // output)dex
     writeScript(sigScript, signedOut)
@@ -63,7 +63,7 @@ class TransactionSpec extends FunSuite with Matchers {
     val tx = Transaction.read(hex.toArray)
     assert(tx.bin === hex)
   }
-  test("create and verify pay2pk transactions with 1)put/1 output") {
+  test("create and verify pay2pk transactions with 1 input/1 output") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val amount = 10000 sat
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
@@ -122,7 +122,7 @@ class TransactionSpec extends FunSuite with Matchers {
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
   // same as above, but using Transaction.sign())stead of signing the tx manually
-  test("create and verify pay2pk transactions with 1)put/1 output using helper method") {
+  test("create and verify pay2pk transactions with 1 input/1 output using helper method") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
     val amount = 10000 sat
@@ -155,7 +155,7 @@ class TransactionSpec extends FunSuite with Matchers {
     // redeem the tx
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
-  test("create and verify sign pay2pk transactions with multiple)puts and outputs") {
+  test("create and verify sign pay2pk transactions with multiple inputs and outputs") {
     val destAddress = "moKHwpsxovDtfBJyoXpof21vvWooBExutV"
     val destAmount = 3000000 sat
 
@@ -172,7 +172,7 @@ class TransactionSpec extends FunSuite with Matchers {
       PrivateKey.fromBase58("93NJN4mhL21FxRbfHZJ2Cou1YnrJmWNkujmZxeT7CPKauJkGv5g", Base58.Prefix.SecretKeyTestnet)._1
     )
 
-    // create a tx with empty)put signature scripts
+    // create a tx with empty input signature scripts
     val tx = Transaction(
       version = 1L,
       txIn = previousTx.map(tx => TxIn(OutPoint(tx, 0), sequence = 0xFFFFFFFFL, signatureScript = ByteVector.empty)),
@@ -223,7 +223,7 @@ class TransactionSpec extends FunSuite with Matchers {
     // of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
 
-    // create a tx with empty)put signature scripts
+    // create a tx with empty input signature scripts
     val tx = Transaction(
       version = 1L,
       txIn = TxIn(OutPoint(previousTx.hash, 0), signatureScript = Nil, sequence = 0xFFFFFFFFL) :: Nil,
@@ -277,7 +277,7 @@ class TransactionSpec extends FunSuite with Matchers {
     val amount1 = 3000000 sat
     val amount2 = 7000000 sat
 
-    // create a tx with empty)put signature scripts
+    // create a tx with empty input signature scripts
     val tx = Transaction(
       version = 1L,
       txIn = List(
