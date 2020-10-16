@@ -40,28 +40,22 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.PartiallySignedInput], out
              redeemScript: Option[Seq[ScriptElt]] = None,
              witnessScript: Option[Seq[ScriptElt]] = None,
              sighashType: Option[Int] = None,
-             derivationPaths: Map[PublicKey, KeyPathWithMaster] = Map.empty): Try[Psbt] = {
+             derivationPaths: Map[PublicKey, KeyPathWithMaster] = Map.empty): Try[Psbt] = Try {
+    require(outputIndex < inputTx.txOut.size, "output index must exist in the input tx")
     val outpoint = OutPoint(inputTx, outputIndex)
-    if (outputIndex >= inputTx.txOut.length) {
-      Failure(new IllegalArgumentException("output index must exist in the input tx"))
-    } else if (!global.tx.txIn.map(_.outPoint).contains(outpoint)) {
-      Failure(new IllegalArgumentException("psbt transaction does not spend the provided outpoint"))
+    val inputIndex = global.tx.txIn.indexWhere(_.outPoint == outpoint)
+    require(inputIndex >= 0, "psbt transaction does not spend the provided outpoint")
+    val input = inputs(inputIndex)
+    val withUtxo = if (witnessScript.nonEmpty) {
+      input.copy(witnessUtxo = Some(inputTx.txOut(outputIndex)), redeemScript = redeemScript.orElse(input.redeemScript), witnessScript = witnessScript)
     } else {
-      val updatedInputs = global.tx.txIn.zip(inputs).map {
-        case (txIn, input) if txIn.outPoint == outpoint =>
-          val withUtxo = if (witnessScript.nonEmpty) {
-            input.copy(witnessUtxo = Some(inputTx.txOut(outputIndex)), redeemScript = redeemScript.orElse(input.redeemScript), witnessScript = witnessScript)
-          } else {
-            input.copy(nonWitnessUtxo = Some(inputTx), redeemScript = redeemScript.orElse(input.redeemScript))
-          }
-          withUtxo.copy(
-            sighashType = sighashType.orElse(input.sighashType),
-            derivationPaths = input.derivationPaths ++ derivationPaths
-          )
-        case (_, input) => input // we don't update other inputs
-      }
-      Success(this.copy(inputs = updatedInputs))
+      input.copy(nonWitnessUtxo = Some(inputTx), redeemScript = redeemScript.orElse(input.redeemScript))
     }
+    val withSigHashAndDerivation = withUtxo.copy(
+      sighashType = sighashType.orElse(input.sighashType),
+      derivationPaths = input.derivationPaths ++ derivationPaths
+    )
+    this.copy(inputs = inputs.updated(inputIndex, withSigHashAndDerivation))
   }
 
   /**
@@ -73,18 +67,12 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.PartiallySignedInput], out
    * @param inputIndex index of the input that should be signed.
    * @return the psbt with a partial signature added (other inputs will not be modified).
    */
-  def sign(priv: PrivateKey, inputIndex: Int): Try[Psbt] = {
-    if (inputIndex >= inputs.length) {
-      Failure(new IllegalArgumentException("input index must exist in the input tx"))
-    } else {
-      val signedInputs = inputs.zipWithIndex.map {
-        case (input, i) if i == inputIndex => Psbt.sign(priv, inputIndex, input, global) match {
-          case Success(signedInput) => signedInput
-          case Failure(ex) => return Failure(ex)
-        }
-        case (input, _) => input
-      }
-      Success(this.copy(inputs = signedInputs))
+  def sign(priv: PrivateKey, inputIndex: Int): Try[Psbt] = Try {
+    require(inputIndex < inputs.length, "input index must exist in the input tx")
+    val input = inputs(inputIndex)
+    Psbt.sign(priv, inputIndex, input, global) match {
+      case Success(signedInput) => this.copy(inputs = inputs.updated(inputIndex, signedInput))
+      case Failure(ex) => return Failure(ex)
     }
   }
 

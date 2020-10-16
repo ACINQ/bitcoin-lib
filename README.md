@@ -428,8 +428,7 @@ Bitcoin-lib provides low-level support for reading, writing and manipulating PSB
 
     // Provide information about the first input:
     val tx1 = Transaction.read(hex"0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000".toArray)
-    val Success(oneInputFilled) = Psbt.update(
-      psbtNotFunded,
+    val Success(oneInputFilled) = psbtNotFunded.update(
       tx1,
       outputIndex = 0,
       Some(Script.createMultiSigMofN(2, Seq(aliceKeyNonWitness.publicKey, bobKeyNonWitness.publicKey)))
@@ -437,8 +436,7 @@ Bitcoin-lib provides low-level support for reading, writing and manipulating PSB
 
     // Provide information about the second input:
     val tx2 = Transaction.read(hex"0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000".toArray)
-    val Success(bothInputsFilled) = Psbt.update(
-      oneInputFilled,
+    val Success(bothInputsFilled) = oneInputFilled.update(
       tx2,
       outputIndex = 1,
       Some(Script.pay2wsh(Script.createMultiSigMofN(2, Seq(aliceKeyWitness.publicKey, bobKeyWitness.publicKey)))),
@@ -447,15 +445,15 @@ Bitcoin-lib provides low-level support for reading, writing and manipulating PSB
 
     // Alice signs both inputs:
     val signedByAlice = {
-      val Success(firstInputSigned) = Psbt.sign(aliceKeyNonWitness, bothInputsFilled, 0)
-      val Success(bothInputsSigned) = Psbt.sign(aliceKeyWitness, firstInputSigned, 1)
+      val Success(firstInputSigned) = bothInputsFilled.sign(aliceKeyNonWitness, 0)
+      val Success(bothInputsSigned) = firstInputSigned.sign(aliceKeyWitness, 1)
       bothInputsSigned
     }
 
     // Bob signs both inputs:
     val signedByBob = {
-      val Success(firstInputSigned) = Psbt.sign(bobKeyNonWitness, signedByAlice, 0)
-      val Success(bothInputsSigned) = Psbt.sign(bobKeyWitness, firstInputSigned, 1)
+      val Success(firstInputSigned) = signedByAlice.sign(bobKeyNonWitness, 0)
+      val Success(bothInputsSigned) = firstInputSigned.sign(bobKeyWitness, 1)
       bothInputsSigned
     }
 
@@ -464,12 +462,12 @@ Bitcoin-lib provides low-level support for reading, writing and manipulating PSB
       // The first input is a non-witness 2-of-2 multi-sig:
       val redeemScript = Script.write(Script.createMultiSigMofN(2, Seq(aliceKeyNonWitness.publicKey, bobKeyNonWitness.publicKey)))
       val scriptSig = OP_0 +: signedByBob.inputs.head.partialSigs.values.map(sig => OP_PUSHDATA(ByteVector(sig))).toSeq :+ OP_PUSHDATA(redeemScript)
-      val Success(firstInputFinalized) = Psbt.finalize(signedByBob, inputIndex = 0, scriptSig)
+      val Success(firstInputFinalized) = signedByBob.finalize(inputIndex = 0, scriptSig)
       // The second input is a witness 2-of-2 multi-sig:
       val witnessScript = Script.write(Script.createMultiSigMofN(2, Seq(aliceKeyWitness.publicKey, bobKeyWitness.publicKey)))
       val scriptWitness = ScriptWitness(ByteVector.empty +: signedByBob.inputs(1).partialSigs.values.map(sig => ByteVector(sig)).toSeq :+ witnessScript)
-      val Success(bothInputsFinalized) = Psbt.finalize(firstInputFinalized, inputIndex = 1, scriptWitness)
-      Psbt.extract(bothInputsFinalized)
+      val Success(bothInputsFinalized) = firstInputFinalized.finalize(inputIndex = 1, scriptWitness)
+      bothInputsFinalized.extract()
     }
 
     // Transaction is ready to be broadcast.
