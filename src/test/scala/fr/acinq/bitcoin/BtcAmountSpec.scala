@@ -68,9 +68,9 @@ class BtcAmountSpec extends FunSuite {
   }
 
   test("negate amount") {
-    assert(Satoshi(-20) === -Satoshi(20))
-    assert(MilliBtc(-1.5) === -MilliBtc(1.5))
-    assert(Btc(-2.5) === -Btc(2.5))
+    assert(Satoshi(-20) === Satoshi(20).unary_-())
+    assert(MilliBtc(-1.5) === MilliBtc(1.5).unary_-())
+    assert(Btc(-2.5) === Btc(2.5).unary_-())
   }
 
   test("max/min") {
