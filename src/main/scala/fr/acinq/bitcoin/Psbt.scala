@@ -5,7 +5,7 @@ import java.nio.ByteOrder
 
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.DeterministicWallet.{ExtendedPublicKey, KeyPath}
-import scodec.bits.ByteVector
+import scodec.bits.{ByteVector, HexStringSyntax}
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
@@ -43,7 +43,7 @@ object Psbt {
    */
   case class KeyPathWithMaster(masterKeyFingerprint: Long, keyPath: KeyPath)
 
-  case class DataEntry(key: Array[Byte], value: Array[Byte])
+  case class DataEntry(key: ByteVector, value: ByteVector)
 
   /** A PSBT is a collection of key-value maps. */
   sealed trait DataMap {
@@ -78,7 +78,7 @@ object Psbt {
   case class PartiallySignedInput(nonWitnessUtxo: Option[Transaction],
                                   witnessUtxo: Option[TxOut],
                                   sighashType: Option[Int],
-                                  partialSigs: Map[PublicKey, Array[Byte]],
+                                  partialSigs: Map[PublicKey, ByteVector],
                                   derivationPaths: Map[PublicKey, KeyPathWithMaster],
                                   redeemScript: Option[List[ScriptElt]],
                                   witnessScript: Option[List[ScriptElt]],
@@ -102,8 +102,9 @@ object Psbt {
   // @formatter:off
   def read(input: InputStream): Try[Psbt] = Codecs.read(input)
   def read(input: Array[Byte]): Try[Psbt] = read(new ByteArrayInputStream(input))
+  def read(input: ByteVector): Try[Psbt] = read(input.toArray)
   def fromBase64(input: String): Try[Psbt] = ByteVector.fromBase64(input) match {
-    case Some(b) => read(b.toArray)
+    case Some(b) => read(b)
     case None => Failure(new IllegalArgumentException("psbt is not correctly base64-encoded"))
   }
   def write(psbt: Psbt, output: OutputStream): Unit = Codecs.write(psbt, output)
@@ -125,13 +126,17 @@ object Psbt {
       outputs <- readOutputs(input, global.tx.txOut.length)
     } yield Psbt(global, inputs, outputs)
 
-    private def readMagicBytes(input: InputStream): Try[Boolean] = input.readNBytes(4).toList match {
-      case 0x70 :: 0x73 :: 0x62 :: 0x74 :: Nil => Success(true)
+    private def readMagicBytes(input: InputStream): Try[Boolean] = Try {
+      input.readNBytes(4).toList
+    } match {
+      case Success(0x70 :: 0x73 :: 0x62 :: 0x74 :: Nil) => Success(true)
       case _ => Failure(new IllegalArgumentException("invalid magic bytes: psbt must start with 0x70736274"))
     }
 
-    private def readSeparator(input: InputStream): Try[Boolean] = input.read() match {
-      case 0xff => Success(true)
+    private def readSeparator(input: InputStream): Try[Boolean] = Try {
+      input.read()
+    } match {
+      case Success(0xff) => Success(true)
       case _ => Failure(new IllegalArgumentException("magic bytes must be followed by the 0xff separator"))
     }
 
@@ -149,7 +154,7 @@ object Psbt {
       val tx_opt: Try[Transaction] = known.find(_.key.head == 0x00).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt tx key must contain exactly 1 byte"))
         case DataEntry(_, value) =>
-          val tx = Transaction.read(value)
+          val tx = Transaction.read(value.toArray)
           if (tx.txIn.exists(input => input.hasWitness || input.signatureScript.nonEmpty)) {
             Failure(new IllegalArgumentException("psbt tx inputs must have empty scriptSigs and witness"))
           } else {
@@ -159,7 +164,7 @@ object Psbt {
       val xpubs_opt: Try[Seq[ExtendedPublicKeyWithMaster]] = trySequence(known.filter(_.key.head == 0x01).map {
         case DataEntry(key, _) if key.tail.length != 78 => Failure(new IllegalArgumentException("psbt bip32 xpub must contain exactly 78 bytes"))
         case DataEntry(key, value) =>
-          val xpub = new ByteArrayInputStream(key.tail)
+          val xpub = new ByteArrayInputStream(key.toArray.tail)
           val prefix = Protocol.uint32(xpub, ByteOrder.BIG_ENDIAN)
           val depth = Protocol.uint8(xpub)
           val parent = Protocol.uint32(xpub, ByteOrder.BIG_ENDIAN)
@@ -192,14 +197,14 @@ object Psbt {
       val (known, unknown) = entries.partition(entry => entry.key.headOption.exists(keyTypes.contains))
       val nonWitnessUtxo_opt: Try[Option[Transaction]] = known.find(_.key.head == 0x00).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt non-witness utxo key must contain exactly 1 byte"))
-        case DataEntry(_, value) => Success(Some(Transaction.read(value)))
+        case DataEntry(_, value) => Success(Some(Transaction.read(value.toArray)))
       }.getOrElse(Success(None))
       val witnessUtxo_opt: Try[Option[TxOut]] = known.find(_.key.head == 0x01).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt witness utxo key must contain exactly 1 byte"))
-        case DataEntry(_, value) => Success(Some(TxOut.read(value)))
+        case DataEntry(_, value) => Success(Some(TxOut.read(value.toArray)))
       }.getOrElse(Success(None))
-      val partialSigs_opt: Try[Map[PublicKey, Array[Byte]]] = trySequence(known.filter(_.key.head == 0x02).map {
-        case DataEntry(key, value) => Success(PublicKey(ByteVector(key.tail), checkValid = true), value)
+      val partialSigs_opt: Try[Map[PublicKey, ByteVector]] = trySequence(known.filter(_.key.head == 0x02).map {
+        case DataEntry(key, value) => Success(PublicKey(key.tail, checkValid = true), value)
       }).map(_.toMap)
       val sighashType_opt: Try[Option[Int]] = known.find(_.key.head == 0x03).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt sighash type key must contain exactly 1 byte"))
@@ -217,9 +222,9 @@ object Psbt {
       val derivationPaths_opt: Try[Map[PublicKey, KeyPathWithMaster]] = trySequence(known.filter(_.key.head == 0x06).map {
         case DataEntry(_, value) if value.length < 4 || value.length % 4 != 0 => Failure(new IllegalArgumentException("psbt bip32 derivation must contain master key fingerprint and child indexes"))
         case DataEntry(key, value) =>
-          val publicKey = PublicKey(ByteVector(key.tail), checkValid = true)
+          val publicKey = PublicKey(key.tail, checkValid = true)
           val masterKeyFingerprint = Protocol.uint32(value.take(4), ByteOrder.BIG_ENDIAN)
-          val childCount = (value.length / 4) - 1
+          val childCount = (value.length.toInt / 4) - 1
           val derivationPath = KeyPath((0 until childCount).map(i => Protocol.uint32(value.slice(4 * (i + 1), 4 * (i + 2)), ByteOrder.LITTLE_ENDIAN)))
           Success(publicKey, KeyPathWithMaster(masterKeyFingerprint, derivationPath))
       }).map(_.toMap)
@@ -229,7 +234,7 @@ object Psbt {
       }.getOrElse(Success(None))
       val scriptWitness_opt: Try[Option[ScriptWitness]] = known.find(_.key.head == 0x08).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt script witness key must contain exactly 1 byte"))
-        case DataEntry(_, value) => Success(Some(ScriptWitness.read(value)))
+        case DataEntry(_, value) => Success(Some(ScriptWitness.read(value.toArray)))
       }.getOrElse(Success(None))
       for {
         nonWitnessUtxo <- nonWitnessUtxo_opt
@@ -260,9 +265,9 @@ object Psbt {
       val derivationPaths_opt: Try[Map[PublicKey, KeyPathWithMaster]] = trySequence(known.filter(_.key.head == 0x02).map {
         case DataEntry(_, value) if value.length < 4 || value.length % 4 != 0 => Failure(new IllegalArgumentException("psbt bip32 derivation must contain master key fingerprint and child indexes"))
         case DataEntry(key, value) =>
-          val publicKey = PublicKey(ByteVector(key.tail), checkValid = true)
+          val publicKey = PublicKey(key.tail, checkValid = true)
           val masterKeyFingerprint = Protocol.uint32(value.take(4), ByteOrder.BIG_ENDIAN)
-          val childCount = (value.length / 4) - 1
+          val childCount = (value.length.toInt / 4) - 1
           val derivationPath = KeyPath((0 until childCount).map(i => Protocol.uint32(value.slice(4 * (i + 1), 4 * (i + 2)), ByteOrder.LITTLE_ENDIAN)))
           Success(publicKey, KeyPathWithMaster(masterKeyFingerprint, derivationPath))
       }).map(_.toMap)
@@ -276,8 +281,7 @@ object Psbt {
     @tailrec
     private def readDataMap(input: InputStream, entries: Seq[DataEntry] = Nil): Try[Seq[DataEntry]] = readDataEntry(input) match {
       case Success(Some(entry)) => readDataMap(input, entry +: entries)
-      // NB: we convert Array[Byte] to ByteVector because comparing two Array[Byte] doesn't compare the contents of the arrays.
-      case Success(None) => if (entries.map(entry => ByteVector(entry.key)).toSet.size != entries.size) {
+      case Success(None) => if (entries.map(_.key).toSet.size != entries.size) {
         Failure(new IllegalArgumentException("psbt must not contain duplicate keys"))
       } else {
         Success(entries)
@@ -285,14 +289,16 @@ object Psbt {
       case Failure(ex) => Failure(ex)
     }
 
-    private def readDataEntry(input: InputStream): Try[Option[DataEntry]] = Protocol.varint(input) match {
-      case 0 =>
-        // 0x00 is used as separator to mark the end of a data map.
-        Success(None)
-      case keyLength =>
-        val key = input.readNBytes(keyLength.toInt)
-        val value = input.readNBytes(Protocol.varint(input).toInt)
-        Success(Some(DataEntry(key, value)))
+    private def readDataEntry(input: InputStream): Try[Option[DataEntry]] = Try {
+      Protocol.varint(input) match {
+        case 0 =>
+          // 0x00 is used as separator to mark the end of a data map.
+          None
+        case keyLength =>
+          val key = input.readNBytes(keyLength.toInt)
+          val value = input.readNBytes(Protocol.varint(input).toInt)
+          Some(DataEntry(ByteVector(key), ByteVector(value)))
+      }
     }
 
     private def trySequence[T](elems: Seq[Try[T]]): Try[Seq[T]] = elems.foldLeft(Success(Seq.empty): Try[Seq[T]]) {
@@ -310,7 +316,7 @@ object Psbt {
     }
 
     private def writeGlobal(global: Global, output: OutputStream): Unit = {
-      writeDataEntry(DataEntry(Array(0x00), Transaction.write(global.tx).toArray), output)
+      writeDataEntry(DataEntry(hex"00", Transaction.write(global.tx)), output)
       global.extendedPublicKeys.foreach(xpub => {
         val key = new ByteArrayOutputStream()
         Protocol.writeUInt8(0x01, key) // key type
@@ -319,41 +325,41 @@ object Psbt {
         val value = new ByteArrayOutputStream()
         Protocol.writeUInt32(xpub.masterKeyFingerprint, value, ByteOrder.BIG_ENDIAN)
         xpub.extendedPublicKey.path.foreach(child => Protocol.writeUInt32(child, value, ByteOrder.LITTLE_ENDIAN))
-        writeDataEntry(DataEntry(key.toByteArray, value.toByteArray), output)
+        writeDataEntry(DataEntry(ByteVector(key.toByteArray), ByteVector(value.toByteArray)), output)
       })
       if (global.version > 0) {
-        writeDataEntry(DataEntry(Array(0xfb.toByte), Protocol.writeUInt32(global.version, ByteOrder.LITTLE_ENDIAN).toArray), output)
+        writeDataEntry(DataEntry(hex"fb", Protocol.writeUInt32(global.version, ByteOrder.LITTLE_ENDIAN)), output)
       }
       global.unknown.foreach(entry => writeDataEntry(entry, output))
       Protocol.writeUInt8(0x00, output) // separator
     }
 
     private def writeInputs(inputs: Seq[Psbt.PartiallySignedInput], output: OutputStream): Unit = inputs.foreach(input => {
-      input.nonWitnessUtxo.foreach(tx => writeDataEntry(DataEntry(Array(0x00), Transaction.write(tx).toArray), output))
-      input.witnessUtxo.foreach(txOut => writeDataEntry(DataEntry(Array(0x01), TxOut.write(txOut).toArray), output))
-      sortPublicKeys(input.partialSigs).foreach { case (publicKey, signature) => writeDataEntry(DataEntry(0x02.toByte +: publicKey.value.toArray, signature), output) }
-      input.sighashType.foreach(sighashType => writeDataEntry(DataEntry(Array(0x03), Protocol.writeUInt32(sighashType, ByteOrder.LITTLE_ENDIAN).toArray), output))
-      input.redeemScript.foreach(redeemScript => writeDataEntry(DataEntry(Array(0x04), Script.write(redeemScript).toArray), output))
-      input.witnessScript.foreach(witnessScript => writeDataEntry(DataEntry(Array(0x05), Script.write(witnessScript).toArray), output))
+      input.nonWitnessUtxo.foreach(tx => writeDataEntry(DataEntry(hex"00", Transaction.write(tx)), output))
+      input.witnessUtxo.foreach(txOut => writeDataEntry(DataEntry(hex"01", TxOut.write(txOut)), output))
+      sortPublicKeys(input.partialSigs).foreach { case (publicKey, signature) => writeDataEntry(DataEntry(0x02.toByte +: publicKey.value, signature), output) }
+      input.sighashType.foreach(sighashType => writeDataEntry(DataEntry(hex"03", Protocol.writeUInt32(sighashType, ByteOrder.LITTLE_ENDIAN)), output))
+      input.redeemScript.foreach(redeemScript => writeDataEntry(DataEntry(hex"04", Script.write(redeemScript)), output))
+      input.witnessScript.foreach(witnessScript => writeDataEntry(DataEntry(hex"05", Script.write(witnessScript)), output))
       sortPublicKeys(input.derivationPaths).foreach {
         case (publicKey, path) =>
-          val key = 0x06.toByte +: publicKey.value.toArray
-          val value = Protocol.writeUInt32(path.masterKeyFingerprint, ByteOrder.BIG_ENDIAN).toArray ++ path.keyPath.flatMap(childNumber => Protocol.writeUInt32(childNumber, ByteOrder.LITTLE_ENDIAN).toArray)
+          val key = 0x06.toByte +: publicKey.value
+          val value = Protocol.writeUInt32(path.masterKeyFingerprint, ByteOrder.BIG_ENDIAN) ++ ByteVector.concat(path.keyPath.map(childNumber => Protocol.writeUInt32(childNumber, ByteOrder.LITTLE_ENDIAN)))
           writeDataEntry(DataEntry(key, value), output)
       }
-      input.scriptSig.foreach(scriptSig => writeDataEntry(DataEntry(Array(0x07), Script.write(scriptSig).toArray), output))
-      input.scriptWitness.foreach(scriptWitness => writeDataEntry(DataEntry(Array(0x08), ScriptWitness.write(scriptWitness).toArray), output))
+      input.scriptSig.foreach(scriptSig => writeDataEntry(DataEntry(hex"07", Script.write(scriptSig)), output))
+      input.scriptWitness.foreach(scriptWitness => writeDataEntry(DataEntry(hex"08", ScriptWitness.write(scriptWitness)), output))
       input.unknown.foreach(entry => writeDataEntry(entry, output))
       Protocol.writeUInt8(0x00, output) // separator
     })
 
     private def writeOutputs(outputs: Seq[Psbt.PartiallySignedOutput], out: OutputStream): Unit = outputs.foreach(output => {
-      output.redeemScript.foreach(redeemScript => writeDataEntry(DataEntry(Array(0x00), Script.write(redeemScript).toArray), out))
-      output.witnessScript.foreach(witnessScript => writeDataEntry(DataEntry(Array(0x01), Script.write(witnessScript).toArray), out))
+      output.redeemScript.foreach(redeemScript => writeDataEntry(DataEntry(hex"00", Script.write(redeemScript)), out))
+      output.witnessScript.foreach(witnessScript => writeDataEntry(DataEntry(hex"01", Script.write(witnessScript)), out))
       sortPublicKeys(output.derivationPaths).foreach {
         case (publicKey, path) =>
-          val key = 0x02.toByte +: publicKey.value.toArray
-          val value = Protocol.writeUInt32(path.masterKeyFingerprint, ByteOrder.BIG_ENDIAN).toArray ++ path.keyPath.flatMap(childNumber => Protocol.writeUInt32(childNumber, ByteOrder.LITTLE_ENDIAN).toArray)
+          val key = 0x02.toByte +: publicKey.value
+          val value = Protocol.writeUInt32(path.masterKeyFingerprint, ByteOrder.BIG_ENDIAN) ++ ByteVector.concat(path.keyPath.map(childNumber => Protocol.writeUInt32(childNumber, ByteOrder.LITTLE_ENDIAN)))
           writeDataEntry(DataEntry(key, value), out)
       }
       output.unknown.foreach(entry => writeDataEntry(entry, out))
