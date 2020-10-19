@@ -2,6 +2,7 @@ package fr.acinq.bitcoin
 
 import com.google.common.io.BaseEncoding
 import fr.acinq.bitcoin.Base58.Prefix
+import fr.acinq.bitcoin.Crypto.PublicKey
 import org.scalatest.FlatSpec
 import scodec.bits._
 
@@ -29,6 +30,14 @@ class ScriptSpec extends FlatSpec {
   it should "detect 'pay to script' scripts" in {
     val script = hex"a91415727299b05b45fdaf9ac9ecf7565cfe27c3e56787"
     assert(Script.isPayToScript(script))
+  }
+  it should "detect 'native witness' scripts" in {
+    val p2wpkh = Script.pay2wpkh(PublicKey(hex"029da12cdb5b235692b91536afefe5c91c3ab9473d8e43b533836ab456299c8871"))
+    assert(Script.isNativeWitnessScript(p2wpkh))
+    assert(Script.isNativeWitnessScript(Script.write(p2wpkh)))
+    val p2wsh = Script.pay2wsh(hex"a91415727299b05b45fdaf9ac9ecf7565cfe27c3e56787")
+    assert(Script.isNativeWitnessScript(p2wsh))
+    assert(Script.isNativeWitnessScript(Script.write(p2wsh)))
   }
   it should "parse if/else/endif" in {
     val tx = Transaction(version = 1,
