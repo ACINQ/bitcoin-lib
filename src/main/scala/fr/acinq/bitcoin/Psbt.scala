@@ -249,7 +249,7 @@ object Psbt {
                                   unknown: Seq[DataEntry]) extends DataMap
 
   object PartiallySignedInput {
-    def empty: PartiallySignedInput = PartiallySignedInput(None, None, None, Map.empty, Map.empty, None, None, None, None, Nil)
+    val empty: PartiallySignedInput = PartiallySignedInput(None, None, None, Map.empty, Map.empty, None, None, None, None, Nil)
   }
 
   /**
@@ -266,7 +266,7 @@ object Psbt {
                                    unknown: Seq[DataEntry]) extends DataMap
 
   object PartiallySignedOutput {
-    def empty: PartiallySignedOutput = PartiallySignedOutput(None, None, Map.empty, Nil)
+    val empty: PartiallySignedOutput = PartiallySignedOutput(None, None, Map.empty, Nil)
   }
 
   /**
