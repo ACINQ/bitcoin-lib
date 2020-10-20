@@ -18,7 +18,7 @@ object FindMyAddresses extends App {
   def address(pub: PublicKey): String = Base58Check.encode(if (testnet) Base58.Prefix.ScriptAddressTestnet else Base58.Prefix.ScriptAddress, Crypto.hash160(Script.write(Script.pay2wpkh(pub))))
 
   // step #1: compute the seed from the mnemonic code
-  val seed = MnemonicCode.toSeed(mnemonics.split(' '), passphrase)
+  val seed = MnemonicCode.toSeed(mnemonics, passphrase)
 
   // step #2: generate the master key from the seed
   val master = generate(seed)

@@ -204,7 +204,7 @@ object Protocol {
     for (_ <- 1L to count) {
       items += reader(input, protocolVersion)
     }
-    items
+    items.toSeq
   }
 
   def readCollection[T](input: InputStream, reader: (InputStream, Long) => T, protocolVersion: Long): Seq[T] = readCollection(input, reader, None, protocolVersion)
@@ -307,7 +307,7 @@ object Message extends BtcSerializer[Message] {
     Message(magic, command, payload)
   }
 
-  override def write(input: Message, out: OutputStream, protocolVersion: Long) = {
+  override def write(input: Message, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(input.magic.toInt, out)
     val buffer = new Array[Byte](12)
     input.command.getBytes("ISO-8859-1").copyToArray(buffer)
@@ -343,7 +343,7 @@ object NetworkAddressWithTimestamp extends BtcSerializer[NetworkAddressWithTimes
     NetworkAddressWithTimestamp(time, services, address, port)
   }
 
-  override def write(input: NetworkAddressWithTimestamp, out: OutputStream, protocolVersion: Long) = {
+  override def write(input: NetworkAddressWithTimestamp, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(input.time.toInt, out)
     writeUInt64(input.services, out)
     input.address match {
@@ -369,7 +369,7 @@ object NetworkAddress extends BtcSerializer[NetworkAddress] {
     NetworkAddress(services, address, port)
   }
 
-  override def write(input: NetworkAddress, out: OutputStream, protocolVersion: Long) = {
+  override def write(input: NetworkAddress, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt64(input.services, out)
     input.address match {
       case _: Inet4Address => writeBytes(hex"00000000000000000000ffff".toArray, out)
@@ -400,7 +400,7 @@ object Version extends BtcSerializer[Version] {
     Version(version, services, timestamp, addr_recv, addr_from, nonce, user_agent, start_height, relay)
   }
 
-  override def write(input: Version, out: OutputStream, protocolVersion: Long) = {
+  override def write(input: Version, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(input.version.toInt, out)
     writeUInt64(input.services, out)
     writeUInt64(input.timestamp, out)
