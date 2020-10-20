@@ -29,7 +29,7 @@ package object bitcoin {
     // @formatter:off
     override def compare(x: Satoshi, y: Satoshi): Int = x.compare(y)
     override def minus(x: Satoshi, y: Satoshi): Satoshi = x - y
-    override def negate(x: Satoshi): Satoshi = Satoshi(-x.toLong)
+    override def negate(x: Satoshi): Satoshi = -x
     override def plus(x: Satoshi, y: Satoshi): Satoshi = x + y
     override def times(x: Satoshi, y: Satoshi): Satoshi = x * y.toLong
     override def toDouble(x: Satoshi): Double = x.toLong.toDouble

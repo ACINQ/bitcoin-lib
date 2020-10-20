@@ -11,7 +11,7 @@ import scodec.bits._
   */
 class BIP84Spec extends FunSuite {
   test("BIP49 reference tests") {
-    val seed = MnemonicCode.toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".split(" ").toSeq, "")
+    val seed = MnemonicCode.toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "")
     val master = DeterministicWallet.generate(seed)
     assert(DeterministicWallet.encode(master, DeterministicWallet.zprv) == "zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5")
     assert(DeterministicWallet.encode(DeterministicWallet.publicKey(master), DeterministicWallet.zpub) == "zpub6jftahH18ngZxLmXaKw3GSZzZsszmt9WqedkyZdezFtWRFBZqsQH5hyUmb4pCEeZGmVfQuP5bedXTB8is6fTv19U1GQRyQUKQGUTzyHACMF")
