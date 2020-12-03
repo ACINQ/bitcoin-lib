@@ -413,6 +413,7 @@ This sample demonstrates how to serialize, create and verify a P2WPSH transactio
 #### Partially Signed Transactions
 
 Bitcoin-lib provides low-level support for reading, writing and manipulating PSBTs.
+Bitcoin-lib is *not* compatible with Bitcoin Core versions before 0.20.1, because we include the `nonWitnessUtxo` for segwit inputs: see [BIP 174 - note 8](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-8) for details.
 
 ```scala
     val aliceKeyNonWitness = PrivateKey(hex"2c6ba77e9184c5b6c6215f84ef0e00558884dec7d23a027f0573d11bf77aff46")

@@ -1,12 +1,11 @@
 package fr.acinq.bitcoin
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
-import java.nio.ByteOrder
-
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.DeterministicWallet.{ExtendedPublicKey, KeyPath}
 import scodec.bits.{ByteVector, HexStringSyntax}
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
+import java.nio.ByteOrder
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
@@ -26,6 +25,7 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.PartiallySignedInput], out
 
   /**
    * Implements the PSBT updater role; adds information about a given UTXO.
+   * Note that we always fill the nonWitnessUtxo (see https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-8).
    *
    * @param inputTx         transaction containing the UTXO.
    * @param outputIndex     index of the UTXO in the inputTx.
@@ -47,7 +47,10 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.PartiallySignedInput], out
     require(inputIndex >= 0, "psbt transaction does not spend the provided outpoint")
     val input = inputs(inputIndex)
     val withUtxo = if (witnessScript.nonEmpty) {
-      input.copy(witnessUtxo = Some(inputTx.txOut(outputIndex)), redeemScript = redeemScript.orElse(input.redeemScript), witnessScript = witnessScript)
+      input.copy(
+        witnessUtxo = Some(inputTx.txOut(outputIndex)), redeemScript = redeemScript.orElse(input.redeemScript), witnessScript = witnessScript,
+        nonWitnessUtxo = Some(inputTx)
+      )
     } else {
       input.copy(nonWitnessUtxo = Some(inputTx), redeemScript = redeemScript.orElse(input.redeemScript))
     }
