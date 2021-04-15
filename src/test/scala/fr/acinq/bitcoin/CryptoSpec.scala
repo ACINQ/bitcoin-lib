@@ -44,7 +44,7 @@ class CryptoSpec extends FlatSpec {
   }
 
   it should "validate public key at instantiation" in {
-    intercept[Throwable] { // can be IllegalArgumentException or AssertFailException depending on whether spongycastle or libsecp256k1 is used
+    intercept[Throwable] { // can be IllegalArgumentException or AssertFailException depending on whether bouncycastle or libsecp256k1 is used
       // by default we check
       PublicKey(hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", checkValid = true)
     }
