@@ -4,17 +4,16 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import java.math.BigInteger
 
 import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
+import org.bouncycastle.asn1.sec.SECNamedCurves
+import org.bouncycastle.asn1.{ASN1Integer, DERSequenceGenerator}
+import org.bouncycastle.crypto.Digest
+import org.bouncycastle.crypto.digests.{RIPEMD160Digest, SHA1Digest, SHA256Digest, SHA512Digest}
+import org.bouncycastle.crypto.macs.HMac
+import org.bouncycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters, KeyParameter}
+import org.bouncycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
+import org.bouncycastle.math.ec.ECPoint
 import org.slf4j.LoggerFactory
-import org.spongycastle.asn1.sec.SECNamedCurves
-import org.spongycastle.asn1.{ASN1Integer, DERSequenceGenerator}
-import org.spongycastle.crypto.Digest
-import org.spongycastle.crypto.digests.{RIPEMD160Digest, SHA1Digest, SHA256Digest, SHA512Digest}
-import org.spongycastle.crypto.macs.HMac
-import org.spongycastle.crypto.params.{ECDomainParameters, ECPrivateKeyParameters, ECPublicKeyParameters, KeyParameter}
-import org.spongycastle.crypto.signers.{ECDSASigner, HMacDSAKCalculator}
-import org.spongycastle.math.ec.ECPoint
 import scodec.bits.ByteVector
-
 
 object Crypto {
   val params = SECNamedCurves.getByName("secp256k1")
@@ -27,7 +26,7 @@ object Crypto {
   if (Secp256k1Context.isEnabled) {
     logger.info("secp256k1 library successfully loaded")
   } else {
-    logger.info("couldn't find secp256k1 library, defaulting to spongycastle")
+    logger.info("couldn't find secp256k1 library, defaulting to bouncycastle")
   }
 
   def fixSize(data: ByteVector): ByteVector32 = ByteVector32(data.padLeft(32))
