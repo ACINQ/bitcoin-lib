@@ -1,13 +1,14 @@
 package fr.acinq.bitcoin
 
-import java.io.ByteArrayOutputStream
-
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.Protocol._
 import org.scalatest.{FunSuite, Matchers}
 import scodec.bits._
 
+import java.io.ByteArrayOutputStream
+
 class TransactionSpec extends FunSuite with Matchers {
+
   test("create and sign transaction") {
     val srcTx = ByteVector.fromValidHex("dcd82df7b26f0eacd226b8fbd366672c854284ba8080f79e1307138c7f1a1f6d").reverse.toArray
     // for some reason it has to be reversed
@@ -58,11 +59,26 @@ class TransactionSpec extends FunSuite with Matchers {
     val res = ByteVector.view(signedOut.toByteArray)
     assert(res === hex"01000000016d1f1a7f8c1307139ef78080ba8442852c6766d3fbb826d2ac0e6fb2f72dd8dc000000008b483045022100bdd23d0f98a4173a64fa432b8bf4ac41261a671f2c6c690d57ac839866d78bb202207bddb87ca95c9cef45de30a75144e5513571aa7938635b9e051b1c20f01088a60141044aec194c55c97f4519535f50f5539c6915045ecb79a36281dee6db55ffe1ad2e55f4a1c0e0950d3511e8f205b45cafa348a4a2ab2359246cb3c93f6532c4e8f5ffffffff0140548900000000001976a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac00000000")
   }
+
   test("read and write transactions") {
     val hex = hex"0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000"
     val tx = Transaction.read(hex.toArray)
     assert(tx.bin === hex)
   }
+
+  test("read transaction without inputs in non-witness format") {
+    val hex = hex"020000000002d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787b32e1300"
+    assertThrows[Throwable](Transaction.read(hex.toArray))
+    val tx = Transaction.read(hex.toArray, Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)
+    assert(tx.version === 2)
+    assert(tx.txIn.isEmpty)
+    assert(tx.txid === ByteVector32(hex"062d74b3c6183147c30a02addf3c8cd0df10a049ced5677247edd8f114ddb6fb"))
+    assert(tx.txOut.length === 2)
+    assert(tx.txOut(0).publicKeyScript === Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hex"d0c59903c5bac2868760e90fd521a4665aa76520") :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
+    assert(tx.txOut(1).publicKeyScript === Script.write(OP_HASH160 :: OP_PUSHDATA(hex"3545e6e33b832c47050f24d3eeb93c9c03948bc7") :: OP_EQUAL :: Nil))
+    assert(tx.bin === hex)
+  }
+
   test("create and verify pay2pk transactions with 1 input/1 output") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val amount = 10000 sat
@@ -121,7 +137,8 @@ class TransactionSpec extends FunSuite with Matchers {
     // check script
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
-  // same as above, but using Transaction.sign())stead of signing the tx manually
+
+  // same as above, but using Transaction.sign() instead of signing the tx manually
   test("create and verify pay2pk transactions with 1 input/1 output using helper method") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
     val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
@@ -155,6 +172,7 @@ class TransactionSpec extends FunSuite with Matchers {
     // redeem the tx
     Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
+
   test("create and verify sign pay2pk transactions with multiple inputs and outputs") {
     val destAddress = "moKHwpsxovDtfBJyoXpof21vvWooBExutV"
     val destAmount = 3000000 sat
@@ -325,4 +343,5 @@ class TransactionSpec extends FunSuite with Matchers {
     val tx = Transaction.read(hex)
     assert(tx.toString == hex)
   }
+
 }
