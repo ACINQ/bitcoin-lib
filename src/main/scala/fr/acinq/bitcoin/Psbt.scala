@@ -25,7 +25,7 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.PartiallySignedInput], out
 
   /**
    * Implements the PSBT updater role; adds information about a given UTXO.
-   * Note that we always fill the nonWitnessUtxo (see https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-8).
+   * Note that we always fill the nonWitnessUtxo (see https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-7).
    *
    * @param inputTx         transaction containing the UTXO.
    * @param outputIndex     index of the UTXO in the inputTx.
@@ -150,10 +150,10 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.PartiallySignedInput], out
           witness = input.scriptWitness.getOrElse(ScriptWitness.empty),
           signatureScript = input.scriptSig.map(Script.write).getOrElse(ByteVector.empty))
         val utxo = input match {
-          case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _) if utxo.txid != txIn.outPoint.txid => return Failure(new IllegalArgumentException("cannot extract transaction: non-witness utxo does not match unsigned tx input"))
-          case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _) if utxo.txOut.length <= txIn.outPoint.index => return Failure(new IllegalArgumentException("cannot extract transaction: non-witness utxo index out of bounds"))
-          case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _) => utxo.txOut(txIn.outPoint.index.toInt)
-          case PartiallySignedInput(_, Some(utxo), _, _, _, _, _, _, _, _) => utxo
+          case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _, _) if utxo.txid != txIn.outPoint.txid => return Failure(new IllegalArgumentException("cannot extract transaction: non-witness utxo does not match unsigned tx input"))
+          case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _, _) if utxo.txOut.length <= txIn.outPoint.index => return Failure(new IllegalArgumentException("cannot extract transaction: non-witness utxo index out of bounds"))
+          case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _, _) => utxo.txOut(txIn.outPoint.index.toInt)
+          case PartiallySignedInput(_, Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _) => utxo
           case _ => return Failure(new IllegalArgumentException("cannot extract transaction: some utxos are missing"))
         }
         (finalTxIn, txIn.outPoint -> utxo)
@@ -249,10 +249,14 @@ object Psbt {
                                   witnessScript: Option[Seq[ScriptElt]],
                                   scriptSig: Option[Seq[ScriptElt]],
                                   scriptWitness: Option[ScriptWitness],
+                                  ripemd160: Set[ByteVector],
+                                  sha256: Set[ByteVector],
+                                  hash160: Set[ByteVector],
+                                  hash256: Set[ByteVector],
                                   unknown: Seq[DataEntry]) extends DataMap
 
   object PartiallySignedInput {
-    val empty: PartiallySignedInput = PartiallySignedInput(None, None, None, Map.empty, Map.empty, None, None, None, None, Nil)
+    val empty: PartiallySignedInput = PartiallySignedInput(None, None, None, Map.empty, Map.empty, None, None, None, None, Set.empty, Set.empty, Set.empty, Set.empty, Nil)
   }
 
   /**
@@ -287,11 +291,11 @@ object Psbt {
   private def sign(priv: PrivateKey, inputIndex: Int, input: PartiallySignedInput, global: Global): Try[PartiallySignedInput] = {
     val txIn = global.tx.txIn(inputIndex)
     input match {
-      case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _) if utxo.txid != txIn.outPoint.txid => Failure(new IllegalArgumentException("non-witness utxo does not match unsigned tx input"))
-      case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _) if utxo.txOut.length <= txIn.outPoint.index => Failure(new IllegalArgumentException("non-witness utxo index out of bounds"))
-      case PartiallySignedInput(_, Some(utxo), _, _, _, _, _, _, _, _) if !Script.isNativeWitnessScript(utxo.publicKeyScript) && !Script.isPayToScript(utxo.publicKeyScript) => Failure(new IllegalArgumentException("witness utxo must use native witness program or P2SH witness program"))
-      case PartiallySignedInput(_, Some(utxo), _, _, _, _, _, _, _, _) => signWitness(priv, inputIndex, input, global, utxo)
-      case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _) => signNonWitness(priv, inputIndex, input, global, utxo)
+      case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _, _) if utxo.txid != txIn.outPoint.txid => Failure(new IllegalArgumentException("non-witness utxo does not match unsigned tx input"))
+      case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _, _) if utxo.txOut.length <= txIn.outPoint.index => Failure(new IllegalArgumentException("non-witness utxo index out of bounds"))
+      case PartiallySignedInput(_, Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _) if !Script.isNativeWitnessScript(utxo.publicKeyScript) && !Script.isPayToScript(utxo.publicKeyScript) => Failure(new IllegalArgumentException("witness utxo must use native witness program or P2SH witness program"))
+      case PartiallySignedInput(_, Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _) => signWitness(priv, inputIndex, input, global, utxo)
+      case PartiallySignedInput(Some(utxo), _, _, _, _, _, _, _, _, _, _, _, _, _) => signNonWitness(priv, inputIndex, input, global, utxo)
       case input => Success(input)
     }
   }
@@ -329,7 +333,7 @@ object Psbt {
       case None => Success(Script.parse(utxo.publicKeyScript))
     }
     redeemScript.flatMap(script => input.witnessScript match {
-      case Some(witnessScript) => if (script != Script.pay2wsh(witnessScript)) {
+      case Some(witnessScript) => if (!Script.isPay2wpkh(script) && script != Script.pay2wsh(witnessScript)) {
         Failure(new IllegalArgumentException("witness script does not match redeemScript or scriptPubKey"))
       } else {
         val sig = Transaction.signInput(global.tx, inputIndex, witnessScript, input.sighashType.getOrElse(SIGHASH_ALL), utxo.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
@@ -378,6 +382,10 @@ object Psbt {
     inputs.flatMap(_.witnessScript).headOption,
     inputs.flatMap(_.scriptSig).headOption,
     inputs.flatMap(_.scriptWitness).headOption,
+    inputs.flatMap(_.ripemd160).toSet,
+    inputs.flatMap(_.sha256).toSet,
+    inputs.flatMap(_.hash160).toSet,
+    inputs.flatMap(_.hash256).toSet,
     combineUnknown(inputs.map(_.unknown))
   )
 
@@ -487,7 +495,7 @@ object Psbt {
       val tx_opt: Try[Transaction] = known.find(_.key.head == 0x00).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt tx key must contain exactly 1 byte"))
         case DataEntry(_, value) =>
-          val tx = Transaction.read(value.toArray)
+          val tx = Transaction.read(value.toArray, Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)
           if (tx.txIn.exists(input => input.hasWitness || input.signatureScript.nonEmpty)) {
             Failure(new IllegalArgumentException("psbt tx inputs must have empty scriptSigs and witness"))
           } else {
@@ -526,7 +534,7 @@ object Psbt {
     private def readInputs(input: InputStream, txsIn: Seq[TxIn]): Try[Seq[PartiallySignedInput]] = trySequence(txsIn.map(txIn => readInput(input, txIn)))
 
     private def readInput(input: InputStream, txIn: TxIn): Try[PartiallySignedInput] = readDataMap(input).flatMap(entries => {
-      val keyTypes = Set(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08).map(_.toByte)
+      val keyTypes = Set(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0a, 0x0b, 0x0c, 0x0d).map(_.toByte)
       val (known, unknown) = entries.partition(entry => entry.key.headOption.exists(keyTypes.contains))
       val nonWitnessUtxo_opt: Try[Option[Transaction]] = known.find(_.key.head == 0x00).map {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt non-witness utxo key must contain exactly 1 byte"))
@@ -575,6 +583,26 @@ object Psbt {
         case DataEntry(key, _) if key.length != 1 => Failure(new IllegalArgumentException("psbt script witness key must contain exactly 1 byte"))
         case DataEntry(_, value) => Success(Some(ScriptWitness.read(value.toArray)))
       }.getOrElse(Success(None))
+      val ripemd160Preimages = trySequence(known.filter(_.key.head == 0x0a).map {
+        case DataEntry(key, _) if key.tail.length != 20 => Failure(new IllegalArgumentException("ripemd160 hash must contain exactly 20 bytes"))
+        case DataEntry(key, value) if key.tail != Crypto.ripemd160(value) => Failure(new IllegalArgumentException("invalid ripemd160 preimage"))
+        case DataEntry(_, value) => Success(value)
+      }).map(_.toSet)
+      val sha256Preimages = trySequence(known.filter(_.key.head == 0x0b).map {
+        case DataEntry(key, _) if key.tail.length != 32 => Failure(new IllegalArgumentException("sha256 hash must contain exactly 32 bytes"))
+        case DataEntry(key, value) if key.tail != Crypto.sha256(value).bytes => Failure(new IllegalArgumentException("invalid sha256 preimage"))
+        case DataEntry(_, value) => Success(value)
+      }).map(_.toSet)
+      val hash160Preimages = trySequence(known.filter(_.key.head == 0x0c).map {
+        case DataEntry(key, _) if key.tail.length != 20 => Failure(new IllegalArgumentException("hash160 hash must contain exactly 20 bytes"))
+        case DataEntry(key, value) if key.tail != Crypto.hash160(value) => Failure(new IllegalArgumentException("invalid hash160 preimage"))
+        case DataEntry(_, value) => Success(value)
+      }).map(_.toSet)
+      val hash256Preimages = trySequence(known.filter(_.key.head == 0x0d).map {
+        case DataEntry(key, _) if key.tail.length != 32 => Failure(new IllegalArgumentException("hash256 hash must contain exactly 32 bytes"))
+        case DataEntry(key, value) if key.tail != Crypto.hash256(value).bytes => Failure(new IllegalArgumentException("invalid hash256 preimage"))
+        case DataEntry(_, value) => Success(value)
+      }).map(_.toSet)
       for {
         nonWitnessUtxo <- nonWitnessUtxo_opt
         witnessUtxo <- witnessUtxo_opt
@@ -585,7 +613,11 @@ object Psbt {
         witnessScript <- witnessScript_opt
         scriptSig <- scriptSig_opt
         scriptWitness <- scriptWitness_opt
-      } yield PartiallySignedInput(nonWitnessUtxo, witnessUtxo, sighashType, partialSigs, derivationPaths, redeemScript, witnessScript, scriptSig, scriptWitness, unknown)
+        ripemd160 <- ripemd160Preimages
+        sha256 <- sha256Preimages
+        hash160 <- hash160Preimages
+        hash256 <- hash256Preimages
+      } yield PartiallySignedInput(nonWitnessUtxo, witnessUtxo, sighashType, partialSigs, derivationPaths, redeemScript, witnessScript, scriptSig, scriptWitness, ripemd160, sha256, hash160, hash256, unknown)
     })
 
     private def readOutputs(input: InputStream, expectedCount: Int): Try[Seq[PartiallySignedOutput]] = trySequence((0 until expectedCount).map(_ => readOutput(input)))
@@ -655,7 +687,7 @@ object Psbt {
     }
 
     private def writeGlobal(global: Global, output: OutputStream): Unit = {
-      writeDataEntry(DataEntry(hex"00", Transaction.write(global.tx)), output)
+      writeDataEntry(DataEntry(hex"00", Transaction.write(global.tx, Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)), output)
       global.extendedPublicKeys.foreach(xpub => {
         val key = new ByteArrayOutputStream()
         Protocol.writeUInt8(0x01, key) // key type
@@ -688,6 +720,10 @@ object Psbt {
       }
       input.scriptSig.foreach(scriptSig => writeDataEntry(DataEntry(hex"07", Script.write(scriptSig)), output))
       input.scriptWitness.foreach(scriptWitness => writeDataEntry(DataEntry(hex"08", ScriptWitness.write(scriptWitness)), output))
+      input.ripemd160.foreach(preimage => writeDataEntry(DataEntry(0x0a.toByte +: Crypto.ripemd160(preimage), preimage), output))
+      input.sha256.foreach(preimage => writeDataEntry(DataEntry(0x0b.toByte +: Crypto.sha256(preimage), preimage), output))
+      input.hash160.foreach(preimage => writeDataEntry(DataEntry(0x0c.toByte +: Crypto.hash160(preimage), preimage), output))
+      input.hash256.foreach(preimage => writeDataEntry(DataEntry(0x0d.toByte +: Crypto.hash256(preimage), preimage), output))
       input.unknown.foreach(entry => writeDataEntry(entry, output))
       Protocol.writeUInt8(0x00, output) // separator
     })

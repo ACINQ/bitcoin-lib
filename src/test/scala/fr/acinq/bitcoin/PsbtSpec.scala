@@ -1,6 +1,6 @@
 package fr.acinq.bitcoin
 
-import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.DeterministicWallet.{ExtendedPrivateKey, KeyPath}
 import fr.acinq.bitcoin.Psbt.{KeyPathWithMaster, PartiallySignedOutput}
 import org.scalatest.FunSuite
@@ -107,6 +107,11 @@ class PsbtSpec extends FunSuite {
         hex"70736274ff0100730200000001301ae986e516a1ec8ac5b4bc6573d32f83b465e23ad76167d68b38e730b4dbdb0000000000ffffffff02747b01000000000017a91403aa17ae882b5d0d54b25d63104e4ffece7b9ea2876043993b0000000017a914b921b1ba6f722e4bfa83b6557a3139986a42ec8387000000000001011f00ca9a3b00000000160014d2d94b64ae08587eefc8eeb187c601e939f9037c00010016001462e9e982fff34dd8239610316b090cd2a3b747cb000100220020876bad832f1d168015ed41232a9ea65a1815d9ef13c0ef8759f64b5b2b278a6521010025512103b7ce23a01c5b4bf00a642537cdfabb315b668332867478ef51309d06d57f8a8751ae00",
         "psbt witness script key must contain exactly 1 byte"
       ),
+      // PSBT with unsigned tx serialized with witness serialization format
+      TestCase(
+        hex"70736274ff01007802000000000101268171371edff285e937adeea4b37b78000c0566cbb3ad64641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc78700b32e1300000100fda5010100000000010289a3c71eab4d20e0371bbba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bbb2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c4355943abcb34bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d05870247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c012103d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d022067338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b72beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab300000000000000",
+        "not enough data to read from"
+      ),
 
       /** ADDITIONAL TEST VECTORS */
       // PSBT missing inputs
@@ -116,8 +121,8 @@ class PsbtSpec extends FunSuite {
       ),
       // PSBT missing outputs
       TestCase(
-        hex"70736274ff0100750200000001268171371edff285e937adeea4b37b78000c0566cbb3ad64641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787b32e1300000100fda5010100000000010289a3c71eab4d20e0371bbba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bbb2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c4355943abcb34bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d05870247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c012103d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d022067338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b72beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab300000000000100fda5010100000000010289a3c71eab4d20e0371bbba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bbb2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c4355943abcb34bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d05870247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c012103d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d022067338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b72beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab3000000000000",
-        "not enough data to read from"
+        hex"70736274ff0100750200000001268171371edff285e937adeea4b37b78000c0566cbb3ad64641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787b32e1300000100fda5010100000000010289a3c71eab4d20e0371bbba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bbb2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c4355943abcb34bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d05870247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c012103d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d022067338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b72beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab3000000000000",
+        "len < 0"
       ))
 
     for (TestCase(bin, expected) <- testCases) {
@@ -271,7 +276,7 @@ class PsbtSpec extends FunSuite {
     }
     {
       // PSBT with unknown types in the inputs.
-      val bin = hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a010000000000000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f0000"
+      val bin = hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a010000000000000af00102030405060708090f0102030405060708090a0b0c0d0e0f0000"
       val Success(psbt) = Psbt.read(bin.toArray)
       assert(psbt.global.unknown.isEmpty)
       assert(psbt.inputs.length === 1)
@@ -294,6 +299,26 @@ class PsbtSpec extends FunSuite {
       assert(psbt.outputs.length === 2)
       verifyEmptyOutput(psbt.outputs.head)
       assert(psbt.outputs(1).derivationPaths === Map(PublicKey(hex"02d20ca502ee289686d21815bd43a80637b0698e1fbcdbe4caed445f6c1a0a90ef") -> KeyPathWithMaster(659987536, KeyPath("m/49'/0'/0'/0/4"))))
+      assert(Psbt.write(psbt) === bin.toArray, bin.toHex)
+    }
+    {
+      // PSBT with global unsigned tx that has 0 inputs and 0 outputs
+      val bin = hex"70736274ff01000a0000000000000000000000"
+      val Success(psbt) = Psbt.read(bin.toArray)
+      assert(psbt.global.tx.txIn.isEmpty)
+      assert(psbt.global.tx.txOut.isEmpty)
+      assert(psbt.inputs.isEmpty)
+      assert(psbt.outputs.isEmpty)
+      assert(Psbt.write(psbt) === bin.toArray, bin.toHex)
+    }
+    {
+      // PSBT with 0 inputs
+      val bin = hex"70736274ff01004c020000000002d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787b32e1300000000"
+      val Success(psbt) = Psbt.read(bin.toArray)
+      verifyNoUnknown(psbt)
+      assert(psbt.inputs.isEmpty)
+      assert(psbt.outputs.length === 2)
+      psbt.outputs.foreach(verifyEmptyOutput)
       assert(Psbt.write(psbt) === bin.toArray, bin.toHex)
     }
   }
@@ -448,10 +473,10 @@ class PsbtSpec extends FunSuite {
   }
 
   test("combine PSBTs with unknown keys (official test vectors)") {
-    val Success(psbt1) = Psbt.read(hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f00".toArray)
-    val Success(psbt2) = Psbt.read(hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000a0f0102030405060708100f0102030405060708090a0b0c0d0e0f000a0f0102030405060708100f0102030405060708090a0b0c0d0e0f000a0f0102030405060708100f0102030405060708090a0b0c0d0e0f00".toArray)
+    val Success(psbt1) = Psbt.read(hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000af00102030405060708090f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f00".toArray)
+    val Success(psbt2) = Psbt.read(hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708100f0102030405060708090a0b0c0d0e0f00".toArray)
     val Success(psbt) = Psbt.combine(psbt1, psbt2)
-    assert(Psbt.write(psbt) === hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f0a0f0102030405060708100f0102030405060708090a0b0c0d0e0f000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f0a0f0102030405060708100f0102030405060708090a0b0c0d0e0f000a0f0102030405060708090f0102030405060708090a0b0c0d0e0f0a0f0102030405060708100f0102030405060708090a0b0c0d0e0f00".toArray)
+    assert(Psbt.write(psbt) === hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f00".toArray)
   }
 
   test("finalize PSBT (official test vectors)") {
@@ -542,6 +567,49 @@ class PsbtSpec extends FunSuite {
     assert(oneInput.computeFees().isFailure) // second input has not been updated yet
     val Success(bothInputs) = oneInput.update(inputTx2, 0, redeemScript = Some(Seq(OP_RETURN)))
     assert(bothInputs.computeFees() === Success(250 sat))
+  }
+
+  test("preimage challenges") {
+    val Success(psbt) = Psbt.read(hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000".toArray)
+    val withPreimageChallenges = psbt.copy(inputs = Seq(
+      psbt.inputs.head.copy(ripemd160 = Set(hex"01020304", hex"0102"), hash160 = Set(hex"123456"), hash256 = Set(hex"abcdef", hex"00000000")),
+      psbt.inputs.last.copy(ripemd160 = Set(hex"0102"), sha256 = Set(hex"123456", hex"11"), hash256 = Set(hex"abcdef", hex"00000000"))
+    ))
+    val Success(decoded) = Psbt.read(Psbt.write(withPreimageChallenges))
+    assert(decoded === withPreimageChallenges)
+  }
+
+  test("bump lightning commit tx fee from cold wallet") {
+    def anchorScript(fundingPubKey: PublicKey): Seq[ScriptElt] = {
+      // @formatter:off
+      OP_PUSHDATA(fundingPubKey) :: OP_CHECKSIG :: OP_IFDUP ::
+      OP_NOTIF ::
+        OP_16 :: OP_CHECKSEQUENCEVERIFY ::
+      OP_ENDIF :: Nil
+      // @formatter:on
+    }
+
+    // A lightning node prepares a PSBT that spends the anchor output of a commitment transaction.
+    val (fundingPubKey, lightningPsbt) = {
+      val fundingPrivKey = PrivateKey(hex"0101010101010101010101010101010101010101010101010101010101010101")
+      val script = anchorScript(fundingPrivKey.publicKey)
+      val txToBump = Transaction(2, Nil, Seq(TxOut(330 sat, Script.pay2wsh(script))), 0)
+      val Success(lightningPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(txToBump, 0), Nil, 0)), Nil, 0))
+        .update(txToBump, 0, None, Some(script), Some(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
+        .flatMap(_.sign(fundingPrivKey, 0))
+      (fundingPrivKey.publicKey, lightningPsbt)
+    }
+
+    // A cold wallet adds inputs and finalizes a transaction that bumps the fees of the commitment transaction.
+    val walletPrivKey = PrivateKey(hex"0202020202020202020202020202020202020202020202020202020202020202")
+    val confirmedTx = Transaction(2, Nil, Seq(TxOut(100000 sat, Script.pay2wpkh(walletPrivKey.publicKey))), 0)
+    val finalTx_opt = Psbt.join(lightningPsbt, Psbt(Transaction(2, Seq(TxIn(OutPoint(confirmedTx, 0), Nil, 0)), Seq(TxOut(75000 sat, Script.pay2wpkh(walletPrivKey.publicKey))), 0)))
+      .flatMap(_.update(confirmedTx, 0, None, Some(Script.pay2pkh(walletPrivKey.publicKey))))
+      .flatMap(_.sign(walletPrivKey, 1))
+      .flatMap(psbt => psbt.finalize(0, ScriptWitness(Seq(psbt.inputs.head.partialSigs(fundingPubKey), Script.write(anchorScript(fundingPubKey))))))
+      .flatMap(psbt => psbt.finalize(1, Script.witnessPay2wpkh(walletPrivKey.publicKey, psbt.inputs(1).partialSigs(walletPrivKey.publicKey))))
+      .flatMap(_.extract())
+    assert(finalTx_opt.isSuccess)
   }
 
   private def verifyNoUnknown(psbt: Psbt): Unit = {

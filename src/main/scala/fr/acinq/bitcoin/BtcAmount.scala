@@ -24,6 +24,7 @@ case class Satoshi(private val underlying: Long) extends BtcAmount with Ordered[
   def toBtc: Btc = Btc(BigDecimal(underlying) / BtcAmount.Coin)
   def toMilliBtc: MilliBtc = toBtc.toMilliBtc
   def toLong = underlying
+  override def toString = s"$underlying sat"
   // @formatter:on
 }
 
@@ -51,6 +52,7 @@ case class MilliBtc(private val underlying: BigDecimal) extends BtcAmount with O
   def toBigDecimal = underlying
   def toDouble: Double = underlying.toDouble
   def toLong: Long = underlying.toLong
+  override def toString = s"$underlying mBTC"
   // @formatter:on
 }
 
@@ -80,6 +82,7 @@ case class Btc(private val underlying: BigDecimal) extends BtcAmount with Ordere
   def toBigDecimal = underlying
   def toDouble: Double = underlying.toDouble
   def toLong: Long = underlying.toLong
+  override def toString = s"$underlying BTC"
   // @formatter:on
 }
 
