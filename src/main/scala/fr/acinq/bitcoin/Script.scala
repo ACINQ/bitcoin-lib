@@ -328,8 +328,9 @@ object Script {
     if (!(
       (tx.lockTime < Transaction.LOCKTIME_THRESHOLD && lockTime < Transaction.LOCKTIME_THRESHOLD) ||
         (tx.lockTime >= Transaction.LOCKTIME_THRESHOLD && lockTime >= Transaction.LOCKTIME_THRESHOLD)
-      ))
+      )) {
       return false
+    }
 
     // Now that we know we're comparing apples-to-apples, the
     // comparison is a simple numeric one.
@@ -1012,7 +1013,7 @@ object Script {
    */
   def createMultiSigMofN(m: Int, pubkeys: Seq[PublicKey]): Seq[ScriptElt] = {
     require(m > 0 && m <= 16, s"number of required signatures is $m, should be between 1 and 16")
-    require(pubkeys.size > 0 && pubkeys.size <= 16, s"number of public keys is ${pubkeys.size}, should be between 1 and 16")
+    require(pubkeys.nonEmpty && pubkeys.size <= 16, s"number of public keys is ${pubkeys.size}, should be between 1 and 16")
     require(m <= pubkeys.size, "The required number of signatures shouldn't be greater than the number of public keys")
     val op_m = ScriptElt.code2elt(m + 0x50)
     // 1 -> OP_1, 2 -> OP_2, ... 16 -> OP_16
@@ -1021,7 +1022,6 @@ object Script {
   }
 
   /**
-   *
    * @param pubKeyHash public key hash
    * @return a pay-to-public-key-hash script
    */
@@ -1031,42 +1031,57 @@ object Script {
   }
 
   /**
-   *
    * @param pubKey public key
    * @return a pay-to-public-key-hash script
    */
   def pay2pkh(pubKey: PublicKey): Seq[ScriptElt] = pay2pkh(pubKey.hash160)
 
+  def isPay2pkh(script: Seq[ScriptElt]): Boolean = {
+    script match {
+      case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil if data.length == 20 => true
+      case _ => false
+    }
+  }
+
   /**
-   *
    * @param script bitcoin script
    * @return a pay-to-script script
    */
   def pay2sh(script: Seq[ScriptElt]): Seq[ScriptElt] = pay2sh(Script.write(script))
 
   /**
-   *
    * @param script bitcoin script
    * @return a pay-to-script script
    */
   def pay2sh(script: ByteVector): Seq[ScriptElt] = OP_HASH160 :: OP_PUSHDATA(hash160(script)) :: OP_EQUAL :: Nil
 
+  def isPay2sh(script: Seq[ScriptElt]): Boolean = {
+    script match {
+      case OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUAL :: Nil if data.length == 20 => true
+      case _ => false
+    }
+  }
+
   /**
-   *
    * @param script bitcoin script
    * @return a pay-to-witness-script script
    */
   def pay2wsh(script: Seq[ScriptElt]): Seq[ScriptElt] = pay2wsh(Script.write(script))
 
   /**
-   *
    * @param script bitcoin script
    * @return a pay-to-witness-script script
    */
   def pay2wsh(script: ByteVector): Seq[ScriptElt] = OP_0 :: OP_PUSHDATA(sha256(script)) :: Nil
 
+  def isPay2wsh(script: Seq[ScriptElt]): Boolean = {
+    script match {
+      case OP_0 :: OP_PUSHDATA(data, _) :: Nil if data.length == 32 => true
+      case _ => false
+    }
+  }
+
   /**
-   *
    * @param pubKeyHash public key hash
    * @return a pay-to-witness-public-key-hash script
    */
@@ -1076,9 +1091,23 @@ object Script {
   }
 
   /**
-   *
    * @param pubKey public key
    * @return a pay-to-witness-public-key-hash script
    */
   def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = pay2wpkh(pubKey.hash160)
+
+  def isPay2wpkh(script: Seq[ScriptElt]): Boolean = {
+    script match {
+      case OP_0 :: OP_PUSHDATA(data, _) :: Nil if data.length == 20 => true
+      case _ => false
+    }
+  }
+
+  /**
+   * @param pubKey public key
+   * @param sig    signature matching the public key
+   * @return script witness for the corresponding pay-to-witness-public-key-hash script
+   */
+  def witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = ScriptWitness(sig :: pubKey.value :: Nil)
+
 }
