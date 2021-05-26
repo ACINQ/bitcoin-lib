@@ -5,9 +5,9 @@ import scodec.bits.ByteVector
 import scala.annotation.tailrec
 
 /**
-  * Lexicographical Ordering of Transaction Inputs and Outputs
-  * see https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki
-  */
+ * Lexicographical Ordering of Transaction Inputs and Outputs
+ * see https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki
+ */
 object LexicographicalOrdering {
   @tailrec
   def isLessThan(a: Seq[Byte], b: Seq[Byte]): Boolean = {
@@ -15,7 +15,7 @@ object LexicographicalOrdering {
     else if (a.isEmpty) true
     else if (b.isEmpty) false
     else if (a.head == b.head) isLessThan(a.tail, b.tail)
-    else ((a.head & 0xff) < (b.head & 0xff))
+    else (a.head & 0xff) < (b.head & 0xff)
   }
 
   @tailrec
@@ -24,7 +24,7 @@ object LexicographicalOrdering {
     else if (a.isEmpty) true
     else if (b.isEmpty) false
     else if (a.head == b.head) isLessThan(a.tail, b.tail)
-    else ((a.head & 0xff) < (b.head & 0xff))
+    else (a.head & 0xff) < (b.head & 0xff)
   }
 
   def isLessThan(a: OutPoint, b: OutPoint): Boolean = {
@@ -36,13 +36,12 @@ object LexicographicalOrdering {
 
   def isLessThan(a: TxOut, b: TxOut): Boolean = {
     if (a.amount == b.amount) isLessThan(a.publicKeyScript, b.publicKeyScript)
-    else (a.amount.compare(b.amount) < 0)
+    else a.amount.compare(b.amount) < 0
   }
 
   /**
-    *
-    * @param tx input transaction
-    * @return the input tx with inputs and outputs sorted in lexicographical order
-    */
+   * @param tx input transaction
+   * @return the input tx with inputs and outputs sorted in lexicographical order
+   */
   def sort(tx: Transaction): Transaction = tx.copy(txIn = tx.txIn.sortWith(isLessThan), txOut = tx.txOut.sortWith(isLessThan))
 }
