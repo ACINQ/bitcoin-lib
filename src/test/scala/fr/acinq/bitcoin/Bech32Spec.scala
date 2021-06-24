@@ -4,8 +4,8 @@ import org.scalatest.FunSuite
 import scodec.bits._
 
 /**
-  * Created by fabrice on 19/04/17.
-  */
+ * Created by fabrice on 19/04/17.
+ */
 class Bech32Spec extends FunSuite {
   test("valid checksums") {
     val inputs = Seq(
@@ -25,12 +25,16 @@ class Bech32Spec extends FunSuite {
     val inputs = Seq(
       " 1nwldj5",
       "\u007f1axkwrx",
+      "\u00801eym55h",
       "an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx",
       "pzry9x0s0muk",
       "1pzry9x0s0muk",
       "x1b4n0q5v",
       "li1dgmt3",
-      "de1lg7wt\u00ff"
+      "de1lg7wt\u00ff",
+      "A1G7SGD8",
+      "10a06t8",
+      "1qzzfhee"
     )
 
     inputs.map(address => {
