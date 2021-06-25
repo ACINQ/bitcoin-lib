@@ -1,7 +1,5 @@
 package fr.acinq.bitcoin.reference
 
-import java.io.InputStreamReader
-
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import fr.acinq.bitcoin.{Base58, Base58Check, Bech32, OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA, Script}
 import org.json4s.DefaultFormats
@@ -10,6 +8,7 @@ import org.json4s.jackson.JsonMethods
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
 
+import java.io.InputStreamReader
 import scala.util.Try
 
 class KeyEncodingSpec extends FunSuite {
@@ -23,18 +22,16 @@ class KeyEncodingSpec extends FunSuite {
   }
 
   test("invalid keys") {
-    val result = KeyEncodingSpec.isValidBase58("KxuACDviz8Xvpn1xAh9MfopySZNuyajYMZWz16Dv2mHHryznWUp3")
+    assert(!KeyEncodingSpec.isValidBase58("KxuACDviz8Xvpn1xAh9MfopySZNuyajYMZWz16Dv2mHHryznWUp3"))
 
     val stream = classOf[KeyEncodingSpec].getResourceAsStream("/data/key_io_invalid.json")
     val json = JsonMethods.parse(new InputStreamReader(stream))
 
     json.extract[List[List[JValue]]].foreach {
-      _ match {
-        case JString(value) :: Nil =>
-          assert(!KeyEncodingSpec.isValidBase58(value))
-          assert(!KeyEncodingSpec.isValidBech32(value))
-        case unexpected => throw new IllegalArgumentException(s"don't know how to parse $unexpected")
-      }
+      case JString(value) :: Nil =>
+        assert(!KeyEncodingSpec.isValidBase58(value))
+        assert(!KeyEncodingSpec.isValidBech32(value))
+      case unexpected => throw new IllegalArgumentException(s"don't know how to parse $unexpected")
     }
   }
 }
@@ -47,14 +44,14 @@ object KeyEncodingSpec {
       case Base58.Prefix.PubkeyAddress | Base58.Prefix.PubkeyAddressTestnet => bin.length == 20
       case _ => false
     }
-  } getOrElse (false)
+  } getOrElse false
 
   def isValidBech32(input: String): Boolean = Try {
     Bech32.decodeWitnessAddress(input) match {
       case (hrp, 0, bin) if (hrp == "bc" || hrp == "tb" || hrp == "bcrt") && (bin.length == 20 || bin.length == 32) => true
       case _ => false
     }
-  } getOrElse (false)
+  } getOrElse false
 
   def check(data: List[JValue]): Unit = {
     data match {
