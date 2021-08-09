@@ -83,4 +83,30 @@ class Bech32Spec extends FunSuite {
       }
     })
   }
+
+  test("encode lnurl string") {
+    val inputs = Seq(
+      // example lnurl string taken from https://github.com/fiatjaf/lnurl-rfc
+      "https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df" -> "LNURL1DP68GURN8GHJ7UM9WFMXJCM99E3K7MF0V9CXJ0M385EKVCENXC6R2C35XVUKXEFCV5MKVV34X5EKZD3EV56NYD3HXQURZEPEXEJXXEPNXSCRVWFNV9NXZCN9XQ6XYEFHVGCXXCMYXYMNSERXFQ5FNS"
+    )
+    inputs.map {
+      case (uri, expected) =>
+        val bytes = Bech32.eight2five(uri.getBytes);
+        val encodedLnurl = Bech32.encode("lnurl", bytes);
+        assert(encodedLnurl equals expected.toLowerCase)
+    }
+  }
+
+  test("decode lnurl string") {
+    val inputs = Seq(
+      // example lnurl string taken from https://github.com/fiatjaf/lnurl-rfc
+      "LNURL1DP68GURN8GHJ7UM9WFMXJCM99E3K7MF0V9CXJ0M385EKVCENXC6R2C35XVUKXEFCV5MKVV34X5EKZD3EV56NYD3HXQURZEPEXEJXXEPNXSCRVWFNV9NXZCN9XQ6XYEFHVGCXXCMYXYMNSERXFQ5FNS" -> "https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df"
+    )
+    inputs.map {
+      case (encodedLnurl, expected) =>
+        val decoded = Bech32.decode(encodedLnurl);
+        val decodedLnurl = new String(Bech32.five2eight(decoded._2));
+        assert(decodedLnurl equals expected)
+    }
+  }
 }

@@ -98,7 +98,7 @@ object Bech32 {
     * @param input a sequence of 8 bits integers
     * @return a sequence of 5 bits integers
     */
-  private def eight2five(input: Array[Byte]): Array[Int5] = {
+  def eight2five(input: Array[Byte]): Array[Int5] = {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
