@@ -104,9 +104,9 @@ class Bech32Spec extends FunSuite {
     )
     inputs.map {
       case (encodedLnurl, expected) =>
-        val decoded = Bech32.decode(encodedLnurl);
-        val decodedLnurl = new String(Bech32.five2eight(decoded._2));
-        assert(decodedLnurl equals expected)
+        val (_, decoded) = Bech32.decode(encodedLnurl)
+        val decodedLnurl = new String(Bech32.five2eight(decoded))
+        assert(decodedLnurl == expected)
     }
   }
 }
