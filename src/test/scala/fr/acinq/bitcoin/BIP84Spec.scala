@@ -10,7 +10,7 @@ import scodec.bits._
   * see https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki
   */
 class BIP84Spec extends FunSuite {
-  test("BIP49 reference tests") {
+  test("BIP84 reference tests") {
     val seed = MnemonicCode.toSeed("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "")
     val master = DeterministicWallet.generate(seed)
     assert(DeterministicWallet.encode(master, DeterministicWallet.zprv) == "zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5")
