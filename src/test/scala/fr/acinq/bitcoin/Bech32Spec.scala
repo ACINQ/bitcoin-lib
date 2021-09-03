@@ -142,7 +142,7 @@ class Bech32Spec extends FunSuite {
     inputs.map {
       case (uri, expected) =>
         val bytes = Bech32.eight2five(uri.getBytes)
-        val encodedLnurl = Bech32.encode("lnurl", bytes)
+        val encodedLnurl = Bech32.encode("lnurl", bytes, Bech32.Bech32Encoding)
         assert(encodedLnurl == expected.toLowerCase)
     }
   }
@@ -154,9 +154,10 @@ class Bech32Spec extends FunSuite {
     )
     inputs.map {
       case (encodedLnurl, expected) =>
-        val (_, decoded) = Bech32.decode(encodedLnurl)
+        val (_, decoded, encoding) = Bech32.decode(encodedLnurl)
+        assert(encoding === Bech32.Bech32Encoding)
         val decodedLnurl = new String(Bech32.five2eight(decoded))
-        assert(decodedLnurl == expected)
+        assert(decodedLnurl === expected)
     }
   }
 
