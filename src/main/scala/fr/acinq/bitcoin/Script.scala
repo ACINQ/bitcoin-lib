@@ -1,10 +1,9 @@
 package fr.acinq.bitcoin
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
-
 import fr.acinq.bitcoin.Crypto._
 import scodec.bits.ByteVector
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
@@ -1109,5 +1108,15 @@ object Script {
    * @return script witness for the corresponding pay-to-witness-public-key-hash script
    */
   def witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = ScriptWitness(sig :: pubKey.value :: Nil)
+
+  /**
+   * @param pubKeys are the public keys signatures will be checked against.
+   * @param sigs    are the signatures for a subset of the public keys.
+   * @return script witness for the pay-to-witness-script-hash script containing a multisig script.
+   */
+  def witnessMultiSigMofN(pubKeys: Seq[PublicKey], sigs: Seq[ByteVector]): ScriptWitness = {
+    val redeemScript = Script.write(Script.createMultiSigMofN(sigs.size, pubKeys))
+    ScriptWitness(ByteVector.empty +: sigs :+ redeemScript)
+  }
 
 }

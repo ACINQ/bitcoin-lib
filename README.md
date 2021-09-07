@@ -27,7 +27,7 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
 ## Status
 
 * [X] Message parsing (blocks, transactions, inv, ...)
-* [X] Building transactions (P2PK, P2PKH, P2SH, P2WPK, P2WSH)
+* [X] Building transactions (P2PK, P2PKH, P2SH, P2WPKH, P2WSH)
 * [X] Signing transactions
 * [X] Verifying signatures
 * [X] Passing core reference tests (scripts & transactions)
@@ -245,7 +245,7 @@ This sample demonstrates how to serialize, create and verify a multisig P2SH tra
     // this tx was published on segnet as 943e07f0c66a9766d0cec81d65a03db4157bc0bfac4d36e400521b947be55aeb
 ```
 
-#### P2WPK transactions
+#### P2WPKH transactions
 
 This is the simplest segwit transaction, equivalent to standard P2PKH transactions but more compact:
 
@@ -260,7 +260,7 @@ To spend them, you provide a witness that is just a push of a signature and the 
 val witness = ScriptWitness(sig :: pubKey :: Nil))
 ```
 
-This sample demonstrates how to serialize, create and verify a P2WPK transaction
+This sample demonstrates how to serialize, create and verify a P2WPKH transaction
 
 ```scala
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
@@ -272,7 +272,7 @@ This sample demonstrates how to serialize, create and verify a P2WPK transaction
     // this is a standard tx that sends 0.4 BTC to D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap
     val tx1 = Transaction.read("010000000001014d5a1833ddd78613408d66b0189e3171aa3b5d1a5b2df4392749d39291ea73cd0000000000feffffff02005a6202000000001976a9140f66351d05269952302a607b4d6fb69517387a9788ac048b9800000000001976a914eb7c97a96fa9205b8a772d0c1d170e90a8a3098388ac02483045022100e2ccc1ab7e7e0c6bcbbdd4d9935448011b415fc1ec774416aa2760c3ae08431d022064ad6fd7c952df2b3f06a9cf94ddc9856c734c46ad43d0ab45d5ddf3b7deeef0012102edc343e7c422e94cca4c2a87a4f7ce54594c1b68682bbeefa130295e471ac019ae590000", pversion)
 
-    // now let's create a simple tx that spends tx1 and send 0.39 BTC to P2WPK output
+    // now let's create a simple tx that spends tx1 and send 0.39 BTC to P2WPKH output
     val tx2 = {
       val tmp = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx1.hash, 0), sequence = 0xffffffffL, signatureScript = ByteVector.empty, witness = ScriptWitness.empty) :: Nil,
@@ -286,7 +286,7 @@ This sample demonstrates how to serialize, create and verify a P2WPK transaction
     assert(tx2.txid == ByteVector32(hex"3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e"))
     // this tx was published on segnet as 3acf933cd1dbffbb81bb5c6fab816fdebf85875a3b77754a28f00d717f450e1e
 
-    // and now we create a segwit tx that spends the P2WPK output
+    // and now we create a segwit tx that spends the P2WPKH output
     val tx3 = {
       val tmp: Transaction = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = ByteVector.empty, witness = ScriptWitness.empty) :: Nil,
@@ -322,7 +322,7 @@ val redeemScript = Script.createMultiSigMofN(2, Seq(pub2, pub3))
 val witness = ScriptWitness(Seq(ByteVector.empty, sig2, sig3, redeemScript))
 ```
 
-This sample demonstrates how to serialize, create and verify a P2WPSH transaction
+This sample demonstrates how to serialize, create and verify a P2WSH transaction
 
 ```scala
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
@@ -424,13 +424,13 @@ Bitcoin-lib is *not* compatible with Bitcoin Core versions before 0.20.1, becaus
 
     // This PSBT has been initialized with an unsigned transaction containing two multi-sig inputs:
     val Success(psbtNotFunded) = Psbt.read(hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000".toArray)
-    assert(psbt.global.version === 0)
-    assert(psbt.global.tx.txIn.length === 2)
-    assert(psbt.global.tx.txOut.length === 2)
+    assert(psbtNotFunded.global.version === 0)
+    assert(psbtNotFunded.global.tx.txIn.length === 2)
+    assert(psbtNotFunded.global.tx.txOut.length === 2)
 
     // Provide information about the first input:
     val tx1 = Transaction.read(hex"0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000".toArray)
-    val Success(oneInputFilled) = psbtNotFunded.update(
+    val Success(oneInputFilled) = psbtNotFunded.updateNonWitnessInput(
       tx1,
       outputIndex = 0,
       Some(Script.createMultiSigMofN(2, Seq(aliceKeyNonWitness.publicKey, bobKeyNonWitness.publicKey)))
@@ -438,7 +438,7 @@ Bitcoin-lib is *not* compatible with Bitcoin Core versions before 0.20.1, becaus
 
     // Provide information about the second input:
     val tx2 = Transaction.read(hex"0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000".toArray)
-    val Success(bothInputsFilled) = oneInputFilled.update(
+    val Success(bothInputsFilled) = oneInputFilled.updateWitnessInput(
       tx2,
       outputIndex = 1,
       Some(Script.pay2wsh(Script.createMultiSigMofN(2, Seq(aliceKeyWitness.publicKey, bobKeyWitness.publicKey)))),
@@ -446,29 +446,25 @@ Bitcoin-lib is *not* compatible with Bitcoin Core versions before 0.20.1, becaus
     )
 
     // Alice signs both inputs:
-    val signedByAlice = {
-      val Success(firstInputSigned) = bothInputsFilled.sign(aliceKeyNonWitness, 0)
-      val Success(bothInputsSigned) = firstInputSigned.sign(aliceKeyWitness, 1)
-      bothInputsSigned
-    }
+    val Success(signedByAlice) = bothInputsFilled
+      .sign(aliceKeyNonWitness, 0)
+      .flatMap(_.sign(aliceKeyWitness, 1))
 
     // Bob signs both inputs:
-    val signedByBob = {
-      val Success(firstInputSigned) = signedByAlice.sign(bobKeyNonWitness, 0)
-      val Success(bothInputsSigned) = firstInputSigned.sign(bobKeyWitness, 1)
-      bothInputsSigned
-    }
+    val Success(signedByBob) = signedByAlice
+      .sign(bobKeyNonWitness, 0)
+      .flatMap(_.sign(bobKeyWitness, 1))
 
     // Finalize inputs and extract transaction:
     val Success(tx) = {
       // The first input is a non-witness 2-of-2 multi-sig:
       val redeemScript = Script.write(Script.createMultiSigMofN(2, Seq(aliceKeyNonWitness.publicKey, bobKeyNonWitness.publicKey)))
-      val scriptSig = OP_0 +: signedByBob.inputs.head.partialSigs.values.map(sig => OP_PUSHDATA(ByteVector(sig))).toSeq :+ OP_PUSHDATA(redeemScript)
-      val Success(firstInputFinalized) = signedByBob.finalize(inputIndex = 0, scriptSig)
+      val scriptSig = OP_0 +: signedByBob.inputs.head.partialSigs.values.map(sig => OP_PUSHDATA(sig)).toSeq :+ OP_PUSHDATA(redeemScript)
+      val Success(firstInputFinalized) = signedByBob.finalizeNonWitnessInput(inputIndex = 0, scriptSig)
       // The second input is a witness 2-of-2 multi-sig:
       val witnessScript = Script.write(Script.createMultiSigMofN(2, Seq(aliceKeyWitness.publicKey, bobKeyWitness.publicKey)))
-      val scriptWitness = ScriptWitness(ByteVector.empty +: signedByBob.inputs(1).partialSigs.values.map(sig => ByteVector(sig)).toSeq :+ witnessScript)
-      val Success(bothInputsFinalized) = firstInputFinalized.finalize(inputIndex = 1, scriptWitness)
+      val scriptWitness = ScriptWitness(ByteVector.empty +: signedByBob.inputs(1).partialSigs.values.toSeq :+ witnessScript)
+      val Success(bothInputsFinalized) = firstInputFinalized.finalizeWitnessInput(inputIndex = 1, scriptWitness)
       bothInputsFinalized.extract()
     }
 
