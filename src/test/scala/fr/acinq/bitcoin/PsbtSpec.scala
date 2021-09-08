@@ -444,7 +444,7 @@ class PsbtSpec extends FunSuite {
 
     def sign(keys: Map[Int, ExtendedPrivateKey]): Psbt = keys.foldLeft(psbt) {
       case (cur, (inputIndex, priv)) => cur.sign(priv.privateKey, inputIndex) match {
-        case Success(signed) => signed
+        case Success(signed) => signed.psbt
         case Failure(ex) => fail(ex)
       }
     }
@@ -707,15 +707,15 @@ class PsbtSpec extends FunSuite {
     assert(updated.updateWitnessInput(inputTx, 1, sighashType = Some(SIGHASH_ALL)).isFailure)
     assert(updated.updateNonWitnessInput(inputTx, 3, derivationPaths = allDerivationPaths).isFailure)
 
-    val Success(signed) = updated
+    val Success(SignPsbtResult(signed, _)) = updated
       .sign(priv1, 0)
-      .flatMap(_.sign(priv1, 1))
-      .flatMap(_.sign(priv2, OutPoint(inputTx, 1)))
-      .flatMap(_.sign(priv2, 2))
-      .flatMap(_.sign(priv3, OutPoint(inputTx, 3)))
-      .flatMap(_.sign(priv2, 4))
-      .flatMap(_.sign(priv3, OutPoint(inputTx, 4)))
-      .flatMap(_.sign(priv2, 5))
+      .flatMap(_.psbt.sign(priv1, 1))
+      .flatMap(_.psbt.sign(priv2, OutPoint(inputTx, 1)))
+      .flatMap(_.psbt.sign(priv2, 2))
+      .flatMap(_.psbt.sign(priv3, OutPoint(inputTx, 3)))
+      .flatMap(_.psbt.sign(priv2, 4))
+      .flatMap(_.psbt.sign(priv3, OutPoint(inputTx, 4)))
+      .flatMap(_.psbt.sign(priv2, 5))
 
     assert(signed.getInput(0).get.partialSigs.size === 1)
     assert(signed.getInput(OutPoint(inputTx, 4)).get.partialSigs.size === 2)
@@ -780,7 +780,7 @@ class PsbtSpec extends FunSuite {
       val fundingPrivKey = PrivateKey(hex"0101010101010101010101010101010101010101010101010101010101010101")
       val script = anchorScript(fundingPrivKey.publicKey)
       val txToBump = Transaction(2, Nil, Seq(TxOut(330 sat, Script.pay2wsh(script))), 0)
-      val Success(lightningPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(txToBump, 0), Nil, 0)), Nil, 0))
+      val Success(SignPsbtResult(lightningPsbt, _)) = Psbt(Transaction(2, Seq(TxIn(OutPoint(txToBump, 0), Nil, 0)), Nil, 0))
         .updateWitnessInput(txToBump, 0, None, Some(script), Some(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
         .flatMap(_.sign(fundingPrivKey, 0))
       (fundingPrivKey.publicKey, lightningPsbt)
@@ -792,9 +792,89 @@ class PsbtSpec extends FunSuite {
     val finalTx_opt = Psbt.join(lightningPsbt, Psbt(Transaction(2, Seq(TxIn(OutPoint(confirmedTx, 0), Nil, 0)), Seq(TxOut(75_000 sat, Script.pay2wpkh(walletPrivKey.publicKey))), 0)))
       .flatMap(_.updateWitnessInput(confirmedTx, 0, None, Some(Script.pay2pkh(walletPrivKey.publicKey))))
       .flatMap(_.sign(walletPrivKey, 1))
-      .flatMap(psbt => psbt.finalizeWitnessInput(0, ScriptWitness(Seq(psbt.inputs.head.partialSigs(fundingPubKey), Script.write(anchorScript(fundingPubKey))))))
+      .flatMap(signResult => signResult.psbt.finalizeWitnessInput(0, ScriptWitness(Seq(signResult.psbt.inputs.head.partialSigs(fundingPubKey), Script.write(anchorScript(fundingPubKey))))))
       .flatMap(psbt => psbt.finalizeWitnessInput(1, Script.witnessPay2wpkh(walletPrivKey.publicKey, psbt.inputs(1).partialSigs(walletPrivKey.publicKey))))
       .flatMap(_.extract())
+    assert(finalTx_opt.isSuccess)
+  }
+
+  test("manual coinjoin workflow") {
+    val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
+    val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
+    val aliceInputTx = Transaction(2, Nil, Seq(TxOut(50000 sat, Script.pay2wpkh(alicePrivKey.publicKey))), 0)
+    val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).privateKey
+    val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/2'")).publicKey
+    val bobInputTx = Transaction(2, Nil, Seq(TxOut(40000 sat, Script.pay2wpkh(bobPrivKey.publicKey))), 0)
+    val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
+    val carolNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/2'")).publicKey
+    val carolInputTx = Transaction(2, Nil, Seq(TxOut(60000 sat, Script.pay2wpkh(carolPrivKey.publicKey))), 0)
+
+    // Each participant adds their inputs and fills their utxos.
+    val Success(alicePsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(aliceInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(aliceNextPubKey))), 0))
+      .updateWitnessInput(aliceInputTx, 0, None, Some(Script.pay2pkh(alicePrivKey.publicKey)), Some(SIGHASH_ALL))
+    val Success(bobPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(bobInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(bobNextPubKey))), 0))
+      .updateWitnessInput(bobInputTx, 0, None, Some(Script.pay2pkh(bobPrivKey.publicKey)), Some(SIGHASH_ALL))
+    val Success(carolPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(carolInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(carolNextPubKey))), 0))
+      .updateWitnessInput(carolInputTx, 0, None, Some(Script.pay2pkh(carolPrivKey.publicKey)), Some(SIGHASH_ALL))
+
+    // Carol joins the psbts, signs and finalizes her inputs.
+    val Success(carolFinal) = {
+      val Success(joined) = Psbt.join(alicePsbt, bobPsbt, carolPsbt)
+      val outPoint = OutPoint(carolInputTx, 0)
+      // Carol verifies the sighash before signing her inputs.
+      assert(joined.getInput(outPoint).flatMap(_.sighashType) === Some(SIGHASH_ALL))
+      joined.sign(carolPrivKey, outPoint).flatMap(signed => signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(carolPrivKey.publicKey, signed.sig)))
+    }
+
+    // Bob signs and finalizes his inputs.
+    val Success(bobFinal) = {
+      val outPoint = OutPoint(bobInputTx, 0)
+      // Bob verifies the sighash before signing his inputs.
+      assert(carolFinal.getInput(outPoint).flatMap(_.sighashType) === Some(SIGHASH_ALL))
+      carolFinal.sign(bobPrivKey, outPoint).flatMap(signed => signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(bobPrivKey.publicKey, signed.sig)))
+    }
+
+    // Alice signs and extracts the final tx.
+    val conjoinTx = {
+      val outPoint = OutPoint(aliceInputTx, 0)
+      // Alice verifies the sighash before signing her inputs.
+      assert(bobFinal.getInput(outPoint).flatMap(_.sighashType) === Some(SIGHASH_ALL))
+      val Success(aliceFinal) = bobFinal.sign(alicePrivKey, outPoint).flatMap(signed => signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(alicePrivKey.publicKey, signed.sig)))
+      // Alice verifies that all inputs have been finalized.
+      assert(aliceFinal.inputs.forall(_.isInstanceOf[FinalizedInput]))
+      aliceFinal.extract()
+    }
+
+    assert(conjoinTx.isSuccess)
+  }
+
+  test("2-of-3 multisig workflow") {
+    val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
+    val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
+    val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/0'")).privateKey
+    val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).publicKey
+    val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
+    val pubKeys = Seq(alicePrivKey, bobPrivKey, carolPrivKey).map(_.publicKey)
+    val inputTx = Transaction(2, Nil, TxOut(250000 sat, Script.pay2wsh(Script.createMultiSigMofN(2, pubKeys))) :: Nil, 0)
+
+    // Alice creates the (unsigned) PSBT and sends it to Bob and Carol.
+    val spendingTx = Transaction(2, TxIn(OutPoint(inputTx, 0), Nil, 0) :: Nil, TxOut(100000 sat, Script.pay2wpkh(aliceNextPubKey)) :: TxOut(125000 sat, Script.pay2wpkh(bobNextPubKey)) :: Nil, 0)
+    val Success(unsignedPsbt) = Psbt(spendingTx).updateWitnessInput(inputTx, 0, None, Some(Script.createMultiSigMofN(2, pubKeys)), Some(SIGHASH_ALL))
+
+    // Each participant signs the input.
+    val Success(aliceSigned) = unsignedPsbt.sign(alicePrivKey, 0).map(_.psbt)
+    val Success(bobSigned) = unsignedPsbt.sign(bobPrivKey, 0).map(_.psbt)
+    val Success(carolSigned) = unsignedPsbt.sign(carolPrivKey, 0).map(_.psbt)
+
+    // Alice combines the inputs and broadcasts the final transaction.
+    val finalTx_opt = {
+      val Success(combined) = Psbt.combine(aliceSigned, bobSigned, carolSigned)
+      // Alice verifies that all participants have signed.
+      val sigs = combined.inputs.head.partialSigs.filter { case (pubKey, _) => pubKeys.contains(pubKey) }.values.toSeq
+      assert(sigs.length === 3)
+      combined.finalizeWitnessInput(0, Script.witnessMultiSigMofN(pubKeys, sigs.drop(1))).flatMap(_.extract())
+    }
+
     assert(finalTx_opt.isSuccess)
   }
 

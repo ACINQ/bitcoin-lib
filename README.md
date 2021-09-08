@@ -446,14 +446,14 @@ Bitcoin-lib is *not* compatible with Bitcoin Core versions before 0.20.1, becaus
     )
 
     // Alice signs both inputs:
-    val Success(signedByAlice) = bothInputsFilled
+    val Success(SignPsbtResult(signedByAlice, _)) = bothInputsFilled
       .sign(aliceKeyNonWitness, 0)
-      .flatMap(_.sign(aliceKeyWitness, 1))
+      .flatMap(_.psbt.sign(aliceKeyWitness, 1))
 
     // Bob signs both inputs:
-    val Success(signedByBob) = signedByAlice
+    val Success(SignPsbtResult(signedByBob, _)) = signedByAlice
       .sign(bobKeyNonWitness, 0)
-      .flatMap(_.sign(bobKeyWitness, 1))
+      .flatMap(_.psbt.sign(bobKeyWitness, 1))
 
     // Finalize inputs and extract transaction:
     val Success(tx) = {

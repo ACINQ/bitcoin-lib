@@ -197,7 +197,7 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.Input], outputs: Seq[Psbt.
    * @param outPoint input that should be signed.
    * @return the psbt with a partial signature added (other inputs will not be modified).
    */
-  def sign(priv: PrivateKey, outPoint: OutPoint): Try[Psbt] = {
+  def sign(priv: PrivateKey, outPoint: OutPoint): Try[SignPsbtResult] = {
     val inputIndex = global.tx.txIn.indexWhere(_.outPoint == outPoint)
     require(inputIndex >= 0, "psbt transaction does not spend the provided outpoint")
     sign(priv, inputIndex)
@@ -212,11 +212,11 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.Input], outputs: Seq[Psbt.
    * @param inputIndex index of the input that should be signed.
    * @return the psbt with a partial signature added (other inputs will not be modified).
    */
-  def sign(priv: PrivateKey, inputIndex: Int): Try[Psbt] = Try {
+  def sign(priv: PrivateKey, inputIndex: Int): Try[SignPsbtResult] = Try {
     require(inputIndex < inputs.length, "input index must exist in the input tx")
     val input = inputs(inputIndex)
     Psbt.sign(priv, inputIndex, input, global) match {
-      case Success(signedInput) => this.copy(inputs = inputs.updated(inputIndex, signedInput))
+      case Success((signedInput, sig)) => SignPsbtResult(this.copy(inputs = inputs.updated(inputIndex, signedInput)), sig)
       case Failure(ex) => return Failure(ex)
     }
   }
@@ -372,6 +372,8 @@ object Psbt {
    * @param keyPath              bip 32 derivation path.
    */
   case class KeyPathWithMaster(masterKeyFingerprint: Long, keyPath: KeyPath)
+
+  case class SignPsbtResult(psbt: Psbt, sig: ByteVector)
 
   case class DataEntry(key: ByteVector, value: ByteVector)
 
@@ -585,7 +587,7 @@ object Psbt {
     tx.txOut.map(_ => UnspecifiedOutput(Map.empty, Seq.empty))
   )
 
-  private def sign(priv: PrivateKey, inputIndex: Int, input: Input, global: Global): Try[PartiallySignedInput] = {
+  private def sign(priv: PrivateKey, inputIndex: Int, input: Input, global: Global): Try[(PartiallySignedInput, ByteVector)] = {
     val txIn = global.tx.txIn(inputIndex)
     input match {
       case _: PartiallySignedInputWithoutUtxo => Failure(new IllegalArgumentException("cannot sign: input hasn't been updated with utxo data"))
@@ -598,7 +600,7 @@ object Psbt {
     }
   }
 
-  private def signNonWitness(priv: PrivateKey, inputIndex: Int, input: PartiallySignedNonWitnessInput, global: Global): Try[PartiallySignedInput] = {
+  private def signNonWitness(priv: PrivateKey, inputIndex: Int, input: PartiallySignedNonWitnessInput, global: Global): Try[(PartiallySignedInput, ByteVector)] = {
     val txIn = global.tx.txIn(inputIndex)
     val redeemScript = input.redeemScript match {
       case Some(script) =>
@@ -613,11 +615,11 @@ object Psbt {
     }
     redeemScript.map(script => {
       val sig = Transaction.signInput(global.tx, inputIndex, script, input.sighashType.getOrElse(SIGHASH_ALL), input.amount, SigVersion.SIGVERSION_BASE, priv)
-      input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig))
+      (input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig)), sig)
     })
   }
 
-  private def signWitness(priv: PrivateKey, inputIndex: Int, input: PartiallySignedWitnessInput, global: Global): Try[PartiallySignedInput] = {
+  private def signWitness(priv: PrivateKey, inputIndex: Int, input: PartiallySignedWitnessInput, global: Global): Try[(PartiallySignedInput, ByteVector)] = {
     val redeemScript = input.redeemScript match {
       case Some(script) =>
         // If a redeem script is provided in the partially signed input, the utxo must be a p2sh for that script (we're using p2sh-embedded segwit).
@@ -634,11 +636,11 @@ object Psbt {
         Failure(new IllegalArgumentException("witness script does not match redeemScript or scriptPubKey"))
       } else {
         val sig = Transaction.signInput(global.tx, inputIndex, witnessScript, input.sighashType.getOrElse(SIGHASH_ALL), input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
-        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig)))
+        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig)), sig)
       }
       case None =>
         val sig = Transaction.signInput(global.tx, inputIndex, script, input.sighashType.getOrElse(SIGHASH_ALL), input.amount, SigVersion.SIGVERSION_WITNESS_V0, priv)
-        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig)))
+        Success(input.copy(partialSigs = input.partialSigs + (priv.publicKey -> sig)), sig)
     })
   }
 
