@@ -92,20 +92,20 @@ The following REPL session shows how to create and use keys and addresses:
 
 ```shell
 mvn scala:console
-scala> import fr.acinq.bitcoin._
-import fr.acinq.bitcoin._
+scala> import fr.acinq.bitcoin.scala._
+import fr.acinq.bitcoin.scala._
 
-scala> import fr.acinq.bitcoin.Crypto._
-import fr.acinq.bitcoin.Crypto._
+scala> import fr.acinq.bitcoin.scala.Crypto._
+import fr.acinq.bitcoin.scala.Crypto._
 
 scala> import scodec.bits._
 import scodec.bits._
 
 scala> val priv = PrivateKey(hex"1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd")
-priv: fr.acinq.bitcoin.Crypto.PrivateKey = PrivateKey(1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd)
+priv: fr.acinq.bitcoin.scala.Crypto.PrivateKey = PrivateKey(1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd)
 
 scala> val pub = priv.publicKey
-pub: fr.acinq.bitcoin.Crypto.PublicKey = 03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a    ^
+pub: fr.acinq.bitcoin.scala.Crypto.PublicKey = 03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a    ^
 
 scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160)
 res0: String = 1J7mdg5rbQyUHENYdx39WVWK7fsLpEoXZy
@@ -492,10 +492,10 @@ import fr.acinq.bitcoin._
 scala> import scodec.bits._
 import scodec.bits._
 
-scala> import fr.acinq.bitcoin.DeterministicWallet
+scala> import fr.acinq.bitcoin.scala.DeterministicWallet
 DeterministicWallet   DeterministicWalletSpec
 
-scala> import fr.acinq.bitcoin.DeterministicWallet._
+scala> import fr.acinq.bitcoin.scala.DeterministicWallet._
 import fr.acinq.bitcoin.DeterministicWallet._
 
 scala> val m = generate(hex"000102030405060708090a0b0c0d0e0f")
@@ -511,7 +511,7 @@ scala> encode(publicKey(m), xpub)
 res3: String = xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8
 
 scala> val priv = derivePrivateKey(m, KeyPath("0'/1/2'/2"))
-priv: fr.acinq.bitcoin.DeterministicWallet.ExtendedPrivateKey = ExtendedPrivateKey(0f479245fb19a38a1954c5c7c0ebab2f9bdfd96a17563ef28a6a4b1a2a764ef4,cfb71883f01676f587d023cc53a35bc7f88f724b1f8c2892ac1275ac822a3edd,4,m/0h/1/2h/2,4001020172)
+priv: fr.acinq.bitcoin.scala.DeterministicWallet.ExtendedPrivateKey = ExtendedPrivateKey(0f479245fb19a38a1954c5c7c0ebab2f9bdfd96a17563ef28a6a4b1a2a764ef4,cfb71883f01676f587d023cc53a35bc7f88f724b1f8c2892ac1275ac822a3edd,4,m/0h/1/2h/2,4001020172)
 
 scala> encode(priv, xprv)
 res5: String = xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334
@@ -520,13 +520,13 @@ scala> encode(publicKey(priv), xpub)
 res6: String = xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV
 
 scala> val k2 = derivePrivateKey(m, KeyPath("0'/1/2'"))
-k2: fr.acinq.bitcoin.DeterministicWallet.ExtendedPrivateKey = ExtendedPrivateKey(cbce0d719ecf7431d88e6a89fa1483e02e35092af60c042b1df2ff59fa424dca,04466b9cc8e161e966409ca52986c584f07e9dc81f735db683c3ff6ec7b1503f,3,m/0'/1/2',3203769081)
+k2: fr.acinq.bitcoin.scala.DeterministicWallet.ExtendedPrivateKey = ExtendedPrivateKey(cbce0d719ecf7431d88e6a89fa1483e02e35092af60c042b1df2ff59fa424dca,04466b9cc8e161e966409ca52986c584f07e9dc81f735db683c3ff6ec7b1503f,3,m/0'/1/2',3203769081)
 
 scala> val K2 = publicKey(k2)
-K2: fr.acinq.bitcoin.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey(ByteVector(33 bytes, 0x0357bfe1e341d01c69fe5654309956cbea516822fba8a601743a012a7896ee8dc2),04466b9cc8e161e966409ca52986c584f07e9dc81f735db683c3ff6ec7b1503f,3,m/0'/1/2',3203769081)
+K2: fr.acinq.bitcoin.scala.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey(ByteVector(33 bytes, 0x0357bfe1e341d01c69fe5654309956cbea516822fba8a601743a012a7896ee8dc2),04466b9cc8e161e966409ca52986c584f07e9dc81f735db683c3ff6ec7b1503f,3,m/0'/1/2',3203769081)
 
 scala> derivePublicKey(K2, KeyPath("2/1000000000"))
-res6: fr.acinq.bitcoin.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey(ByteVector(33 bytes, 0x022a471424da5e657499d1ff51cb43c47481a03b1e77f951fe64cec9f5a48f7011),c783e67b921d2beb8f6b389cc646d7263b4145701dadd2161548a8b078e65e9e,5,m/0'/1/2'/2/1000000000,3632322520)
+res6: fr.acinq.bitcoin.scala.DeterministicWallet.ExtendedPublicKey = ExtendedPublicKey(ByteVector(33 bytes, 0x022a471424da5e657499d1ff51cb43c47481a03b1e77f951fe64cec9f5a48f7011),c783e67b921d2beb8f6b389cc646d7263b4145701dadd2161548a8b078e65e9e,5,m/0'/1/2'/2/1000000000,3632322520)
 
 scala> encode(derivePublicKey(K2, KeyPath("2/1000000000")), xpub)
 res8: String = xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy
@@ -537,7 +537,7 @@ res8: String = xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJ
 ```shell
 mvn scala:console
 
-scala> import fr.acinq.bitcoin._
+scala> import fr.acinq.bitcoin.scala._
 import fr.acinq.bitcoin._
 
 scala> import scodec.bits._
