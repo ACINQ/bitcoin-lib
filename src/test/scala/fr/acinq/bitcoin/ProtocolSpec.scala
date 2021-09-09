@@ -46,6 +46,7 @@ class ProtocolSpec extends FlatSpec {
     assert(Block.TestnetGenesisBlock.blockId === ByteVector32(hex"000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"))
     assert(Block.RegtestGenesisBlock.blockId === ByteVector32(hex"0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"))
     assert(Block.SegnetGenesisBlock.blockId === ByteVector32(hex"18fb5ff510c09532033d2137a6914010509ee6258275a4b7e1b7b24b1d2191b2"))
+    assert(Block.SignetGenesisBlock.blockId === ByteVector32(hex"00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6"))
   }
   it should "decode proof-of-work difficulty" in {
     assert(decodeCompact(0) === (BigInteger.ZERO, false, false))
