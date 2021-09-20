@@ -25,6 +25,54 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.Input], outputs: Seq[Psbt.
 
   /**
    * Implements the PSBT updater role; adds information about a given segwit utxo.
+   * When you have access to the complete input transaction, you should prefer [[updateWitnessInputTx]].
+   *
+   * @param outPoint        utxo being spent.
+   * @param txOut           transaction output for the provided outPoint.
+   * @param redeemScript    redeem script if known and applicable (when using p2sh-embedded segwit).
+   * @param witnessScript   witness script if known and applicable (when using p2wsh).
+   * @param sighashType     sighash type if one should be specified.
+   * @param derivationPaths derivation paths for keys used by this utxo.
+   * @return psbt with the matching input updated.
+   */
+  def updateWitnessInput(outPoint: OutPoint,
+                         txOut: TxOut,
+                         redeemScript: Option[Seq[ScriptElt]] = None,
+                         witnessScript: Option[Seq[ScriptElt]] = None,
+                         sighashType: Option[Int] = None,
+                         derivationPaths: Map[PublicKey, KeyPathWithMaster] = Map.empty): Try[Psbt] = Try {
+    val inputIndex = global.tx.txIn.indexWhere(_.outPoint == outPoint)
+    require(inputIndex >= 0, "psbt transaction does not spend the provided outpoint")
+    val updatedInput = inputs(inputIndex) match {
+      case input: PartiallySignedInputWithoutUtxo => PartiallySignedWitnessInput(
+        txOut,
+        None,
+        sighashType.orElse(input.sighashType),
+        Map.empty,
+        derivationPaths ++ input.derivationPaths,
+        redeemScript,
+        witnessScript,
+        input.ripemd160,
+        input.sha256,
+        input.hash160,
+        input.hash256,
+        input.unknown
+      )
+      case input: PartiallySignedWitnessInput => input.copy(
+        txOut = txOut,
+        redeemScript = redeemScript.orElse(input.redeemScript),
+        witnessScript = witnessScript.orElse(input.witnessScript),
+        sighashType = sighashType.orElse(input.sighashType),
+        derivationPaths = input.derivationPaths ++ derivationPaths
+      )
+      case _: PartiallySignedNonWitnessInput => return Failure(new IllegalArgumentException("cannot update segwit input: it has already been updated with non-segwit data"))
+      case _: FinalizedInput => return Failure(new IllegalArgumentException("cannot update segwit input: it has already been finalized"))
+    }
+    this.copy(inputs = inputs.updated(inputIndex, updatedInput))
+  }
+
+  /**
+   * Implements the PSBT updater role; adds information about a given segwit utxo.
    * Note that we always fill the nonWitnessUtxo (see https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-7).
    *
    * @param inputTx         transaction containing the utxo.
@@ -35,12 +83,12 @@ case class Psbt(global: Psbt.Global, inputs: Seq[Psbt.Input], outputs: Seq[Psbt.
    * @param derivationPaths derivation paths for keys used by this utxo.
    * @return psbt with the matching input updated.
    */
-  def updateWitnessInput(inputTx: Transaction,
-                         outputIndex: Int,
-                         redeemScript: Option[Seq[ScriptElt]] = None,
-                         witnessScript: Option[Seq[ScriptElt]] = None,
-                         sighashType: Option[Int] = None,
-                         derivationPaths: Map[PublicKey, KeyPathWithMaster] = Map.empty): Try[Psbt] = Try {
+  def updateWitnessInputTx(inputTx: Transaction,
+                           outputIndex: Int,
+                           redeemScript: Option[Seq[ScriptElt]] = None,
+                           witnessScript: Option[Seq[ScriptElt]] = None,
+                           sighashType: Option[Int] = None,
+                           derivationPaths: Map[PublicKey, KeyPathWithMaster] = Map.empty): Try[Psbt] = Try {
     require(outputIndex < inputTx.txOut.size, "output index must exist in the input tx")
     val outpoint = OutPoint(inputTx, outputIndex)
     val inputIndex = global.tx.txIn.indexWhere(_.outPoint == outpoint)

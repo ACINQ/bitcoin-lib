@@ -405,7 +405,7 @@ class PsbtSpec extends FunSuite {
         PublicKey(hex"02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'"))
       ))
     // Update input 2 with a witness multi-sig utxo:
-    val Success(withBothInputs) = withOneInput.updateWitnessInput(
+    val Success(withBothInputs) = withOneInput.updateWitnessInputTx(
       secondInputTx,
       secondInputIndex,
       Some(Script.pay2wsh(Script.createMultiSigMofN(2, Seq(PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"), PublicKey(hex"023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))))),
@@ -430,7 +430,7 @@ class PsbtSpec extends FunSuite {
       firstInputTx,
       firstInputIndex,
       sighashType = Some(SIGHASH_ALL)
-    ).flatMap(_.updateWitnessInput(
+    ).flatMap(_.updateWitnessInputTx(
       secondInputTx,
       secondInputIndex,
       sighashType = Some(SIGHASH_ALL)
@@ -499,12 +499,12 @@ class PsbtSpec extends FunSuite {
     val input2 = OutPoint(inputTx2, 0)
     val globalTx = Transaction(2, TxIn(input1, Nil, 0) :: TxIn(input2, Nil, 0) :: Nil, TxOut(5000 sat, hex"01020304") :: TxOut(6000 sat, hex"abcdef") :: Nil, 0)
     val Success(psbt1) = Psbt(globalTx)
-      .updateWitnessInput(inputTx1, 2, None, Some(Seq(OP_1)), Some(SIGHASH_ALL), Map(PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'"))))
+      .updateWitnessInputTx(inputTx1, 2, None, Some(Seq(OP_1)), Some(SIGHASH_ALL), Map(PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'"))))
       .flatMap(_.updateNonWitnessInput(inputTx2, 0, Some(Seq(OP_RETURN)), Some(SIGHASH_SINGLE)))
       .flatMap(_.updateNonWitnessOutput(0, derivationPaths = Map(PublicKey(hex"03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'")))))
     val Success(psbt2) = Psbt(globalTx)
       .updateNonWitnessInput(inputTx1, 2, Some(Seq(OP_2DROP)), Some(SIGHASH_NONE), Map(PublicKey(hex"02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'"))))
-      .flatMap(_.updateWitnessInput(inputTx2, 0, None, Some(Seq(OP_8))))
+      .flatMap(_.updateWitnessInputTx(inputTx2, 0, None, Some(Seq(OP_8))))
     val Success(psbt3) = Psbt(globalTx)
       .updateNonWitnessOutput(0, Some(Seq(OP_DIV)), Map(PublicKey(hex"027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'"))))
       .flatMap(_.updateWitnessOutput(1, Some(Seq(OP_4)), Some(Seq(OP_ADD))))
@@ -635,7 +635,7 @@ class PsbtSpec extends FunSuite {
     ))
 
     assert(psbt.computeFees().isFailure) // inputs have not been updated yet
-    val Success(oneInput) = psbt.updateWitnessInput(inputTx1, 1, witnessScript = Some(Seq(OP_RETURN)))
+    val Success(oneInput) = psbt.updateWitnessInputTx(inputTx1, 1, witnessScript = Some(Seq(OP_RETURN)))
     assert(oneInput.computeFees().isFailure) // second input has not been updated yet
     val Success(bothInputs) = oneInput.updateNonWitnessInput(inputTx2, 0, redeemScript = Some(Seq(OP_RETURN)))
     assert(bothInputs.computeFees() === Success(250 sat))
@@ -695,16 +695,16 @@ class PsbtSpec extends FunSuite {
     val Success(updated) = psbt
       .updateNonWitnessInput(inputTx, 0, None, Some(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY), Map(priv1.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/1'"))))
       .flatMap(_.updateNonWitnessInput(inputTx, 1, Some(Script.createMultiSigMofN(2, pubKeys)), Some(SIGHASH_ALL), allDerivationPaths))
-      .flatMap(_.updateWitnessInput(inputTx, 2, Some(Script.pay2wpkh(priv2.publicKey)), Some(Script.pay2pkh(priv2.publicKey))))
-      .flatMap(_.updateWitnessInput(inputTx, 3, None, Some(Script.pay2pkh(priv3.publicKey)), Some(SIGHASH_SINGLE), Map(priv3.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/3'")))))
-      .flatMap(_.updateWitnessInput(inputTx, 4, None, Some(Script.createMultiSigMofN(2, pubKeys))))
-      .flatMap(_.updateWitnessInput(inputTx, 5, Some(Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys))), Some(Script.createMultiSigMofN(1, pubKeys))))
+      .flatMap(_.updateWitnessInputTx(inputTx, 2, Some(Script.pay2wpkh(priv2.publicKey)), Some(Script.pay2pkh(priv2.publicKey))))
+      .flatMap(_.updateWitnessInputTx(inputTx, 3, None, Some(Script.pay2pkh(priv3.publicKey)), Some(SIGHASH_SINGLE), Map(priv3.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/3'")))))
+      .flatMap(_.updateWitnessInputTx(inputTx, 4, None, Some(Script.createMultiSigMofN(2, pubKeys))))
+      .flatMap(_.updateWitnessInputTx(inputTx, 5, Some(Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys))), Some(Script.createMultiSigMofN(1, pubKeys))))
       .flatMap(_.updateWitnessOutput(0, Some(Script.createMultiSigMofN(1, pubKeys.drop(1))), None, allDerivationPaths - priv1.publicKey))
 
     assert(updated.getInput(0).get.asInstanceOf[PartiallySignedNonWitnessInput].sighashType === Some(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY))
     assert(updated.getInput(OutPoint(inputTx, 2)).get.asInstanceOf[PartiallySignedWitnessInput].redeemScript === Some(Script.pay2wpkh(priv2.publicKey)))
     // We reject invalid updates.
-    assert(updated.updateWitnessInput(inputTx, 1, sighashType = Some(SIGHASH_ALL)).isFailure)
+    assert(updated.updateWitnessInputTx(inputTx, 1, sighashType = Some(SIGHASH_ALL)).isFailure)
     assert(updated.updateNonWitnessInput(inputTx, 3, derivationPaths = allDerivationPaths).isFailure)
 
     val Success(SignPsbtResult(signed, _)) = updated
@@ -781,7 +781,7 @@ class PsbtSpec extends FunSuite {
       val script = anchorScript(fundingPrivKey.publicKey)
       val txToBump = Transaction(2, Nil, Seq(TxOut(330 sat, Script.pay2wsh(script))), 0)
       val Success(SignPsbtResult(lightningPsbt, _)) = Psbt(Transaction(2, Seq(TxIn(OutPoint(txToBump, 0), Nil, 0)), Nil, 0))
-        .updateWitnessInput(txToBump, 0, None, Some(script), Some(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
+        .updateWitnessInputTx(txToBump, 0, None, Some(script), Some(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
         .flatMap(_.sign(fundingPrivKey, 0))
       (fundingPrivKey.publicKey, lightningPsbt)
     }
@@ -790,7 +790,7 @@ class PsbtSpec extends FunSuite {
     val walletPrivKey = PrivateKey(hex"0202020202020202020202020202020202020202020202020202020202020202")
     val confirmedTx = Transaction(2, Nil, Seq(TxOut(100_000 sat, Script.pay2wpkh(walletPrivKey.publicKey))), 0)
     val finalTx_opt = Psbt.join(lightningPsbt, Psbt(Transaction(2, Seq(TxIn(OutPoint(confirmedTx, 0), Nil, 0)), Seq(TxOut(75_000 sat, Script.pay2wpkh(walletPrivKey.publicKey))), 0)))
-      .flatMap(_.updateWitnessInput(confirmedTx, 0, None, Some(Script.pay2pkh(walletPrivKey.publicKey))))
+      .flatMap(_.updateWitnessInputTx(confirmedTx, 0, None, Some(Script.pay2pkh(walletPrivKey.publicKey))))
       .flatMap(_.sign(walletPrivKey, 1))
       .flatMap(signResult => signResult.psbt.finalizeWitnessInput(0, ScriptWitness(Seq(signResult.psbt.inputs.head.partialSigs(fundingPubKey), Script.write(anchorScript(fundingPubKey))))))
       .flatMap(psbt => psbt.finalizeWitnessInput(1, Script.witnessPay2wpkh(walletPrivKey.publicKey, psbt.inputs(1).partialSigs(walletPrivKey.publicKey))))
@@ -811,11 +811,11 @@ class PsbtSpec extends FunSuite {
 
     // Each participant adds their inputs and fills their utxos.
     val Success(alicePsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(aliceInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(aliceNextPubKey))), 0))
-      .updateWitnessInput(aliceInputTx, 0, None, Some(Script.pay2pkh(alicePrivKey.publicKey)), Some(SIGHASH_ALL))
+      .updateWitnessInputTx(aliceInputTx, 0, None, Some(Script.pay2pkh(alicePrivKey.publicKey)), Some(SIGHASH_ALL))
     val Success(bobPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(bobInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(bobNextPubKey))), 0))
-      .updateWitnessInput(bobInputTx, 0, None, Some(Script.pay2pkh(bobPrivKey.publicKey)), Some(SIGHASH_ALL))
+      .updateWitnessInput(OutPoint(bobInputTx, 0), bobInputTx.txOut.head, None, Some(Script.pay2pkh(bobPrivKey.publicKey)), Some(SIGHASH_ALL))
     val Success(carolPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(carolInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(carolNextPubKey))), 0))
-      .updateWitnessInput(carolInputTx, 0, None, Some(Script.pay2pkh(carolPrivKey.publicKey)), Some(SIGHASH_ALL))
+      .updateWitnessInputTx(carolInputTx, 0, None, Some(Script.pay2pkh(carolPrivKey.publicKey)), Some(SIGHASH_ALL))
 
     // Carol joins the psbts, signs and finalizes her inputs.
     val Success(carolFinal) = {
@@ -859,7 +859,7 @@ class PsbtSpec extends FunSuite {
 
     // Alice creates the (unsigned) PSBT and sends it to Bob and Carol.
     val spendingTx = Transaction(2, TxIn(OutPoint(inputTx, 0), Nil, 0) :: Nil, TxOut(100000 sat, Script.pay2wpkh(aliceNextPubKey)) :: TxOut(125000 sat, Script.pay2wpkh(bobNextPubKey)) :: Nil, 0)
-    val Success(unsignedPsbt) = Psbt(spendingTx).updateWitnessInput(inputTx, 0, None, Some(Script.createMultiSigMofN(2, pubKeys)), Some(SIGHASH_ALL))
+    val Success(unsignedPsbt) = Psbt(spendingTx).updateWitnessInputTx(inputTx, 0, None, Some(Script.createMultiSigMofN(2, pubKeys)), Some(SIGHASH_ALL))
 
     // Each participant signs the input.
     val Success(aliceSigned) = unsignedPsbt.sign(alicePrivKey, 0).map(_.psbt)
