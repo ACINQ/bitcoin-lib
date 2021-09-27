@@ -2,7 +2,7 @@ package fr.acinq.bitcoin
 
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.DeterministicWallet.{ExtendedPrivateKey, KeyPath}
-import fr.acinq.bitcoin.Psbt.{KeyPathWithMaster, PartiallySignedOutput}
+import fr.acinq.bitcoin.Psbt._
 import org.scalatest.FunSuite
 import scodec.bits.{ByteVector, HexStringSyntax}
 
@@ -155,7 +155,7 @@ class PsbtSpec extends FunSuite {
       lockTime = 3
     )
     val psbt = Psbt(tx)
-    val Success(updated) = psbt.update(inputTx1, 1, redeemScript = Some(Seq(OP_RETURN))).flatMap(_.update(inputTx2, 0, redeemScript = Some(Seq(OP_RETURN))))
+    val Success(updated) = psbt.updateNonWitnessInput(inputTx1, 1, redeemScript = Some(Seq(OP_RETURN))).flatMap(_.updateNonWitnessInput(inputTx2, 0, redeemScript = Some(Seq(OP_RETURN))))
 
     val outputIndexMismatch = updated.copy(global = updated.global.copy(tx = Transaction(
       version = 2,
@@ -342,7 +342,7 @@ class PsbtSpec extends FunSuite {
       TestCase(
         hex"70736274ff0100a00200000002ab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be40000000000feffffffab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821a8139f877a5b7be40100000000feffffff02603bea0b000000001976a914768a40bbd740cbe81d988e71de2a4d5c71396b1d88ac8e240000000000001976a9146f4620b553fa095e721b9ee0efe9fa039cca459788ac0000000000010122d3dff505000000001976a914d48ed3110b94014cb114bd32d6f4d066dc74256b88ac0001012000e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787010416001485d13537f2e265405a34dbafa9e3dda01fb8230800220202ead596687ca806043edc3de116cdf29d5e9257c196cd055cf698c8d02bf24e9910b4a6ba670000008000000080020000800022020394f62be9df19952c5587768aeb7698061ad2c4a25c894f47d8c162b4d7213d0510b4a6ba6700000080010000800200008000",
         0,
-        "witness utxo must use native witness program or P2SH witness program"
+        "witness utxo must use native segwit or P2SH embedded segwit"
       ),
       // redeemScript with non-witness UTXO does not match the scriptPubKey
       TestCase(
@@ -389,39 +389,52 @@ class PsbtSpec extends FunSuite {
   }
 
   test("update PSBT (official test vectors)") {
+    val firstInputTx = Transaction.read(hex"0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000".toArray)
+    val firstInputIndex = 0
+    val secondInputTx = Transaction.read(hex"0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000".toArray)
+    val secondInputIndex = 1
     // Updated PSBT from the previous step.
     val Success(psbt) = Psbt.read(hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000".toArray)
     // Update input 1 with a non-witness multi-sig utxo:
-    val Success(withOneInput) = psbt.update(
-      Transaction.read(hex"0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000".toArray),
-      0,
-      Some(Script.parse(hex"5221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae")),
+    val Success(withOneInput) = psbt.updateNonWitnessInput(
+      firstInputTx,
+      firstInputIndex,
+      Some(Script.createMultiSigMofN(2, Seq(PublicKey(hex"029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f"), PublicKey(hex"02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7")))),
       derivationPaths = Map(
         PublicKey(hex"029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/0'")),
         PublicKey(hex"02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'"))
       ))
     // Update input 2 with a witness multi-sig utxo:
-    val Success(withBothInputs) = withOneInput.update(
-      Transaction.read(hex"0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000".toArray),
-      1,
-      Some(Script.parse(hex"00208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903")),
-      Some(Script.parse(hex"522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae")),
+    val Success(withBothInputs) = withOneInput.updateWitnessInputTx(
+      secondInputTx,
+      secondInputIndex,
+      Some(Script.pay2wsh(Script.createMultiSigMofN(2, Seq(PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"), PublicKey(hex"023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))))),
+      Some(Script.createMultiSigMofN(2, Seq(PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"), PublicKey(hex"023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73")))),
       derivationPaths = Map(
         PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'")),
         PublicKey(hex"023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/3'"))
       ))
     // Update outputs with known derivation paths:
-    val withInputsAndOutputs = withBothInputs.copy(outputs = Seq(
-      psbt.outputs.head.copy(derivationPaths = Map(PublicKey(hex"03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'")))),
-      psbt.outputs(1).copy(derivationPaths = Map(PublicKey(hex"027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'"))))
-    ))
+    val Success(withInputsAndOutputs) = withBothInputs
+      .updateNonWitnessOutput(0, derivationPaths = Map(PublicKey(hex"03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'"))))
+      .flatMap(_.updateWitnessOutput(1, derivationPaths = Map(PublicKey(hex"027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'")))))
     // We differ from the official test vector because we include both witnessUtxo and nonWitnessUtxo, because of https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-8
     assert(Psbt.write(withInputsAndOutputs) === hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f000000800000008001000080000100f80200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f796500000001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88701042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000".toArray)
     // But if we remove the nonWitnessUtxo in the second input, we match the official test vector:
-    val withOnlyWitnessUtxo = withInputsAndOutputs.copy(inputs = Seq(withInputsAndOutputs.inputs.head, withInputsAndOutputs.inputs(1).copy(nonWitnessUtxo = None)))
+    val withOnlyWitnessUtxo = withInputsAndOutputs.copy(
+      inputs = Seq(withInputsAndOutputs.inputs.head, withInputsAndOutputs.inputs(1).asInstanceOf[PartiallySignedWitnessInput].copy(nonWitnessUtxo = None))
+    )
     assert(Psbt.write(withOnlyWitnessUtxo) === hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88701042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000".toArray)
     // Update inputs to use SIGHASH_ALL:
-    val withSighash = withInputsAndOutputs.copy(inputs = withInputsAndOutputs.inputs.map(_.copy(sighashType = Some(SIGHASH_ALL))))
+    val Success(withSighash) = withInputsAndOutputs.updateNonWitnessInput(
+      firstInputTx,
+      firstInputIndex,
+      sighashType = Some(SIGHASH_ALL)
+    ).flatMap(_.updateWitnessInputTx(
+      secondInputTx,
+      secondInputIndex,
+      sighashType = Some(SIGHASH_ALL)
+    ))
     assert(Psbt.write(withSighash) === hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f000000800000008001000080000100f80200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f796500000001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8870103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000".toArray)
   }
 
@@ -431,7 +444,7 @@ class PsbtSpec extends FunSuite {
 
     def sign(keys: Map[Int, ExtendedPrivateKey]): Psbt = keys.foldLeft(psbt) {
       case (cur, (inputIndex, priv)) => cur.sign(priv.privateKey, inputIndex) match {
-        case Success(signed) => signed
+        case Success(signed) => signed.psbt
         case Failure(ex) => fail(ex)
       }
     }
@@ -479,23 +492,82 @@ class PsbtSpec extends FunSuite {
     assert(Psbt.write(psbt) === hex"70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000ffffffff010000000000000000036a0100000000000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f000af00102030405060708090f0102030405060708090a0b0c0d0e0f0af00102030405060708100f0102030405060708090a0b0c0d0e0f00".toArray)
   }
 
+  test("combine PSBTs") {
+    val inputTx1 = Transaction(2, Nil, TxOut(500 sat, Nil) :: TxOut(1500 sat, Nil) :: TxOut(10000 sat, hex"11223344") :: Nil, 0)
+    val input1 = OutPoint(inputTx1, 2)
+    val inputTx2 = Transaction(2, Nil, TxOut(7500 sat, hex"ff01ee02dd03") :: TxOut(250 sat, Nil) :: Nil, 0)
+    val input2 = OutPoint(inputTx2, 0)
+    val globalTx = Transaction(2, TxIn(input1, Nil, 0) :: TxIn(input2, Nil, 0) :: Nil, TxOut(5000 sat, hex"01020304") :: TxOut(6000 sat, hex"abcdef") :: Nil, 0)
+    val Success(psbt1) = Psbt(globalTx)
+      .updateWitnessInputTx(inputTx1, 2, None, Some(Seq(OP_1)), Some(SIGHASH_ALL), Map(PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'"))))
+      .flatMap(_.updateNonWitnessInput(inputTx2, 0, Some(Seq(OP_RETURN)), Some(SIGHASH_SINGLE)))
+      .flatMap(_.updateNonWitnessOutput(0, derivationPaths = Map(PublicKey(hex"03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'")))))
+    val Success(psbt2) = Psbt(globalTx)
+      .updateNonWitnessInput(inputTx1, 2, Some(Seq(OP_2DROP)), Some(SIGHASH_NONE), Map(PublicKey(hex"02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'"))))
+      .flatMap(_.updateWitnessInputTx(inputTx2, 0, None, Some(Seq(OP_8))))
+    val Success(psbt3) = Psbt(globalTx)
+      .updateNonWitnessOutput(0, Some(Seq(OP_DIV)), Map(PublicKey(hex"027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'"))))
+      .flatMap(_.updateWitnessOutput(1, Some(Seq(OP_4)), Some(Seq(OP_ADD))))
+    val Success(combined) = Psbt.combine(psbt1, psbt2, psbt3)
+    val expected = Psbt(
+      Global(0, globalTx, Nil, Nil),
+      Seq(
+        PartiallySignedWitnessInput(
+          inputTx1.txOut(2),
+          Some(inputTx1),
+          Some(SIGHASH_ALL),
+          Map.empty,
+          Map(
+            PublicKey(hex"02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/1'")),
+            PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/2'")),
+          ),
+          Some(Seq(OP_2DROP)),
+          Some(Seq(OP_1)),
+          Set.empty, Set.empty, Set.empty, Set.empty, Seq.empty
+        ),
+        PartiallySignedWitnessInput(
+          inputTx2.txOut(0),
+          Some(inputTx2),
+          Some(SIGHASH_SINGLE),
+          Map.empty,
+          Map.empty,
+          Some(Seq(OP_RETURN)),
+          Some(Seq(OP_8)),
+          Set.empty, Set.empty, Set.empty, Set.empty, Seq.empty
+        )
+      ),
+      Seq(
+        NonWitnessOutput(
+          Some(Seq(OP_DIV)),
+          Map(
+            PublicKey(hex"03a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca58771") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/4'")),
+            PublicKey(hex"027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b50051096") -> KeyPathWithMaster(DeterministicWallet.fingerprint(masterPrivKey), KeyPath("m/0'/0'/5'")),
+          ),
+          Seq.empty
+        ),
+        WitnessOutput(Some(Seq(OP_4)), Some(Seq(OP_ADD)), Map.empty, Seq.empty)
+      )
+    )
+    assert(combined === expected)
+  }
+
   test("finalize PSBT (official test vectors)") {
     val Success(psbt) = Psbt.read(hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000002202029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01220202dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01010304010000000104475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae2206029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f10d90c6a4f000000800000008000000080220602dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d710d90c6a4f0000008000000080010000800001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e887220203089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f012202023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d2010103040100000001042200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903010547522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae2206023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7310d90c6a4f000000800000008003000080220603089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc10d90c6a4f00000080000000800200008000220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000".toArray)
-    val finalized0 = {
+    val Success(finalized0) = {
       // The first input is a non-witness 2-of-2 multisig:
       val sig1 = psbt.inputs.head.partialSigs(PublicKey(hex"029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f"))
       val sig2 = psbt.inputs.head.partialSigs(PublicKey(hex"02dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d7"))
       val redeemScript = Script.write(psbt.inputs.head.redeemScript.get)
       val scriptSig = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
-      psbt.finalize(0, scriptSig).get
+      psbt.finalizeNonWitnessInput(0, scriptSig)
     }
-    val finalized1 = {
+    val Success(finalized1) = {
       // The second input is a P2SH witness program of a 2-of-2 multisig:
       val sig1 = psbt.inputs(1).partialSigs(PublicKey(hex"03089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc"))
       val sig2 = psbt.inputs(1).partialSigs(PublicKey(hex"023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e73"))
       val witnessScript = Script.write(psbt.inputs(1).witnessScript.get)
       val scriptWitness = ScriptWitness(ByteVector.empty :: sig1 :: sig2 :: witnessScript :: Nil)
-      finalized0.finalize(1, scriptWitness).get
+      finalized0.finalizeWitnessInput(1, scriptWitness)
     }
     assert(Psbt.write(finalized1) === hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f00000000000100bb0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f6187650000000107da00473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752ae0001012000c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e8870107232200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b20289030108da0400473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f01473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d20147522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae00220203a9a4c37f5996d3aa25dbac6b570af0650394492942460b354753ed9eeca5877110d90c6a4f000000800000008004000080002202027f6399757d2eff55a136ad02c684b1838b6556e5f1b6b34282a94b6b5005109610d90c6a4f00000080000000800500008000".toArray)
   }
@@ -563,20 +635,134 @@ class PsbtSpec extends FunSuite {
     ))
 
     assert(psbt.computeFees().isFailure) // inputs have not been updated yet
-    val Success(oneInput) = psbt.update(inputTx1, 1, witnessScript = Some(Seq(OP_RETURN)))
+    val Success(oneInput) = psbt.updateWitnessInputTx(inputTx1, 1, witnessScript = Some(Seq(OP_RETURN)))
     assert(oneInput.computeFees().isFailure) // second input has not been updated yet
-    val Success(bothInputs) = oneInput.update(inputTx2, 0, redeemScript = Some(Seq(OP_RETURN)))
+    val Success(bothInputs) = oneInput.updateNonWitnessInput(inputTx2, 0, redeemScript = Some(Seq(OP_RETURN)))
     assert(bothInputs.computeFees() === Success(250 sat))
   }
 
   test("preimage challenges") {
-    val Success(psbt) = Psbt.read(hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000".toArray)
-    val withPreimageChallenges = psbt.copy(inputs = Seq(
-      psbt.inputs.head.copy(ripemd160 = Set(hex"01020304", hex"0102"), hash160 = Set(hex"123456"), hash256 = Set(hex"abcdef", hex"00000000")),
-      psbt.inputs.last.copy(ripemd160 = Set(hex"0102"), sha256 = Set(hex"123456", hex"11"), hash256 = Set(hex"abcdef", hex"00000000"))
-    ))
+    val Success(withPreimageChallenges) = Psbt.read(hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000".toArray)
+      .flatMap(_.updatePreimageChallenges(0, Set(hex"01020304", hex"0102"), Set.empty, Set(hex"123456"), Set(hex"abcdef", hex"00000000")))
+      .flatMap(_.updatePreimageChallenges(1, Set(hex"0102"), Set(hex"123456", hex"11"), Set.empty, Set(hex"abcdef", hex"00000000")))
+    assert(withPreimageChallenges.inputs.head.hash160 === Set(hex"123456"))
+    assert(withPreimageChallenges.inputs.last.sha256 === Set(hex"123456", hex"11"))
     val Success(decoded) = Psbt.read(Psbt.write(withPreimageChallenges))
     assert(decoded === withPreimageChallenges)
+  }
+
+  test("create psbt with various input types") {
+    val masterFingerprint = DeterministicWallet.fingerprint(masterPrivKey)
+    val priv1 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/1'")).privateKey
+    val priv2 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/2'")).privateKey
+    val priv3 = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/3'/3'")).privateKey
+    val pubKeys = Seq(priv1, priv2, priv3).map(_.publicKey)
+    val allDerivationPaths = Map(
+      priv1.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/1'")),
+      priv2.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/2'")),
+      priv3.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/3'")),
+    )
+    val inputTx = Transaction(
+      2,
+      Nil,
+      Seq(
+        TxOut(15000 sat, Script.pay2pkh(priv1.publicKey)),
+        TxOut(12000 sat, Script.pay2sh(Script.createMultiSigMofN(2, pubKeys))),
+        TxOut(16000 sat, Script.pay2sh(Script.pay2wpkh(priv2.publicKey))),
+        TxOut(11000 sat, Script.pay2wpkh(priv3.publicKey)),
+        TxOut(13000 sat, Script.pay2wsh(Script.createMultiSigMofN(2, pubKeys))),
+        TxOut(10000 sat, Script.pay2sh(Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys))))
+      ),
+      0
+    )
+    val globalTx = Transaction(
+      2,
+      (0 to 5).map(i => TxIn(OutPoint(inputTx, i), Nil, 0)),
+      Seq(TxOut(60000 sat, Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys.drop(1))))),
+      0
+    )
+    val psbt = Psbt(globalTx)
+    assert(psbt.getInput(2) === Some(PartiallySignedInputWithoutUtxo(None, Map.empty, Set.empty, Set.empty, Set.empty, Set.empty, Seq.empty)))
+    assert(psbt.getInput(6) === None)
+    assert(psbt.getInput(OutPoint(inputTx, 1)) === Some(PartiallySignedInputWithoutUtxo(None, Map.empty, Set.empty, Set.empty, Set.empty, Set.empty, Seq.empty)))
+    assert(psbt.getInput(OutPoint(ByteVector32.Zeroes, 0)) === None)
+
+    // We can't sign the psbt before adding the utxo details (updater role).
+    assert(psbt.sign(priv1, 0).isFailure)
+    assert(psbt.sign(priv3, OutPoint(inputTx, 3)).isFailure)
+
+    // Update all inputs and outputs.
+    val Success(updated) = psbt
+      .updateNonWitnessInput(inputTx, 0, None, Some(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY), Map(priv1.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/1'"))))
+      .flatMap(_.updateNonWitnessInput(inputTx, 1, Some(Script.createMultiSigMofN(2, pubKeys)), Some(SIGHASH_ALL), allDerivationPaths))
+      .flatMap(_.updateWitnessInputTx(inputTx, 2, Some(Script.pay2wpkh(priv2.publicKey)), Some(Script.pay2pkh(priv2.publicKey))))
+      .flatMap(_.updateWitnessInputTx(inputTx, 3, None, Some(Script.pay2pkh(priv3.publicKey)), Some(SIGHASH_SINGLE), Map(priv3.publicKey -> KeyPathWithMaster(masterFingerprint, KeyPath("m/0'/3'/3'")))))
+      .flatMap(_.updateWitnessInputTx(inputTx, 4, None, Some(Script.createMultiSigMofN(2, pubKeys))))
+      .flatMap(_.updateWitnessInputTx(inputTx, 5, Some(Script.pay2wsh(Script.createMultiSigMofN(1, pubKeys))), Some(Script.createMultiSigMofN(1, pubKeys))))
+      .flatMap(_.updateWitnessOutput(0, Some(Script.createMultiSigMofN(1, pubKeys.drop(1))), None, allDerivationPaths - priv1.publicKey))
+
+    assert(updated.getInput(0).get.asInstanceOf[PartiallySignedNonWitnessInput].sighashType === Some(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY))
+    assert(updated.getInput(OutPoint(inputTx, 2)).get.asInstanceOf[PartiallySignedWitnessInput].redeemScript === Some(Script.pay2wpkh(priv2.publicKey)))
+    // We reject invalid updates.
+    assert(updated.updateWitnessInputTx(inputTx, 1, sighashType = Some(SIGHASH_ALL)).isFailure)
+    assert(updated.updateNonWitnessInput(inputTx, 3, derivationPaths = allDerivationPaths).isFailure)
+
+    val Success(SignPsbtResult(signed, _)) = updated
+      .sign(priv1, 0)
+      .flatMap(_.psbt.sign(priv1, 1))
+      .flatMap(_.psbt.sign(priv2, OutPoint(inputTx, 1)))
+      .flatMap(_.psbt.sign(priv2, 2))
+      .flatMap(_.psbt.sign(priv3, OutPoint(inputTx, 3)))
+      .flatMap(_.psbt.sign(priv2, 4))
+      .flatMap(_.psbt.sign(priv3, OutPoint(inputTx, 4)))
+      .flatMap(_.psbt.sign(priv2, 5))
+
+    assert(signed.getInput(0).get.partialSigs.size === 1)
+    assert(signed.getInput(OutPoint(inputTx, 4)).get.partialSigs.size === 2)
+    assert(signed.getInput(5).get.partialSigs.size === 1)
+    assert(signed.finalizeWitnessInput(0, ScriptWitness(Seq(priv1.publicKey.value))).isFailure)
+    assert(signed.finalizeNonWitnessInput(3, OP_PUSHDATA(priv1.publicKey) :: Nil).isFailure)
+
+    val scriptSig0 = {
+      val sig = signed.getInput(0).get.partialSigs(priv1.publicKey)
+      OP_PUSHDATA(sig) :: OP_PUSHDATA(priv1.publicKey) :: Nil
+    }
+    val scriptSig1 = {
+      val sig1 = signed.getInput(1).get.partialSigs(priv1.publicKey)
+      val sig2 = signed.getInput(1).get.partialSigs(priv2.publicKey)
+      val redeemScript = Script.write(Script.createMultiSigMofN(2, pubKeys))
+      OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
+    }
+    val scriptWitness2 = {
+      val sig = signed.getInput(2).get.partialSigs(priv2.publicKey)
+      Script.witnessPay2wpkh(priv2.publicKey, sig)
+    }
+    val scriptWitness3 = {
+      val sig = signed.getInput(3).get.partialSigs(priv3.publicKey)
+      Script.witnessPay2wpkh(priv3.publicKey, sig)
+    }
+    val scriptWitness4 = {
+      val sig1 = signed.getInput(4).get.partialSigs(priv2.publicKey)
+      val sig2 = signed.getInput(4).get.partialSigs(priv3.publicKey)
+      Script.witnessMultiSigMofN(pubKeys, Seq(sig1, sig2))
+    }
+    val scriptWitness5 = {
+      val sig = signed.getInput(5).get.partialSigs(priv2.publicKey)
+      Script.witnessMultiSigMofN(pubKeys, Seq(sig))
+    }
+
+    val Success(finalized) = signed
+      .finalizeNonWitnessInput(0, scriptSig0)
+      .flatMap(_.finalizeNonWitnessInput(1, scriptSig1))
+      .flatMap(_.finalizeWitnessInput(OutPoint(inputTx, 2), scriptWitness2))
+      .flatMap(_.finalizeWitnessInput(3, scriptWitness3))
+      .flatMap(_.finalizeWitnessInput(4, scriptWitness4))
+      .flatMap(_.finalizeWitnessInput(OutPoint(inputTx, 5), scriptWitness5))
+
+    assert(finalized.extract().isSuccess)
+    // Once the psbt is finalized, we reject updates.
+    assert(finalized.sign(priv2, 2).isFailure)
+    assert(finalized.finalizeWitnessInput(3, scriptWitness3).isFailure)
   }
 
   test("bump lightning commit tx fee from cold wallet") {
@@ -594,8 +780,8 @@ class PsbtSpec extends FunSuite {
       val fundingPrivKey = PrivateKey(hex"0101010101010101010101010101010101010101010101010101010101010101")
       val script = anchorScript(fundingPrivKey.publicKey)
       val txToBump = Transaction(2, Nil, Seq(TxOut(330 sat, Script.pay2wsh(script))), 0)
-      val Success(lightningPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(txToBump, 0), Nil, 0)), Nil, 0))
-        .update(txToBump, 0, None, Some(script), Some(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
+      val Success(SignPsbtResult(lightningPsbt, _)) = Psbt(Transaction(2, Seq(TxIn(OutPoint(txToBump, 0), Nil, 0)), Nil, 0))
+        .updateWitnessInputTx(txToBump, 0, None, Some(script), Some(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
         .flatMap(_.sign(fundingPrivKey, 0))
       (fundingPrivKey.publicKey, lightningPsbt)
     }
@@ -604,11 +790,91 @@ class PsbtSpec extends FunSuite {
     val walletPrivKey = PrivateKey(hex"0202020202020202020202020202020202020202020202020202020202020202")
     val confirmedTx = Transaction(2, Nil, Seq(TxOut(100_000 sat, Script.pay2wpkh(walletPrivKey.publicKey))), 0)
     val finalTx_opt = Psbt.join(lightningPsbt, Psbt(Transaction(2, Seq(TxIn(OutPoint(confirmedTx, 0), Nil, 0)), Seq(TxOut(75_000 sat, Script.pay2wpkh(walletPrivKey.publicKey))), 0)))
-      .flatMap(_.update(confirmedTx, 0, None, Some(Script.pay2pkh(walletPrivKey.publicKey))))
+      .flatMap(_.updateWitnessInputTx(confirmedTx, 0, None, Some(Script.pay2pkh(walletPrivKey.publicKey))))
       .flatMap(_.sign(walletPrivKey, 1))
-      .flatMap(psbt => psbt.finalize(0, ScriptWitness(Seq(psbt.inputs.head.partialSigs(fundingPubKey), Script.write(anchorScript(fundingPubKey))))))
-      .flatMap(psbt => psbt.finalize(1, Script.witnessPay2wpkh(walletPrivKey.publicKey, psbt.inputs(1).partialSigs(walletPrivKey.publicKey))))
+      .flatMap(signResult => signResult.psbt.finalizeWitnessInput(0, ScriptWitness(Seq(signResult.psbt.inputs.head.partialSigs(fundingPubKey), Script.write(anchorScript(fundingPubKey))))))
+      .flatMap(psbt => psbt.finalizeWitnessInput(1, Script.witnessPay2wpkh(walletPrivKey.publicKey, psbt.inputs(1).partialSigs(walletPrivKey.publicKey))))
       .flatMap(_.extract())
+    assert(finalTx_opt.isSuccess)
+  }
+
+  test("manual coinjoin workflow") {
+    val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
+    val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
+    val aliceInputTx = Transaction(2, Nil, Seq(TxOut(50000 sat, Script.pay2wpkh(alicePrivKey.publicKey))), 0)
+    val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).privateKey
+    val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/2'")).publicKey
+    val bobInputTx = Transaction(2, Nil, Seq(TxOut(40000 sat, Script.pay2wpkh(bobPrivKey.publicKey))), 0)
+    val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
+    val carolNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/2'")).publicKey
+    val carolInputTx = Transaction(2, Nil, Seq(TxOut(60000 sat, Script.pay2wpkh(carolPrivKey.publicKey))), 0)
+
+    // Each participant adds their inputs and fills their utxos.
+    val Success(alicePsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(aliceInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(aliceNextPubKey))), 0))
+      .updateWitnessInputTx(aliceInputTx, 0, None, Some(Script.pay2pkh(alicePrivKey.publicKey)), Some(SIGHASH_ALL))
+    val Success(bobPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(bobInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(bobNextPubKey))), 0))
+      .updateWitnessInput(OutPoint(bobInputTx, 0), bobInputTx.txOut.head, None, Some(Script.pay2pkh(bobPrivKey.publicKey)), Some(SIGHASH_ALL))
+    val Success(carolPsbt) = Psbt(Transaction(2, Seq(TxIn(OutPoint(carolInputTx, 0), Nil, 0)), Seq(TxOut(50000 sat, Script.pay2wpkh(carolNextPubKey))), 0))
+      .updateWitnessInputTx(carolInputTx, 0, None, Some(Script.pay2pkh(carolPrivKey.publicKey)), Some(SIGHASH_ALL))
+
+    // Carol joins the psbts, signs and finalizes her inputs.
+    val Success(carolFinal) = {
+      val Success(joined) = Psbt.join(alicePsbt, bobPsbt, carolPsbt)
+      val outPoint = OutPoint(carolInputTx, 0)
+      // Carol verifies the sighash before signing her inputs.
+      assert(joined.getInput(outPoint).flatMap(_.sighashType) === Some(SIGHASH_ALL))
+      joined.sign(carolPrivKey, outPoint).flatMap(signed => signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(carolPrivKey.publicKey, signed.sig)))
+    }
+
+    // Bob signs and finalizes his inputs.
+    val Success(bobFinal) = {
+      val outPoint = OutPoint(bobInputTx, 0)
+      // Bob verifies the sighash before signing his inputs.
+      assert(carolFinal.getInput(outPoint).flatMap(_.sighashType) === Some(SIGHASH_ALL))
+      carolFinal.sign(bobPrivKey, outPoint).flatMap(signed => signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(bobPrivKey.publicKey, signed.sig)))
+    }
+
+    // Alice signs and extracts the final tx.
+    val conjoinTx = {
+      val outPoint = OutPoint(aliceInputTx, 0)
+      // Alice verifies the sighash before signing her inputs.
+      assert(bobFinal.getInput(outPoint).flatMap(_.sighashType) === Some(SIGHASH_ALL))
+      val Success(aliceFinal) = bobFinal.sign(alicePrivKey, outPoint).flatMap(signed => signed.psbt.finalizeWitnessInput(outPoint, Script.witnessPay2wpkh(alicePrivKey.publicKey, signed.sig)))
+      // Alice verifies that all inputs have been finalized.
+      assert(aliceFinal.inputs.forall(_.isInstanceOf[FinalizedInput]))
+      aliceFinal.extract()
+    }
+
+    assert(conjoinTx.isSuccess)
+  }
+
+  test("2-of-3 multisig workflow") {
+    val alicePrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/1'")).privateKey
+    val aliceNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/0'/2'")).publicKey
+    val bobPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/0'")).privateKey
+    val bobNextPubKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/1'/1'")).publicKey
+    val carolPrivKey = DeterministicWallet.derivePrivateKey(masterPrivKey, KeyPath("m/0'/2'/1'")).privateKey
+    val pubKeys = Seq(alicePrivKey, bobPrivKey, carolPrivKey).map(_.publicKey)
+    val inputTx = Transaction(2, Nil, TxOut(250000 sat, Script.pay2wsh(Script.createMultiSigMofN(2, pubKeys))) :: Nil, 0)
+
+    // Alice creates the (unsigned) PSBT and sends it to Bob and Carol.
+    val spendingTx = Transaction(2, TxIn(OutPoint(inputTx, 0), Nil, 0) :: Nil, TxOut(100000 sat, Script.pay2wpkh(aliceNextPubKey)) :: TxOut(125000 sat, Script.pay2wpkh(bobNextPubKey)) :: Nil, 0)
+    val Success(unsignedPsbt) = Psbt(spendingTx).updateWitnessInputTx(inputTx, 0, None, Some(Script.createMultiSigMofN(2, pubKeys)), Some(SIGHASH_ALL))
+
+    // Each participant signs the input.
+    val Success(aliceSigned) = unsignedPsbt.sign(alicePrivKey, 0).map(_.psbt)
+    val Success(bobSigned) = unsignedPsbt.sign(bobPrivKey, 0).map(_.psbt)
+    val Success(carolSigned) = unsignedPsbt.sign(carolPrivKey, 0).map(_.psbt)
+
+    // Alice combines the inputs and broadcasts the final transaction.
+    val finalTx_opt = {
+      val Success(combined) = Psbt.combine(aliceSigned, bobSigned, carolSigned)
+      // Alice verifies that all participants have signed.
+      val sigs = combined.inputs.head.partialSigs.filter { case (pubKey, _) => pubKeys.contains(pubKey) }.values.toSeq
+      assert(sigs.length === 3)
+      combined.finalizeWitnessInput(0, Script.witnessMultiSigMofN(pubKeys, sigs.drop(1))).flatMap(_.extract())
+    }
+
     assert(finalTx_opt.isSuccess)
   }
 
@@ -618,7 +884,7 @@ class PsbtSpec extends FunSuite {
     psbt.outputs.foreach(output => assert(output.unknown.isEmpty))
   }
 
-  private def verifyEmptyOutput(output: PartiallySignedOutput): Unit = {
+  private def verifyEmptyOutput(output: Psbt.Output): Unit = {
     assert(output.redeemScript === None)
     assert(output.witnessScript === None)
     assert(output.derivationPaths.isEmpty)
