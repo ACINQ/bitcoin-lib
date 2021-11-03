@@ -39,31 +39,9 @@ class ScriptSpec extends FlatSpec {
     assert(Script.isNativeWitnessScript(p2wsh))
     assert(Script.isNativeWitnessScript(Script.write(p2wsh)))
   }
-  it should "parse if/else/endif" in {
-    val tx = Transaction(version = 1,
-      txIn = TxIn(OutPoint(ByteVector32.Zeroes, 0xffffffff), Script.write(OP_NOP :: Nil), 0xffffffff) :: Nil,
-      txOut = TxOut(0x12a05f200L sat, ByteVector.empty) :: Nil,
-      lockTime = 0)
-    val ctx = Script.Context(tx, 0, 0 sat)
-    val runner = new Script.Runner(ctx)
-    val script = OP_1 :: OP_2 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
-    val stack = runner.run(script)
-    assert(stack === List(ByteVector(4)))
-    val script1 = OP_1 :: OP_1 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
-    val stack1 = runner.run(script1)
-    assert(stack1 === List(ByteVector(3)))
-    val script2 = OP_1 :: OP_1 :: OP_EQUAL :: OP_IF :: OP_3 :: OP_3 :: OP_EQUAL :: OP_IF :: OP_5 :: OP_ENDIF :: OP_ELSE :: OP_4 :: OP_ENDIF :: Nil
-    val stack2 = runner.run(script2)
-    assert(stack2 === List(ByteVector(5)))
-  }
   it should "encode/decode simple numbers" in {
     for (i <- -1 to 16) {
       assert(Script.decodeNumber(Script.encodeNumber(i), checkMinimalEncoding = true) === i)
     }
-  }
-  it should "encode/decode booleans" in {
-    assert(Script.castToBoolean(ByteVector.empty) === false)
-    assert(Script.castToBoolean(ByteVector(0, 0, 0)) === false)
-    assert(Script.castToBoolean(hex"80") === false)
   }
 }
