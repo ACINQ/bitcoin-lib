@@ -3,7 +3,7 @@
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.13</artifactId>
     <packaging>jar</packaging>
-    <version>0.20-SNAPSHOT</version>
+    <version>0.20-KMP-SNAPSHOT</version>
     <description>Simple Scala Bitcoin library</description>
     <url>https://github.com/ACINQ/bitcoin-lib</url>
     <name>bitcoin-lib</name>
@@ -165,24 +165,24 @@
         </dependency>
         <!-- -->
         <dependency>
+            <groupId>fr.acinq.bitcoin</groupId>
+            <artifactId>bitcoin-kmp-jvm</artifactId>
+            <version>0.8.1</version>
+        </dependency>
+        <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
             <artifactId>secp256k1-kmp-jvm</artifactId>
-            <version>0.5.1</version>
+            <version>0.6.1</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
             <artifactId>secp256k1-kmp-jni-jvm</artifactId>
-            <version>0.5.1</version>
+            <version>0.6.1</version>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib-jdk8</artifactId>
-            <version>1.4.31</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk15on</artifactId>
-            <version>1.68</version>
+            <version>1.5.31</version>
         </dependency>
         <dependency>
             <groupId>org.scodec</groupId>

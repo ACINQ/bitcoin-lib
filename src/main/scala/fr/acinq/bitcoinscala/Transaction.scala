@@ -1,13 +1,13 @@
 package fr.acinq.bitcoinscala
 
-import java.io.{ByteArrayOutputStream, InputStream, OutputStream}
-
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
-import fr.acinq.bitcoinscala.Protocol._
-import fr.acinq.bitcoinscala.Script.Runner
+import fr.acinq.bitcoinscala.KotlinUtils._
+import fr.acinq.bitcoinscala.Protocol.{script, _}
+import fr.acinq.bitcoin
 import scodec.bits.ByteVector
 
-import scala.collection.mutable.ArrayBuffer
+import java.io.{InputStream, OutputStream}
+import scala.jdk.CollectionConverters.MapHasAsJava
 
 object OutPoint extends BtcSerializer[OutPoint] {
   def apply(tx: Transaction, index: Int) = new OutPoint(ByteVector32(tx.hash), index)
@@ -22,22 +22,22 @@ object OutPoint extends BtcSerializer[OutPoint] {
   def isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
 
   def isNull(input: OutPoint) = isCoinbase(input)
-
 }
 
+
 /**
-  * an out point is a reference to a specific output in a specific transaction that we want to claim
-  *
-  * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
-  * @param index index of the output in tx that we want to refer to
-  */
+ * an out point is a reference to a specific output in a specific transaction that we want to claim
+ *
+ * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
+ * @param index index of the output in tx that we want to refer to
+ */
 case class OutPoint(hash: ByteVector32, index: Long) extends BtcSerializable[OutPoint] {
   require(index >= -1)
 
   /**
-    *
-    * @return the id of the transaction this output belongs to
-    */
+   *
+   * @return the id of the transaction this output belongs to
+   */
   val txid: ByteVector32 = hash.reverse
 
   override def serializer: BtcSerializer[OutPoint] = OutPoint
@@ -47,20 +47,20 @@ object TxIn extends BtcSerializer[TxIn] {
   def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long): TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
 
   /* Setting nSequence to this value for every input in a transaction disables nLockTime. */
-  val SEQUENCE_FINAL = 0xffffffffL
+  val SEQUENCE_FINAL = bitcoin.TxIn.SEQUENCE_FINAL
 
   /* Below flags apply in the context of BIP 68*/
   /* If this flag set, CTxIn::nSequence is NOT interpreted as a relative lock-time. */
-  val SEQUENCE_LOCKTIME_DISABLE_FLAG = 1L << 31
+  val SEQUENCE_LOCKTIME_DISABLE_FLAG = bitcoin.TxIn.SEQUENCE_LOCKTIME_DISABLE_FLAG
 
   /* If CTxIn::nSequence encodes a relative lock-time and this flag
    * is set, the relative lock-time has units of 512 seconds,
    * otherwise it specifies blocks with a granularity of 1. */
-  val SEQUENCE_LOCKTIME_TYPE_FLAG = 1L << 22
+  val SEQUENCE_LOCKTIME_TYPE_FLAG = bitcoin.TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG
 
   /* If CTxIn::nSequence encodes a relative lock-time, this mask is
    * applied to extract that lock-time from the sequence field. */
-  val SEQUENCE_LOCKTIME_MASK = 0x0000ffffL
+  val SEQUENCE_LOCKTIME_MASK = bitcoin.TxIn.SEQUENCE_LOCKTIME_MASK
 
   /* In order to use the same number of bits to encode roughly the
    * same wall-clock duration, and because blocks are naturally
@@ -69,7 +69,7 @@ object TxIn extends BtcSerializer[TxIn] {
    * Converting from CTxIn::nSequence to seconds is performed by
    * multiplying by 512 = 2^9, or equivalently shifting up by
    * 9 bits. */
-  val SEQUENCE_LOCKTIME_GRANULARITY = 9
+  val SEQUENCE_LOCKTIME_GRANULARITY = bitcoin.TxIn.SEQUENCE_LOCKTIME_GRANULARITY
 
   override def read(input: InputStream, protocolVersion: Long): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
 
@@ -92,14 +92,14 @@ object TxIn extends BtcSerializer[TxIn] {
 }
 
 /**
-  * Transaction input
-  *
-  * @param outPoint        Previous output transaction reference
-  * @param signatureScript Signature script which should match the public key script of the output that we want to spend
-  * @param sequence        Transaction version as defined by the sender. Intended for "replacement" of transactions when
-  *                        information is updated before inclusion into a block. Repurposed for OP_CSV (see BIPs 68 & 112)
-  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
-  */
+ * Transaction input
+ *
+ * @param outPoint        Previous output transaction reference
+ * @param signatureScript Signature script which should match the public key script of the output that we want to spend
+ * @param sequence        Transaction version as defined by the sender. Intended for "replacement" of transactions when
+ *                        information is updated before inclusion into a block. Repurposed for OP_CSV (see BIPs 68 & 112)
+ * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
+ */
 case class TxIn(outPoint: OutPoint, signatureScript: ByteVector, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) extends BtcSerializable[TxIn] {
   def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
 
@@ -127,11 +127,11 @@ object TxOut extends BtcSerializer[TxOut] {
 }
 
 /**
-  * Transaction output
-  *
-  * @param amount          amount in Satoshis
-  * @param publicKeyScript public key script which sets the conditions for spending this output
-  */
+ * Transaction output
+ *
+ * @param amount          amount in Satoshis
+ * @param publicKeyScript public key script which sets the conditions for spending this output
+ */
 case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerializable[TxOut] {
   override def serializer: BtcSerializer[TxOut] = TxOut
 }
@@ -147,11 +147,11 @@ object ScriptWitness extends BtcSerializer[ScriptWitness] {
 }
 
 /**
-  * a script witness is just a stack of data
-  * there is one script witness per transaction input
-  *
-  * @param stack items to be pushed on the stack
-  */
+ * a script witness is just a stack of data
+ * there is one script witness per transaction input
+ *
+ * @param stack items to be pushed on the stack
+ */
 case class ScriptWitness(stack: Seq[ByteVector]) extends BtcSerializable[ScriptWitness] {
   def isNull = stack.isEmpty
 
@@ -166,67 +166,23 @@ object Transaction extends BtcSerializer[Transaction] {
   val LOCKTIME_THRESHOLD = 500000000L
 
   /**
-    *
-    * @param version protocol version (and NOT transaction version !)
-    * @return true if protocol version specifies that witness data is to be serialized
-    */
+   *
+   * @param version protocol version (and NOT transaction version !)
+   * @return true if protocol version specifies that witness data is to be serialized
+   */
   def serializeTxWitness(version: Long): Boolean = (version & SERIALIZE_TRANSACTION_NO_WITNESS) == 0
 
   override def read(input: InputStream, protocolVersion: Long): Transaction = {
-    val tx = Transaction(uint32(input), readCollection[TxIn](input, protocolVersion), Seq.empty[TxOut], 0)
-    val (flags, tx1) = if (tx.txIn.isEmpty && serializeTxWitness(protocolVersion)) {
-      // we just read the 0x00 marker
-      val flags = uint8(input)
-      val txIn = readCollection[TxIn](input, protocolVersion)
-      if (flags == 0 && txIn.nonEmpty) throw new RuntimeException("Extended transaction format unnecessarily used")
-      val txOut = readCollection[TxOut](input, protocolVersion)
-      (flags, tx.copy(txIn = txIn, txOut = txOut))
-    } else (0, tx.copy(txOut = readCollection[TxOut](input, protocolVersion)))
-
-    val tx2 = flags match {
-      case 0 => tx1.copy(lockTime = uint32(input))
-      case 1 =>
-        val witnesses = new ArrayBuffer[ScriptWitness]()
-        for (_ <- tx1.txIn.indices) witnesses += ScriptWitness.read(input, protocolVersion)
-        tx1.updateWitnesses(witnesses.toSeq).copy(lockTime = uint32(input))
-      case _ => throw new RuntimeException(s"Unknown transaction optional data $flags")
-    }
-
-    tx2
+    val tx = fr.acinq.bitcoin.Transaction.read(InputStreamWrapper(input), protocolVersion)
+    tx
   }
 
   override def write(tx: Transaction, out: OutputStream, protocolVersion: Long): Unit = {
-    if (serializeTxWitness(protocolVersion) && tx.hasWitness) {
-      writeUInt32(tx.version.toInt, out)
-      writeUInt8(0x00, out)
-      writeUInt8(0x01, out)
-      writeCollection(tx.txIn, out, protocolVersion)
-      writeCollection(tx.txOut, out, protocolVersion)
-      for (i <- tx.txIn.indices) ScriptWitness.write(tx.txIn(i).witness, out, protocolVersion)
-      writeUInt32(tx.lockTime.toInt, out)
-    } else {
-      writeUInt32(tx.version.toInt, out)
-      writeCollection(tx.txIn, out, protocolVersion)
-      writeCollection(tx.txOut, out, protocolVersion)
-      writeUInt32(tx.lockTime.toInt, out)
-    }
+    fr.acinq.bitcoin.Transaction.write(tx, OutputStreamWrapper(out), protocolVersion)
   }
 
   override def validate(input: Transaction): Unit = {
-    require(input.txIn.nonEmpty, "input list cannot be empty")
-    require(input.txOut.nonEmpty, "output list cannot be empty")
-    require(Transaction.write(input).size <= MaxBlockSize)
-    require(input.txOut.map(_.amount.toLong).sum <= BtcAmount.MaxMoney, "sum of outputs amount is invalid")
-    input.txIn.foreach(TxIn.validate)
-    input.txOut.foreach(TxOut.validate)
-    val outPoints = input.txIn.map(_.outPoint)
-    require(outPoints.size == outPoints.toSet.size, "duplicate inputs")
-    if (Transaction.isCoinbase(input)) {
-      require(input.txIn(0).signatureScript.size >= 2, "coinbase script size")
-      require(input.txIn(0).signatureScript.size <= 100, "coinbase script size")
-    } else {
-      require(input.txIn.forall(in => !OutPoint.isCoinbase(in.outPoint)), "prevout is null")
-    }
+    fr.acinq.bitcoin.Transaction.validate(input)
   }
 
   def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion | SERIALIZE_TRANSACTION_NO_WITNESS).length.toInt
@@ -238,213 +194,123 @@ object Transaction extends BtcSerializer[Transaction] {
   def isCoinbase(input: Transaction) = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn(0).outPoint)
 
   /**
-    * prepare a transaction for signing a specific input
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type
-    * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
-    */
+   * prepare a transaction for signing a specific input
+   *
+   * @param tx                   input transaction
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type
+   * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
+   */
   def prepareForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): Transaction = {
-    val filteredScript = Script.write(Script.parse(previousOutputScript).filterNot(_ == OP_CODESEPARATOR))
-
-    def removeSignatureScript(txin: TxIn): TxIn = txin.copy(signatureScript = ByteVector.empty)
-
-    def removeAllSignatureScripts(tx: Transaction): Transaction = tx.copy(txIn = tx.txIn.map(removeSignatureScript))
-
-    def updateSignatureScript(tx: Transaction, index: Int, script: ByteVector): Transaction = tx.copy(txIn = tx.txIn.updated(index, tx.txIn(index).copy(signatureScript = script)))
-
-    def resetSequence(txins: Seq[TxIn], inputIndex: Int): Seq[TxIn] = for (i <- txins.indices) yield {
-      if (i == inputIndex) txins(i)
-      else txins(i).copy(sequence = 0)
-    }
-
-    val txCopy = {
-      // remove all signature scripts, and replace the sig script for the input that we are processing with the
-      // pubkey script of the output that we are trying to claim
-      val tx1 = removeAllSignatureScripts(tx)
-      val tx2 = updateSignatureScript(tx1, inputIndex, filteredScript)
-
-      val tx3 = if (isHashNone(sighashType)) {
-        // hash none: remove all outputs
-        val inputs = resetSequence(tx2.txIn, inputIndex)
-        tx2.copy(txIn = inputs, txOut = List())
-      }
-      else if (isHashSingle(sighashType)) {
-        // hash single: remove all outputs but the one that we are trying to claim
-        val inputs = resetSequence(tx2.txIn, inputIndex)
-        val outputs = for (i <- 0 to inputIndex) yield {
-          if (i == inputIndex) tx2.txOut(inputIndex)
-          else TxOut(Satoshi(-1), ByteVector.empty)
-        }
-        tx2.copy(txIn = inputs, txOut = outputs)
-      }
-      else tx2
-      // anyone can pay: remove all inputs but the one that we are processing
-      val tx4 = if (isAnyoneCanPay(sighashType)) tx3.copy(txIn = List(tx3.txIn(inputIndex))) else tx3
-      tx4
-    }
-    txCopy
+    fr.acinq.bitcoin.Transaction.prepareForSigning(tx, inputIndex, previousOutputScript.toArray, sighashType)
   }
 
   /**
-    * hash a tx for signing (pre-segwit)
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type
-    * @return a hash which can be used to sign the referenced tx input
-    */
+   * hash a tx for signing (pre-segwit)
+   *
+   * @param tx                   input transaction
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type
+   * @return a hash which can be used to sign the referenced tx input
+   */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): ByteVector32 = {
-    if (isHashSingle(sighashType) && inputIndex >= tx.txOut.length) {
-      ByteVector32.One
-    } else {
-      val txCopy = prepareForSigning(tx, inputIndex, previousOutputScript, sighashType)
-      Crypto.hash256(Transaction.write(txCopy, Transaction.SERIALIZE_TRANSACTION_NO_WITNESS) ++ writeUInt32(sighashType))
-    }
+    ByteVector32(ByteVector.view(fr.acinq.bitcoin.Transaction.hashForSigning(tx, inputIndex, previousOutputScript.toArray, sighashType)))
   }
 
   /**
-    * hash a tx for signing (pre-segwit)
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type
-    * @return a hash which can be used to sign the referenced tx input
-    */
+   * hash a tx for signing (pre-segwit)
+   *
+   * @param tx                   input transaction
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type
+   * @return a hash which can be used to sign the referenced tx input
+   */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int): ByteVector32 =
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType)
 
   /**
-    * hash a tx for signing
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type
-    * @param amount               amount of the output claimed by this input
-    * @return a hash which can be used to sign the referenced tx input
-    */
+   * hash a tx for signing
+   *
+   * @param tx                   input transaction
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type
+   * @param amount               amount of the output claimed by this input
+   * @return a hash which can be used to sign the referenced tx input
+   */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector32 = {
-    signatureVersion match {
-      case SigVersion.SIGVERSION_WITNESS_V0 =>
-        val hashPrevOut: ByteVector = if (!isAnyoneCanPay(sighashType)) {
-          Crypto.hash256(tx.txIn.map(_.outPoint).map(OutPoint.write(_, Protocol.PROTOCOL_VERSION)).foldLeft(ByteVector.empty)(_ ++ _))
-        } else ByteVector32.Zeroes
-
-        val hashSequence: ByteVector = if (!isAnyoneCanPay(sighashType) && !isHashSingle(sighashType) && !isHashNone(sighashType)) {
-          Crypto.hash256(tx.txIn.map(_.sequence).map(s => Protocol.writeUInt32(s.toInt)).foldLeft(ByteVector.empty)(_ ++ _))
-        } else ByteVector32.Zeroes
-
-        val hashOutputs: ByteVector = if (!isHashSingle(sighashType) && !isHashNone(sighashType)) {
-          Crypto.hash256(tx.txOut.map(TxOut.write(_, Protocol.PROTOCOL_VERSION)).foldLeft(ByteVector.empty)(_ ++ _))
-        } else if (isHashSingle(sighashType) && inputIndex < tx.txOut.size) {
-          Crypto.hash256(TxOut.write(tx.txOut(inputIndex), Protocol.PROTOCOL_VERSION))
-        } else ByteVector32.Zeroes
-
-        val out = new ByteArrayOutputStream()
-        Protocol.writeUInt32(tx.version.toInt, out)
-        out.write(hashPrevOut.toArray)
-        out.write(hashSequence.toArray)
-        out.write(OutPoint.write(tx.txIn(inputIndex).outPoint, Protocol.PROTOCOL_VERSION).toArray)
-        Protocol.writeScript(previousOutputScript.toArray, out)
-        Protocol.writeUInt64(amount.toLong, out)
-        Protocol.writeUInt32(tx.txIn(inputIndex).sequence.toInt, out)
-        out.write(hashOutputs.toArray)
-        Protocol.writeUInt32(tx.lockTime.toInt, out)
-        Protocol.writeUInt32(sighashType, out)
-        val preimage = out.toByteArray
-        Crypto.hash256(ByteVector.view(preimage))
-      case _ =>
-        hashForSigning(tx, inputIndex, previousOutputScript, sighashType)
-    }
+    ByteVector32(ByteVector.view(fr.acinq.bitcoin.Transaction.hashForSigning(tx, inputIndex, previousOutputScript.toArray, sighashType, amount, signatureVersion)))
   }
 
   /**
-    * hash a tx for signing
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type
-    * @param amount               amount of the output claimed by this input
-    * @return a hash which can be used to sign the referenced tx input
-    */
+   * hash a tx for signing
+   *
+   * @param tx                   input transaction
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type
+   * @param amount               amount of the output claimed by this input
+   * @return a hash which can be used to sign the referenced tx input
+   */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector32 =
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
 
   /**
-    * sign a tx input
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type, which will be appended to the signature
-    * @param amount               amount of the output claimed by this tx input
-    * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
-    * @param privateKey           private key
-    * @return the encoded signature of this tx for this specific tx input
-    */
+   * sign a tx input
+   *
+   * @param tx                   input transaction
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type, which will be appended to the signature
+   * @param amount               amount of the output claimed by this tx input
+   * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+   * @param privateKey           private key
+   * @return the encoded signature of this tx for this specific tx input
+   */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector = {
-    //if (signatureVersion == SigVersion.SIGVERSION_WITNESS_V0) require(privateKey.compressed, "private key must be compressed in segwit")
-    val hash = hashForSigning(tx, inputIndex, previousOutputScript, sighashType, amount, signatureVersion)
-    val sig = Crypto.sign(hash, privateKey)
-    Crypto.compact2der(sig) :+ sighashType.toByte
+    ByteVector.view(fr.acinq.bitcoin.Transaction.signInput(tx, inputIndex, scala2kmp(previousOutputScript), sighashType, amount, signatureVersion, privateKey.priv))
   }
 
   /**
-    * sign a tx input
-    *
-    * @param tx                   input transaction
-    * @param inputIndex           index of the tx input that is being processed
-    * @param previousOutputScript public key script of the output claimed by this tx input
-    * @param sighashType          signature hash type, which will be appended to the signature
-    * @param amount               amount of the output claimed by this tx input
-    * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
-    * @param privateKey           private key
-    * @return the encoded signature of this tx for this specific tx input
-    */
+   * sign a tx input
+   *
+   * @param tx                   input transaction
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type, which will be appended to the signature
+   * @param amount               amount of the output claimed by this tx input
+   * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+   * @param privateKey           private key
+   * @return the encoded signature of this tx for this specific tx input
+   */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
 
-  def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
-    for (i <- tx.txIn.indices if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
-      val prevOutput = previousOutputs(tx.txIn(i).outPoint)
-      val prevOutputScript = prevOutput.publicKeyScript
-      val amount = prevOutput.amount
-      val ctx = Script.Context(tx, i, amount)
-      val runner = new Script.Runner(ctx, scriptFlags, callback)
-      if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.txIn(i).witness)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
-    }
+  def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int): Unit = {
+    fr.acinq.bitcoin.Transaction.correctlySpends(tx, previousOutputs.map { case (o, t) => scala2kmp(o) -> scala2kmp(t) }.toMap.asJava, scriptFlags)
   }
 
-  def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int): Unit =
-    correctlySpends(tx, previousOutputs, scriptFlags, None)
-
-  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int, callback: Option[Runner.Callback]): Unit = {
+  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = {
     val prevouts = tx.txIn.map(_.outPoint).map(outpoint => {
       val prevTx = inputs.find(_.txid == outpoint.txid).get
       val prevOutput = prevTx.txOut(outpoint.index.toInt)
       outpoint -> prevOutput
     }).toMap
-    correctlySpends(tx, prevouts, scriptFlags, callback)
+    correctlySpends(tx, prevouts, scriptFlags)
   }
-
-  def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit =
-    correctlySpends(tx, inputs, scriptFlags, None)
 }
 
 /**
-  * Transaction
-  *
-  * @param version  Transaction data format version
-  * @param txIn     Transaction inputs
-  * @param txOut    Transaction outputs
-  * @param lockTime The block number or timestamp at which this transaction is locked
-  */
+ * Transaction
+ *
+ * @param version  Transaction data format version
+ * @param txIn     Transaction inputs
+ * @param txOut    Transaction outputs
+ * @param lockTime The block number or timestamp at which this transaction is locked
+ */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) extends BtcSerializable[Transaction] {
 
   import Transaction._
@@ -462,11 +328,11 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   override def toString: String = bin.toHex
 
   /**
-    *
-    * @param blockHeight current block height
-    * @param blockTime   current block time
-    * @return true if the transaction is final
-    */
+   *
+   * @param blockHeight current block height
+   * @param blockTime   current block time
+   * @return true if the transaction is final
+   */
   def isFinal(blockHeight: Long, blockTime: Long): Boolean = lockTime match {
     case 0 => true
     case value if value < LOCKTIME_THRESHOLD && value < blockHeight => true
@@ -476,19 +342,19 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   }
 
   /**
-    *
-    * @param i         index of the tx input to update
-    * @param sigScript new signature script
-    * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
-    */
+   *
+   * @param i         index of the tx input to update
+   * @param sigScript new signature script
+   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+   */
   def updateSigScript(i: Int, sigScript: ByteVector): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(signatureScript = sigScript)))
 
   /**
-    *
-    * @param i         index of the tx input to update
-    * @param sigScript new signature script
-    * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
-    */
+   *
+   * @param i         index of the tx input to update
+   * @param sigScript new signature script
+   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+   */
   def updateSigScript(i: Int, sigScript: Seq[ScriptElt]): Transaction = updateSigScript(i, Script.write(sigScript))
 
   def updateWitness(i: Int, witness: ScriptWitness): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(witness = witness)))
@@ -503,17 +369,17 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   def hasWitness: Boolean = txIn.exists(_.hasWitness)
 
   /**
-    *
-    * @param input input to add the tx
-    * @return a new transaction which includes the newly added input
-    */
+   *
+   * @param input input to add the tx
+   * @return a new transaction which includes the newly added input
+   */
   def addInput(input: TxIn): Transaction = this.copy(txIn = this.txIn :+ input)
 
   /**
-    *
-    * @param output output to add to the tx
-    * @return a new transaction which includes the newly added output
-    */
+   *
+   * @param output output to add to the tx
+   * @return a new transaction which includes the newly added output
+   */
   def addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut :+ output)
 
   def baseSize(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.baseSize(this, protocolVersion)

@@ -30,8 +30,5 @@ jobs:
     - name: Build
       run: mvn install -DskipTests
 
-    - name: Test with Bouncycastle
-      run: mvn test -DargLine="-Dfr.acinq.secp256k1.lib.name=foo"
-
     - name: Test with libsecp256k1
       run: mvn test
