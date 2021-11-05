@@ -1,8 +1,9 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.FlatSpec
-import scodec.bits.{ByteVector, _}
+import scodec.bits._
 
 class CheckLockTimeVerifySpec extends FlatSpec {
   "Bip65" should "let you initiate payment channels" in {
@@ -33,16 +34,14 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         txOut = TxOut(amount = 100 sat, publicKeyScript = scriptPubKey) :: Nil,
         lockTime = 100L
       )
-      val sig = Transaction.signInput(tmpTx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key)
+      val sig = Transaction.signInput(tmpTx, 0, previousTx.txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key)
       tmpTx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(key.publicKey) :: Nil)
     }
 
     Transaction.correctlySpends(tx, Seq(previousTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
-
     // now we try to redeem this tx
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
-    val amount = 10000
 
     // we can redeem this tx with a single signature from Alice, if the lock time of the redeeming tx is >= 100
     val tx1 = {
@@ -53,7 +52,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         lockTime = 100L
       )
 
-      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
+      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
 
       // our script sig is simple our signature followed by "true"
       val sigScript = OP_PUSHDATA(sig) :: OP_1 :: Nil
@@ -73,7 +72,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         lockTime = 99L
       )
 
-      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
+      val sig = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
 
       // our script sig is simple our signature followed by "true"
       val sigScript = OP_PUSHDATA(sig) :: OP_1 :: Nil
@@ -95,8 +94,8 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         lockTime = 0L
       )
 
-      val sig1 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
-      val sig2 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyBob)
+      val sig1 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyAlice)
+      val sig2 = Transaction.signInput(tmpTx, 0, Script.write(scriptPubKey), SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keyBob)
       val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_0 :: Nil
 
       tmpTx.updateSigScript(0, sigScript)

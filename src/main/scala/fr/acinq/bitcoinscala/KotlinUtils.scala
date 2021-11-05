@@ -1,7 +1,7 @@
 package fr.acinq.bitcoinscala
 
-import fr.acinq.bitcoinscala.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin
+import fr.acinq.bitcoinscala.Crypto.{PrivateKey, PublicKey}
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
@@ -10,15 +10,15 @@ import scala.jdk.CollectionConverters.{ListHasAsScala, SeqHasAsJava}
 object KotlinUtils {
   implicit def kmp2scala(input: bitcoin.ByteVector32): ByteVector32 = ByteVector32(ByteVector(input.toByteArray))
 
-  implicit def scala2kmp(input: ByteVector32) = new bitcoin.ByteVector32(input.toArray)
+  implicit def scala2kmp(input: ByteVector32): bitcoin.ByteVector32 = new bitcoin.ByteVector32(input.toArray)
 
   implicit def kmp2scala(input: bitcoin.ByteVector64): ByteVector64 = ByteVector64(ByteVector(input.toByteArray))
 
-  implicit def scala2kmp(input: ByteVector64) = new bitcoin.ByteVector64(input.toArray)
+  implicit def scala2kmp(input: ByteVector64): bitcoin.ByteVector64 = new bitcoin.ByteVector64(input.toArray)
 
   implicit def kmp2scala(input: bitcoin.ByteVector): ByteVector = ByteVector(input.toByteArray)
 
-  implicit def scala2kmp(input: ByteVector) = new bitcoin.ByteVector(input.toArray)
+  implicit def scala2kmp(input: ByteVector): bitcoin.ByteVector = new bitcoin.ByteVector(input.toArray)
 
   implicit def kmp2scala(input: bitcoin.OutPoint): OutPoint = OutPoint(input.hash, input.index)
 
@@ -53,6 +53,7 @@ object KotlinUtils {
   implicit def scala2kmp(input: PublicKey): bitcoin.PublicKey = new bitcoin.PublicKey(input.value)
 
   case class InputStreamWrapper(is: InputStream) extends bitcoin.io.Input {
+    // NB: on the JVM we will use a ByteArrayInputStream, which guarantees that the result will be correct.
     override def getAvailableBytes: Int = is.available()
 
     override def read(): Int = is.read()
@@ -77,7 +78,8 @@ object KotlinUtils {
   }
 
   private val scriptEltMapScala2Kmp: Map[ScriptElt, bitcoin.ScriptElt] = Map(
-    OP_0 -> bitcoin.OP_0.INSTANCE,    OP_1NEGATE -> bitcoin.OP_1NEGATE.INSTANCE,
+    OP_0 -> bitcoin.OP_0.INSTANCE,
+    OP_1NEGATE -> bitcoin.OP_1NEGATE.INSTANCE,
     OP_RESERVED -> bitcoin.OP_RESERVED.INSTANCE,
     OP_1 -> bitcoin.OP_1.INSTANCE,
     OP_2 -> bitcoin.OP_2.INSTANCE,
@@ -187,6 +189,6 @@ object KotlinUtils {
     OP_SMALLINTEGER -> bitcoin.OP_SMALLINTEGER.INSTANCE,
     OP_INVALIDOPCODE -> bitcoin.OP_INVALIDOPCODE.INSTANCE)
 
-  private val scriptEltMapKmp2Scala2Map: Map[bitcoin.ScriptElt, ScriptElt] = scriptEltMapScala2Kmp.map { case (k,v) => v -> k }.toMap
+  private val scriptEltMapKmp2Scala2Map: Map[bitcoin.ScriptElt, ScriptElt] = scriptEltMapScala2Kmp.map { case (k, v) => v -> k }
 }
 
