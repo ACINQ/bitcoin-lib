@@ -1,5 +1,6 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Base58.Prefix
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.{FunSuite, Matchers}
@@ -42,7 +43,7 @@ class MultisigSpec extends FunSuite with Matchers {
     val tx = Transaction(version = 1L, txIn = List(txIn), txOut = List(txOut), lockTime = 0L)
 
     val priv = PrivateKey.fromBase58("92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM", Base58.Prefix.SecretKeyTestnet)._1
-    val sig = Transaction.signInput(tx, 0, hex"76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac", SIGHASH_ALL, txOut.amount, SigVersion.SIGVERSION_BASE, priv)
+    val sig = Transaction.signInput(tx, 0, hex"76a914298e5c1e2d2cf22deffd2885394376c7712f9c6088ac", SigHash.SIGHASH_ALL, txOut.amount, SigVersion.SIGVERSION_BASE, priv)
     val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(priv.publicKey.toUncompressedBin) :: Nil)
 
     //this works because signature is not randomized
@@ -71,8 +72,8 @@ class MultisigSpec extends FunSuite with Matchers {
     )
 
     // we only need 2 signatures because this is a 2-on-3 multisig
-    val sig1 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
-    val sig2 = Transaction.signInput(tx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
+    val sig1 = Transaction.signInput(tx, 0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
+    val sig2 = Transaction.signInput(tx, 0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
 
     // OP_0 because of a bug) OP_CHECKMULTISIG
     val scriptSig = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil

@@ -1,5 +1,6 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin.ScriptFlags
 import org.scalatest.FlatSpec
 
 class PuzzleSpec extends FlatSpec {

@@ -1,17 +1,17 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin
 import fr.acinq.bitcoinscala.KotlinUtils._
-import fr.acinq.secp256k1.Secp256k1
 import scodec.bits.ByteVector
 
 object Crypto {
   /**
-   * Secp256k1 private key, which a 32 bytes value
-   * We assume that private keys are compressed i.e. that the corresponding public key is compressed
-   *
-   * @param value value to initialize this key with
+   * A bitcoin private key.
+   * A private key is valid if it is not 0 and less than the secp256k1 curve order when interpreted as an integer (most significant byte first).
+   * The probability of choosing a 32-byte string uniformly at random which is an invalid private key is negligible, so this condition is not checked by default.
+   * However, if you receive a private key from an external, untrusted source, you should call `isValid()` before actually using it.
    */
-  case class PrivateKey(val priv: fr.acinq.bitcoin.PrivateKey) {
+  case class PrivateKey(priv: bitcoin.PrivateKey) {
     val value: ByteVector32 = priv.value
 
     def add(that: PrivateKey): PrivateKey = PrivateKey(this.priv plus that.priv)
@@ -26,23 +26,27 @@ object Crypto {
 
     def *(that: PrivateKey): PrivateKey = multiply(that)
 
-    def isZero: Boolean = priv.value == fr.acinq.bitcoin.ByteVector32.Zeroes
+    def isZero: Boolean = priv.value == bitcoin.ByteVector32.Zeroes
+
+    def isValid: Boolean = priv.isValid
 
     def publicKey: PublicKey = PublicKey(priv.publicKey())
 
     /**
-     *
      * @param prefix Private key prefix
      * @return the private key in Base58 (WIF) compressed format
      */
-    def toBase58(prefix: Byte) = priv.toBase58(prefix)
+    def toBase58(prefix: Byte): String = priv.toBase58(prefix)
+
+    def toHex: String = priv.toHex
+
+    override def toString = priv.toString
   }
 
   object PrivateKey {
-    def apply(data: ByteVector): PrivateKey = new PrivateKey(new fr.acinq.bitcoin.PrivateKey(data.toArray.take(32)))
+    def apply(data: ByteVector): PrivateKey = new PrivateKey(new bitcoin.PrivateKey(data.toArray))
 
     /**
-     *
      * @param data serialized private key in bitcoin format
      * @return the de-serialized key
      */
@@ -51,27 +55,27 @@ object Crypto {
         case 32 => false
         case 33 if data.last == 1.toByte => true
       }
-      (PrivateKey(data.take(32)), compressed)
+      (PrivateKey(data), compressed)
     }
 
     def fromBase58(value: String, prefix: Byte): (PrivateKey, Boolean) = {
-      val p = fr.acinq.bitcoin.PrivateKey.fromBase58(value, prefix)
+      val p = bitcoin.PrivateKey.fromBase58(value, prefix)
       (p.getFirst, p.getSecond)
     }
   }
 
   /**
-   * Secp256k1 Public key
-   * We assume that public keys are always compressed
-   *
-   * @param value serialized public key, in compressed format (33 bytes)
+   * A bitcoin public key (in compressed form).
+   * A public key is valid if it represents a point on the secp256k1 curve.
+   * The validity of this public key is not checked by default, because when you create a public key from a private key it will always be valid.
+   * However, if you receive a public key from an external, untrusted source, you should call `isValid()` before actually using it.
    */
-  case class PublicKey(pub: fr.acinq.bitcoin.PublicKey) {
+  case class PublicKey(pub: bitcoin.PublicKey) {
     val value: ByteVector = pub.value
 
     def hash160: ByteVector = ByteVector.view(pub.hash160())
 
-    def isValid: Boolean = isPubKeyValidStrict(this.value)
+    def isValid: Boolean = pub.isValid
 
     def add(that: PublicKey): PublicKey = PublicKey(this.pub plus that.pub)
 
@@ -89,28 +93,26 @@ object Crypto {
 
     def toUncompressedBin: ByteVector = ByteVector.view(pub.toUncompressedBin)
 
+    def toHex: String = pub.toHex
+
     override def toString = pub.toString
   }
-
 
   object PublicKey {
     /**
      * @param raw        serialized value of this public key (a point)
      * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
      *                   carefully for optimization purposes
-     * @return
      */
     def apply(raw: ByteVector, checkValid: Boolean = true): PublicKey = fromBin(raw, checkValid)
 
     def fromBin(input: ByteVector, checkValid: Boolean = true): PublicKey = {
-      require(isPubKeyValidLax(input))
-      if (checkValid) {
-        Secp256k1.get().pubkeyParse(input.toArray)
-      }
-      PublicKey(new fr.acinq.bitcoin.PublicKey(fr.acinq.bitcoin.PublicKey.compress(input.toArray)))
+      require(isPubKeyValidLax(input), "public key is not correctly encoded")
+      val pub = PublicKey(new bitcoin.PublicKey(bitcoin.PublicKey.compress(input.toArray)))
+      require(!checkValid || pub.isValid, "public key is invalid")
+      pub
     }
   }
-
 
   /**
    * Computes ecdh using secp256k1's variant: sha256(priv * pub serialized in compressed format)
@@ -119,13 +121,13 @@ object Crypto {
    * @param pub  public value
    * @return ecdh(priv, pub) as computed by libsecp256k1
    */
-  def ecdh(priv: PrivateKey, pub: PublicKey): ByteVector32 = ByteVector32(ByteVector.view(fr.acinq.bitcoin.Crypto.ecdh(priv.priv, pub.pub)))
+  def ecdh(priv: PrivateKey, pub: PublicKey): ByteVector32 = ByteVector32(ByteVector.view(bitcoin.Crypto.ecdh(priv.priv, pub.pub)))
 
-  def hmac512(key: ByteVector, data: ByteVector): ByteVector = ByteVector.view(fr.acinq.bitcoin.Crypto.hmac512(key.toArray, data.toArray))
+  def hmac512(key: ByteVector, data: ByteVector): ByteVector = ByteVector.view(bitcoin.Crypto.hmac512(key.toArray, data.toArray))
 
-  def sha256 = (x: ByteVector) => ByteVector32(ByteVector.view(fr.acinq.bitcoin.Crypto.sha256(x)))
+  def sha256(x: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(bitcoin.Crypto.sha256(x)))
 
-  def ripemd160 = (x: ByteVector) => ByteVector.view(fr.acinq.bitcoin.Crypto.ripemd160(x))
+  def ripemd160(x: ByteVector): ByteVector = ByteVector.view(bitcoin.Crypto.ripemd160(x))
 
   /**
    * 160 bits bitcoin hash, used mostly for address encoding
@@ -134,7 +136,7 @@ object Crypto {
    * @param input array of byte
    * @return the 160 bits BTC hash of input
    */
-  def hash160(input: ByteVector): ByteVector = ByteVector.view(fr.acinq.bitcoin.Crypto.hash160(input.toArray))
+  def hash160(input: ByteVector): ByteVector = ByteVector.view(bitcoin.Crypto.hash160(input.toArray))
 
   /**
    * 256 bits bitcoin hash
@@ -143,18 +145,17 @@ object Crypto {
    * @param input array of byte
    * @return the 256 bits BTC hash of input
    */
-  def hash256(input: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(fr.acinq.bitcoin.Crypto.hash256(input.toArray)))
+  def hash256(input: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(bitcoin.Crypto.hash256(input.toArray)))
 
-  def isDERSignature(sig: ByteVector): Boolean = fr.acinq.bitcoin.Crypto.isDERSignature(sig.toArray)
+  def isDERSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDERSignature(sig.toArray)
 
-  def isLowDERSignature(sig: ByteVector): Boolean = fr.acinq.bitcoin.Crypto.isLowDERSignature(sig.toArray)
+  def isLowDERSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isLowDERSignature(sig.toArray)
 
-  def checkSignatureEncoding(sig: ByteVector, flags: Int): Boolean = fr.acinq.bitcoin.Crypto.checkSignatureEncoding(sig.toArray, flags)
+  def checkSignatureEncoding(sig: ByteVector, flags: Int): Boolean = bitcoin.Crypto.checkSignatureEncoding(sig.toArray, flags)
 
-  def checkPubKeyEncoding(key: ByteVector, flags: Int, sigVersion: Int): Boolean = fr.acinq.bitcoin.Crypto.checkPubKeyEncoding(key.toArray, flags, sigVersion)
+  def checkPubKeyEncoding(key: ByteVector, flags: Int, sigVersion: Int): Boolean = bitcoin.Crypto.checkPubKeyEncoding(key.toArray, flags, sigVersion)
 
   /**
-   *
    * @param key serialized public key
    * @return true if the key is valid. Please not that this performs very basic tests and does not check that the
    *         point represented by this key is actually valid.
@@ -166,29 +167,21 @@ object Crypto {
   }
 
   /**
-   *
    * @param key serialized public key
    * @return true if the key is valid. This check is much more expensive than its lax version since here we check that
    *         the public key is a valid point on the secp256k1 curve
    */
-  def isPubKeyValidStrict(key: ByteVector): Boolean = isPubKeyValidLax(key) && fr.acinq.bitcoin.Crypto.isPubKeyValid(key.toArray)
+  def isPubKeyValidStrict(key: ByteVector): Boolean = isPubKeyValidLax(key) && bitcoin.Crypto.isPubKeyValid(key.toArray)
 
-  def isPubKeyCompressedOrUncompressed(key: ByteVector): Boolean = key.length match {
-    case 65 if key(0) == 4 => true
-    case 33 if key(0) == 2 || key(0) == 3 => true
-    case _ => false
-  }
+  def isPubKeyCompressedOrUncompressed(key: ByteVector): Boolean = bitcoin.Crypto.isPubKeyCompressedOrUncompressed(key.toArray)
 
-  def isPubKeyCompressed(key: ByteVector): Boolean = key.length match {
-    case 33 if key(0) == 2 || key(0) == 3 => true
-    case _ => false
-  }
+  def isPubKeyCompressed(key: ByteVector): Boolean = bitcoin.Crypto.isPubKeyCompressed(key.toArray)
 
-  def isDefinedHashtypeSignature(sig: ByteVector): Boolean = fr.acinq.bitcoin.Crypto.isDefinedHashtypeSignature(sig.toArray)
+  def isDefinedHashtypeSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDefinedHashtypeSignature(sig.toArray)
 
-  def compact2der(signature: ByteVector64): ByteVector = fr.acinq.bitcoin.Crypto.compact2der(signature)
+  def compact2der(signature: ByteVector64): ByteVector = bitcoin.Crypto.compact2der(signature)
 
-  def der2compact(signature: ByteVector): ByteVector64 = fr.acinq.bitcoin.Crypto.der2compact(signature.toArray)
+  def der2compact(signature: ByteVector): ByteVector64 = bitcoin.Crypto.der2compact(signature.toArray)
 
   /**
    * @param data      data
@@ -196,14 +189,13 @@ object Crypto {
    * @param publicKey public key
    * @return true is signature is valid for this data with this public key
    */
-  def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = fr.acinq.bitcoin.Crypto.verifySignature(data.toArray, signature, publicKey.pub)
+  def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = bitcoin.Crypto.verifySignature(data.toArray, signature, publicKey.pub)
 
   /**
-   *
    * @param privateKey private key
    * @return the corresponding public key
    */
-  def publicKeyFromPrivateKey(privateKey: ByteVector) = PrivateKey(privateKey).publicKey
+  def publicKeyFromPrivateKey(privateKey: ByteVector): PublicKey = PrivateKey(privateKey).publicKey
 
   /**
    * Sign data with a private key, using RCF6979 deterministic signatures
@@ -213,7 +205,7 @@ object Crypto {
    *                   the key (there is an extra "1" appended to the key)
    * @return a signature in compact format (64 bytes)
    */
-  def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = fr.acinq.bitcoin.Crypto.sign(data, privateKey.priv)
+  def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = bitcoin.Crypto.sign(data, privateKey.priv)
 
   def sign(data: ByteVector, privateKey: PrivateKey): ByteVector64 = sign(data.toArray, privateKey)
 
@@ -225,10 +217,10 @@ object Crypto {
    * @param message   message that was signed
    * @return a recovered public key
    */
-  def recoverPublicKey(signature: ByteVector64, message: ByteVector, recoveryId: Int): PublicKey = PublicKey(fr.acinq.bitcoin.Crypto.recoverPublicKey(signature, message.toArray, recoveryId))
+  def recoverPublicKey(signature: ByteVector64, message: ByteVector, recoveryId: Int): PublicKey = PublicKey(bitcoin.Crypto.recoverPublicKey(signature, message.toArray, recoveryId))
 
   def recoverPublicKey(signature: ByteVector64, message: ByteVector): (PublicKey, PublicKey) = {
-    val p = fr.acinq.bitcoin.Crypto.recoverPublicKey(signature, message.toArray)
+    val p = bitcoin.Crypto.recoverPublicKey(signature, message.toArray)
     (PublicKey(p.getFirst), PublicKey(p.getSecond))
   }
 }

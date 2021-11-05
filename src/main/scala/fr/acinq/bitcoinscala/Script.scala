@@ -7,118 +7,9 @@ import scodec.bits.ByteVector
 
 import scala.jdk.CollectionConverters.{ListHasAsScala, SeqHasAsJava}
 
-/**
- * script execution flags
- */
-object ScriptFlags {
-  val SCRIPT_VERIFY_NONE = bitcoin.ScriptFlags.SCRIPT_VERIFY_NONE
-
-  // Evaluate P2SH subscripts (softfork safe, BIP16).
-  val SCRIPT_VERIFY_P2SH = bitcoin.ScriptFlags.SCRIPT_VERIFY_P2SH
-
-  // Passing a non-strict-DER signature or one with undefined hashtype to a checksig operation causes script failure.
-  // Evaluating a pubkey that is not (0x04 + 64 bytes) or (0x02 or 0x03 + 32 bytes) by checksig causes script failure.
-  // (softfork safe, but not used or intended as a consensus rule).
-  val SCRIPT_VERIFY_STRICTENC = bitcoin.ScriptFlags.SCRIPT_VERIFY_STRICTENC
-
-  // Passing a non-strict-DER signature to a checksig operation causes script failure (softfork safe, BIP62 rule 1)
-  val SCRIPT_VERIFY_DERSIG = bitcoin.ScriptFlags.SCRIPT_VERIFY_DERSIG
-
-  // Passing a non-strict-DER signature or one with S > order/2 to a checksig operation causes script failure
-  // (softfork safe, BIP62 rule 5).
-  val SCRIPT_VERIFY_LOW_S = bitcoin.ScriptFlags.SCRIPT_VERIFY_LOW_S
-
-  // verify dummy stack item consumed by CHECKMULTISIG is of zero-length (softfork safe, BIP62 rule 7).
-  val SCRIPT_VERIFY_NULLDUMMY = bitcoin.ScriptFlags.SCRIPT_VERIFY_NULLDUMMY
-
-  // Using a non-push operator in the scriptSig causes script failure (softfork safe, BIP62 rule 2).
-  val SCRIPT_VERIFY_SIGPUSHONLY = bitcoin.ScriptFlags.SCRIPT_VERIFY_SIGPUSHONLY
-
-  // Require minimal encodings for all push operations (OP_0... OP_16, OP_1NEGATE where possible, direct
-  // pushes up to 75 bytes, OP_PUSHDATA up to 255 bytes, OP_PUSHDATA2 for anything larger). Evaluating
-  // any other push causes the script to fail (BIP62 rule 3).
-  // In addition, whenever a stack element is interpreted as a number, it must be of minimal length (BIP62 rule 4).
-  // (softfork safe)
-  val SCRIPT_VERIFY_MINIMALDATA = bitcoin.ScriptFlags.SCRIPT_VERIFY_MINIMALDATA
-
-  // Discourage use of NOPs reserved for upgrades (NOP1-10)
-  //
-  // Provided so that nodes can avoid accepting or mining transactions
-  // containing executed NOP's whose meaning may change after a soft-fork,
-  // thus rendering the script invalid; with this flag set executing
-  // discouraged NOPs fails the script. This verification flag will never be
-  // a mandatory flag applied to scripts in a block. NOPs that are not
-  // executed, e.g.  within an unexecuted IF ENDIF block, are *not* rejected.
-  val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS = bitcoin.ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS
-
-  // Require that only a single stack element remains after evaluation. This changes the success criterion from
-  // "At least one stack element must remain, and when interpreted as a boolean, it must be true" to
-  // "Exactly one stack element must remain, and when interpreted as a boolean, it must be true".
-  // (softfork safe, BIP62 rule 6)
-  // Note: CLEANSTACK should never be used without P2SH.
-  val SCRIPT_VERIFY_CLEANSTACK = bitcoin.ScriptFlags.SCRIPT_VERIFY_CLEANSTACK
-
-  // Verify CHECKLOCKTIMEVERIFY
-  //
-  // See BIP65 for details.
-  val SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY = bitcoin.ScriptFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY
-
-
-  // See BIP112 for details
-  val SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = bitcoin.ScriptFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY
-
-  // support CHECKSEQUENCEVERIFY opcode
-  //
-  // Support segregated witness
-  //
-  val SCRIPT_VERIFY_WITNESS = bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS
-
-  // Making v2-v16 witness program non-standard
-  //
-  val SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM = bitcoin.ScriptFlags.SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
-
-
-  // Segwit script only: Require the argument of OP_IF/NOTIF to be exactly 0x01 or empty vector
-  //
-  val SCRIPT_VERIFY_MINIMALIF = bitcoin.ScriptFlags.SCRIPT_VERIFY_MINIMALIF
-
-  // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
-  //
-  val SCRIPT_VERIFY_NULLFAIL = bitcoin.ScriptFlags.SCRIPT_VERIFY_NULLFAIL
-
-  // Public keys in segregated witness scripts must be compressed
-  //
-  val SCRIPT_VERIFY_WITNESS_PUBKEYTYPE = bitcoin.ScriptFlags.SCRIPT_VERIFY_WITNESS_PUBKEYTYPE
-
-  // Making OP_CODESEPARATOR and FindAndDelete fail any non-segwit scripts
-  //
-  val SCRIPT_VERIFY_CONST_SCRIPTCODE = bitcoin.ScriptFlags.SCRIPT_VERIFY_CONST_SCRIPTCODE
-
-  /**
-   * Mandatory script verification flags that all new blocks must comply with for
-   * them to be valid. (but old blocks may not comply with) Currently just P2SH,
-   * but in the future other flags may be added, such as a soft-fork to enforce
-   * strict DER encoding.
-   *
-   * Failing one of these tests may trigger a DoS ban - see CheckInputs() for
-   * details.
-   */
-  val MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH
-
-  /**
-   * Standard script verification flags that standard transactions will comply
-   * with. However scripts violating these flags may still be present in valid
-   * blocks and we must accept those blocks.
-   */
-  val STANDARD_SCRIPT_VERIFY_FLAGS = bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
-
-  /** For convenience, standard but not mandatory verify flags. */
-  val STANDARD_NOT_MANDATORY_VERIFY_FLAGS = bitcoin.ScriptFlags.STANDARD_NOT_MANDATORY_VERIFY_FLAGS
-}
-
 object Script {
 
-  import ScriptFlags._
+  import fr.acinq.bitcoin.ScriptFlags._
 
   def parse(blob: ByteVector): List[ScriptElt] = parse(blob.toArray)
 
@@ -169,7 +60,6 @@ object Script {
       new bitcoin.Script.Context(context.tx, context.inputIndex, context.amount), scriptFlag, null
     )
 
-
     def verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteVector): Unit = runner.verifyWitnessProgram(witness, witnessVersion, program.toArray)
 
     def verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector): Boolean = verifyScripts(scriptSig, scriptPubKey, ScriptWitness.empty)
@@ -189,6 +79,7 @@ object Script {
      */
     def verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector, witness: ScriptWitness): Boolean = runner.verifyScripts(scriptSig, scriptPubKey, witness)
   }
+
   /**
    * extract a public key hash from a public key script
    *
@@ -222,15 +113,7 @@ object Script {
    *                as required signatures)
    * @return a multisig redeem script
    */
-  def createMultiSigMofN(m: Int, pubkeys: Seq[PublicKey]): Seq[ScriptElt] = {
-    require(m > 0 && m <= 16, s"number of required signatures is $m, should be between 1 and 16")
-    require(pubkeys.nonEmpty && pubkeys.size <= 16, s"number of public keys is ${pubkeys.size}, should be between 1 and 16")
-    require(m <= pubkeys.size, "The required number of signatures shouldn't be greater than the number of public keys")
-    val op_m = ScriptElt.code2elt(m + 0x50)
-    // 1 -> OP_1, 2 -> OP_2, ... 16 -> OP_16
-    val op_n = ScriptElt.code2elt(pubkeys.size + 0x50)
-    op_m :: pubkeys.toList.map(pub => OP_PUSHDATA(pub.value)) ::: op_n :: OP_CHECKMULTISIG :: Nil
-  }
+  def createMultiSigMofN(m: Int, pubkeys: Seq[PublicKey]): Seq[ScriptElt] = bitcoin.Script.createMultiSigMofN(m, pubkeys.map(_.pub).asJava).asScala.map(kmp2scala).toList
 
   /**
    * @param pubKeyHash public key hash
