@@ -1,7 +1,5 @@
 package fr.acinq.bitcoinscala.reference
 
-import java.io.InputStreamReader
-
 import fr.acinq.bitcoinscala._
 import org.json4s.JsonAST.{JArray, JDouble, JString}
 import org.json4s.jackson.JsonMethods
@@ -9,12 +7,13 @@ import org.json4s.{DefaultFormats, JValue}
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
 
+import java.io.InputStreamReader
 import scala.util.Try
 
 /**
-  * bitcoin core reference script tests
-  * see bitcoin/src/test/script_tests.cpp for implementation details
-  */
+ * bitcoin core reference script tests
+ * see bitcoin/src/test/script_tests.cpp for implementation details
+ */
 
 object ScriptSpec {
   def parseFromText(input: String): ByteVector = {
@@ -45,7 +44,7 @@ object ScriptSpec {
     }
   }
 
-  import ScriptFlags._
+  import fr.acinq.bitcoin.ScriptFlags._
 
   val mapFlagNames = Map(
     "NONE" -> SCRIPT_VERIFY_NONE,

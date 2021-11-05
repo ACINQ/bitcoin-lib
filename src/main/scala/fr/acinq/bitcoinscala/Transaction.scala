@@ -1,9 +1,9 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import fr.acinq.bitcoinscala.KotlinUtils._
-import fr.acinq.bitcoinscala.Protocol.{script, _}
-import fr.acinq.bitcoin
+import fr.acinq.bitcoinscala.Protocol._
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
@@ -24,7 +24,6 @@ object OutPoint extends BtcSerializer[OutPoint] {
   def isNull(input: OutPoint) = isCoinbase(input)
 }
 
-
 /**
  * an out point is a reference to a specific output in a specific transaction that we want to claim
  *
@@ -32,6 +31,7 @@ object OutPoint extends BtcSerializer[OutPoint] {
  * @param index index of the output in tx that we want to refer to
  */
 case class OutPoint(hash: ByteVector32, index: Long) extends BtcSerializable[OutPoint] {
+  // The genesis block contains inputs with index = -1, so we cannot require it to be >= 0
   require(index >= -1)
 
   /**
@@ -46,31 +46,6 @@ case class OutPoint(hash: ByteVector32, index: Long) extends BtcSerializable[Out
 object TxIn extends BtcSerializer[TxIn] {
   def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long): TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
 
-  /* Setting nSequence to this value for every input in a transaction disables nLockTime. */
-  val SEQUENCE_FINAL = bitcoin.TxIn.SEQUENCE_FINAL
-
-  /* Below flags apply in the context of BIP 68*/
-  /* If this flag set, CTxIn::nSequence is NOT interpreted as a relative lock-time. */
-  val SEQUENCE_LOCKTIME_DISABLE_FLAG = bitcoin.TxIn.SEQUENCE_LOCKTIME_DISABLE_FLAG
-
-  /* If CTxIn::nSequence encodes a relative lock-time and this flag
-   * is set, the relative lock-time has units of 512 seconds,
-   * otherwise it specifies blocks with a granularity of 1. */
-  val SEQUENCE_LOCKTIME_TYPE_FLAG = bitcoin.TxIn.SEQUENCE_LOCKTIME_TYPE_FLAG
-
-  /* If CTxIn::nSequence encodes a relative lock-time, this mask is
-   * applied to extract that lock-time from the sequence field. */
-  val SEQUENCE_LOCKTIME_MASK = bitcoin.TxIn.SEQUENCE_LOCKTIME_MASK
-
-  /* In order to use the same number of bits to encode roughly the
-   * same wall-clock duration, and because blocks are naturally
-   * limited to occur every 600s on average, the minimum granularity
-   * for time-based relative lock-time is fixed at 512 seconds.
-   * Converting from CTxIn::nSequence to seconds is performed by
-   * multiplying by 512 = 2^9, or equivalently shifting up by
-   * 9 bits. */
-  val SEQUENCE_LOCKTIME_GRANULARITY = bitcoin.TxIn.SEQUENCE_LOCKTIME_GRANULARITY
-
   override def read(input: InputStream, protocolVersion: Long): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
 
   override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = {
@@ -80,7 +55,7 @@ object TxIn extends BtcSerializer[TxIn] {
   }
 
   override def validate(input: TxIn): Unit = {
-    require(input.signatureScript.length <= MaxScriptElementSize, s"signature script is ${input.signatureScript.length} bytes, limit is $MaxScriptElementSize bytes")
+    require(input.signatureScript.length <= bitcoin.Script.MaxScriptElementSize, s"signature script is ${input.signatureScript.length} bytes, limit is ${bitcoin.Script.MaxScriptElementSize} bytes")
   }
 
   def coinbase(script: ByteVector): TxIn = {
@@ -101,7 +76,7 @@ object TxIn extends BtcSerializer[TxIn] {
  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
  */
 case class TxIn(outPoint: OutPoint, signatureScript: ByteVector, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) extends BtcSerializable[TxIn] {
-  def isFinal: Boolean = sequence == TxIn.SEQUENCE_FINAL
+  def isFinal: Boolean = sequence == bitcoin.TxIn.SEQUENCE_FINAL
 
   def hasWitness: Boolean = witness.isNotNull
 
@@ -122,7 +97,7 @@ object TxOut extends BtcSerializer[TxOut] {
     import input._
     require(amount.toLong >= 0, s"invalid txout amount: $amount")
     require(amount.toLong <= BtcAmount.MaxMoney, s"invalid txout amount: $amount")
-    require(publicKeyScript.length < MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is $MaxScriptElementSize bytes")
+    require(publicKeyScript.length < bitcoin.Script.MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is ${bitcoin.Script.MaxScriptElementSize} bytes")
   }
 }
 
@@ -161,16 +136,12 @@ case class ScriptWitness(stack: Seq[ByteVector]) extends BtcSerializable[ScriptW
 }
 
 object Transaction extends BtcSerializer[Transaction] {
-  val SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000L
-  // if lockTime >= LOCKTIME_THRESHOLD it is a unix timestamp otherwise it is a block height
-  val LOCKTIME_THRESHOLD = 500000000L
-
   /**
    *
    * @param version protocol version (and NOT transaction version !)
    * @return true if protocol version specifies that witness data is to be serialized
    */
-  def serializeTxWitness(version: Long): Boolean = (version & SERIALIZE_TRANSACTION_NO_WITNESS) == 0
+  def serializeTxWitness(version: Long): Boolean = (version & bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS) == 0
 
   override def read(input: InputStream, protocolVersion: Long): Transaction = {
     val tx = fr.acinq.bitcoin.Transaction.read(InputStreamWrapper(input), protocolVersion)
@@ -185,7 +156,7 @@ object Transaction extends BtcSerializer[Transaction] {
     fr.acinq.bitcoin.Transaction.validate(input)
   }
 
-  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion | SERIALIZE_TRANSACTION_NO_WITNESS).length.toInt
+  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion | bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS).length.toInt
 
   def totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).length.toInt
 
@@ -290,7 +261,7 @@ object Transaction extends BtcSerializer[Transaction] {
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
 
   def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int): Unit = {
-    fr.acinq.bitcoin.Transaction.correctlySpends(tx, previousOutputs.map { case (o, t) => scala2kmp(o) -> scala2kmp(t) }.toMap.asJava, scriptFlags)
+    fr.acinq.bitcoin.Transaction.correctlySpends(tx, previousOutputs.map { case (o, t) => scala2kmp(o) -> scala2kmp(t) }.asJava, scriptFlags)
   }
 
   def correctlySpends(tx: Transaction, inputs: Seq[Transaction], scriptFlags: Int): Unit = {
@@ -313,10 +284,8 @@ object Transaction extends BtcSerializer[Transaction] {
  */
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) extends BtcSerializable[Transaction] {
 
-  import Transaction._
-
   // standard transaction hash, used to identify transactions (in transactions outputs for example)
-  lazy val hash: ByteVector32 = Crypto.hash256(Transaction.write(this, SERIALIZE_TRANSACTION_NO_WITNESS))
+  lazy val hash: ByteVector32 = Crypto.hash256(Transaction.write(this, bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS))
   lazy val txid: ByteVector32 = hash.reverse
   // witness transaction hash that includes witness data. used to compute the witness commitment included in the coinbase
   // transaction of segwit blocks
@@ -335,8 +304,8 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    */
   def isFinal(blockHeight: Long, blockTime: Long): Boolean = lockTime match {
     case 0 => true
-    case value if value < LOCKTIME_THRESHOLD && value < blockHeight => true
-    case value if value >= LOCKTIME_THRESHOLD && value < blockTime => true
+    case value if value < bitcoin.Transaction.LOCKTIME_THRESHOLD && value < blockHeight => true
+    case value if value >= bitcoin.Transaction.LOCKTIME_THRESHOLD && value < blockTime => true
     case _ if txIn.exists(!_.isFinal) => false
     case _ => true
   }

@@ -1,5 +1,7 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin
+import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto._
 import fr.acinq.bitcoinscala.Protocol._
 import org.scalatest.{FunSuite, Matchers}
@@ -69,7 +71,7 @@ class TransactionSpec extends FunSuite with Matchers {
   test("read transaction without inputs in non-witness format") {
     val hex = hex"020000000002d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787b32e1300"
     assertThrows[Throwable](Transaction.read(hex.toArray))
-    val tx = Transaction.read(hex.toArray, Protocol.PROTOCOL_VERSION | Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)
+    val tx = Transaction.read(hex.toArray, Protocol.PROTOCOL_VERSION | bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)
     assert(tx.version === 2)
     assert(tx.txIn.isEmpty)
     assert(tx.txid === ByteVector32(hex"062d74b3c6183147c30a02addf3c8cd0df10a049ced5677247edd8f114ddb6fb"))
@@ -166,7 +168,7 @@ class TransactionSpec extends FunSuite with Matchers {
     )
 
     // step #2: sign the tx
-    val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = Transaction.signInput(tx1, 0, previousTx.txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val tx2 = tx1.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
 
     // redeem the tx
@@ -204,8 +206,8 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L
     )
 
-    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(0))
-    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
+    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(0))
+    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
     val tx1 = tx
       .updateSigScript(0, OP_PUSHDATA(sig1) :: OP_PUSHDATA(keys(0).publicKey.value) :: Nil)
       .updateSigScript(1, OP_PUSHDATA(sig2) :: OP_PUSHDATA(keys(1).publicKey.toUncompressedBin) :: Nil)
@@ -251,7 +253,7 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L)
 
     // and sign it
-    val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = Transaction.signInput(tx, 0, previousTx.txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey.toUncompressedBin) :: Nil)
     Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
@@ -264,8 +266,8 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L)
 
     // we need at least 2 signatures
-    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
-    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
+    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
+    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
 
     // update our tx with the correct sig script
     val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
@@ -312,9 +314,9 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L
     )
 
-    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(1).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(0))
-    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
-    val sig3 = Transaction.signInput(tx, 2, previousTx(2).txOut(0).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(2))
+    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut(1).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(0))
+    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
+    val sig3 = Transaction.signInput(tx, 2, previousTx(2).txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(2))
 
     val signedTx = tx
       .updateSigScript(0, OP_PUSHDATA(sig1) :: OP_PUSHDATA(keys(0).publicKey.value) :: Nil)

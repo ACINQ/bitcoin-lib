@@ -1,12 +1,14 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin.SigHash._
+import fr.acinq.bitcoin.{ScriptFlags, SigVersion}
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
 
 /**
-  * Created by fabrice on 25/10/16.
-  */
+ * Created by fabrice on 25/10/16.
+ */
 class SighashSpec extends FunSuite {
   test("SIGHASH_ANYONECANPAY lets you add inputs") {
     val privateKeys = List(

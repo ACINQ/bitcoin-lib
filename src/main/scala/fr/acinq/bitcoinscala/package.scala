@@ -1,6 +1,7 @@
 package fr.acinq
 
 import fr.acinq.bitcoinscala.Crypto.PublicKey
+import fr.acinq.bitcoinscala.KotlinUtils._
 import scodec.bits.ByteVector
 
 import java.math.BigInteger
@@ -9,22 +10,6 @@ import java.math.BigInteger
  * see https://en.bitcoin.it/wiki/Protocol_specification
  */
 package object bitcoinscala {
-  val MaxScriptElementSize = 520
-  val MaxBlockSize = 1000000
-  val LockTimeThreshold = 500000000L
-
-  /**
-   * signature hash flags
-   */
-  val SIGHASH_ALL = 1
-  val SIGHASH_NONE = 2
-  val SIGHASH_SINGLE = 3
-  val SIGHASH_ANYONECANPAY = 0x80
-
-  object SigVersion {
-    val SIGVERSION_BASE = 0
-    val SIGVERSION_WITNESS_V0 = 1
-  }
 
   implicit object NumericSatoshi extends Numeric[Satoshi] {
     // @formatter:off
@@ -100,20 +85,13 @@ package object bitcoinscala {
     compact
   }
 
-  def isAnyoneCanPay(sighashType: Int): Boolean = (sighashType & SIGHASH_ANYONECANPAY) != 0
+  def isAnyoneCanPay(sighashType: Int): Boolean = (sighashType & bitcoin.SigHash.SIGHASH_ANYONECANPAY) != 0
 
-  def isHashSingle(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_SINGLE
+  def isHashSingle(sighashType: Int): Boolean = (sighashType & 0x1f) == bitcoin.SigHash.SIGHASH_SINGLE
 
-  def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_NONE
+  def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == bitcoin.SigHash.SIGHASH_NONE
 
-  def computeP2PkhAddress(pub: PublicKey, chainHash: ByteVector32): String = {
-    val hash = pub.hash160
-    chainHash match {
-      case Block.SignetGenesisBlock.hash | Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash)
-      case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)
-      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
-    }
-  }
+  def computeP2PkhAddress(pub: PublicKey, chainHash: ByteVector32): String = bitcoin.Bitcoin.computeP2PkhAddress(pub, chainHash)
 
   def computeBIP44Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2PkhAddress(pub, chainHash)
 
@@ -122,15 +100,7 @@ package object bitcoinscala {
    * @param chainHash chain hash (i.e. hash of the genesis block of the chain we're on)
    * @return the p2swh-of-p2pkh address for this key). It is a Base58 address that is compatible with most bitcoin wallets
    */
-  def computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = {
-    val script = Script.pay2wpkh(pub)
-    val hash = Crypto.hash160(Script.write(script))
-    chainHash match {
-      case Block.SignetGenesisBlock.hash | Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, hash)
-      case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.ScriptAddress, hash)
-      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
-    }
-  }
+  def computeP2ShOfP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = bitcoin.Bitcoin.computeP2ShOfP2WpkhAddress(pub, chainHash)
 
   def computeBIP49Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2ShOfP2WpkhAddress(pub, chainHash)
 
@@ -140,17 +110,7 @@ package object bitcoinscala {
    * @return the BIP84 address for this key (i.e. the p2wpkh address for this key). It is a Bech32 address that will be
    *         understood only by native sewgit wallets
    */
-  def computeP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = {
-    val hash = pub.hash160
-    val hrp = chainHash match {
-      case Block.LivenetGenesisBlock.hash => "bc"
-      case Block.TestnetGenesisBlock.hash => "tb"
-      case Block.RegtestGenesisBlock.hash => "bcrt"
-      case Block.SignetGenesisBlock.hash => "tb"
-      case _ => throw new IllegalArgumentException("Unknown chain hash: " + chainHash)
-    }
-    Bech32.encodeWitnessAddress(hrp, 0, hash)
-  }
+  def computeP2WpkhAddress(pub: PublicKey, chainHash: ByteVector32): String = bitcoin.Bitcoin.computeP2WpkhAddress(pub, chainHash)
 
   def computeBIP84Address(pub: PublicKey, chainHash: ByteVector32): String = computeP2WpkhAddress(pub, chainHash)
 

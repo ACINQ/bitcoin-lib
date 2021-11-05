@@ -1,5 +1,6 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.FlatSpec
 import scodec.bits._
@@ -32,10 +33,9 @@ class TransactionMalleabilitySpec extends FlatSpec {
       ),
       lockTime = 0)
 
-
     // step #2: sign the unsigned tx
     // signature script: push signature and public key
-    val sig = Transaction.signInput(unsignedTx, 0, prevTx.txOut(1).publicKeyScript, SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = Transaction.signInput(unsignedTx, 0, prevTx.txOut(1).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val signatureScript = OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey) :: Nil
 
     val tx1 = Transaction(version = 1,

@@ -20,7 +20,7 @@ object DeterministicWallet {
 
     def lastChildNumber: Long = keyPath.getLastChildNumber
 
-    def derive(number: Long) = KeyPath(keyPath.derive(number))
+    def derive(number: Long): KeyPath = KeyPath(keyPath.derive(number))
 
     override def toString = keyPath.toString
   }
@@ -47,7 +47,7 @@ object DeterministicWallet {
 
   def isHardened(index: Long): Boolean = index >= hardenedKeyIndex
 
-  case class ExtendedPrivateKey(val priv: bitcoin.DeterministicWallet.ExtendedPrivateKey) {
+  case class ExtendedPrivateKey(priv: bitcoin.DeterministicWallet.ExtendedPrivateKey) {
     val secretkeybytes: ByteVector32 = priv.secretkeybytes
     val chaincode: ByteVector32 = priv.chaincode
     val depth: Int = priv.depth
@@ -57,6 +57,8 @@ object DeterministicWallet {
     def privateKey: PrivateKey = priv.getPrivateKey
 
     def publicKey: PublicKey = privateKey.publicKey
+
+    override def toString = priv.toString
   }
 
   object ExtendedPrivateKey {
@@ -72,7 +74,7 @@ object DeterministicWallet {
 
   def encode(input: ExtendedPrivateKey, prefix: Int): String = bitcoin.DeterministicWallet.encode(input.priv, prefix)
 
-  case class ExtendedPublicKey(val pub: bitcoin.DeterministicWallet.ExtendedPublicKey) {
+  case class ExtendedPublicKey(pub: bitcoin.DeterministicWallet.ExtendedPublicKey) {
     val publickeybytes: ByteVector = pub.publickeybytes
     val chaincode: ByteVector32 = pub.chaincode
     val depth: Int = pub.depth
@@ -80,6 +82,8 @@ object DeterministicWallet {
     val parent: Long = pub.parent
 
     def publicKey: PublicKey = pub.getPublicKey
+
+    override def toString = pub.toString
   }
 
   object ExtendedPublicKey {
