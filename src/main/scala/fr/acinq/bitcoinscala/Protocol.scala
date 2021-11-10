@@ -492,28 +492,6 @@ case class Getheaders(version: Long, locatorHashes: Seq[ByteVector], stopHash: B
   override def serializer: BtcSerializer[Getheaders] = Getheaders
 }
 
-object Headers extends BtcSerializer[Headers] {
-  override def write(t: Headers, out: OutputStream, protocolVersion: Long): Unit = {
-    writeCollection(t.headers, (t: BlockHeader, o: OutputStream, v: Long) => {
-      BlockHeader.write(t, o, v)
-      writeVarint(0, o)
-    }, out, protocolVersion)
-  }
-
-  override def read(in: InputStream, protocolVersion: Long): Headers = {
-    Headers(readCollection(in, (i: InputStream, v: Long) => {
-      val header = BlockHeader.read(i, v)
-      val dummy = varint(in)
-      require(dummy == 0, s"header in headers message ends with $dummy, should be 0 instead")
-      header
-    }, protocolVersion))
-  }
-}
-
-case class Headers(headers: Seq[BlockHeader]) extends BtcSerializable[Headers] {
-  override def serializer: BtcSerializer[Headers] = Headers
-}
-
 object Getblocks extends BtcSerializer[Getblocks] {
   override def write(t: Getblocks, out: OutputStream, protocolVersion: Long): Unit = {
     writeUInt32(t.version.toInt, out)

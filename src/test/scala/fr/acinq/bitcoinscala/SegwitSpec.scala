@@ -190,18 +190,4 @@ class SegwitSpec extends FunSuite {
     assert(tx1.txid === ByteVector32(hex"98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
     // this tx was published on segnet as 98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5
   }
-
-  test("check block witness commitment (segwit block)") {
-    val stream = classOf[ProtocolSpec].getResourceAsStream("/000000000001e5cc02215a70dc832f3d66c724ce1f9662f83ef36f1e9e4a0371.block")
-    val block = Block.read(stream)
-    val coinbase = block.tx.head
-    assert(Block.witnessReservedValue(coinbase).isDefined && Block.witnessCommitment(coinbase).isDefined && Block.checkWitnessCommitment(block))
-  }
-
-  test("check block witness commitment (non-segwit block)") {
-    val stream = classOf[ProtocolSpec].getResourceAsStream("/block1.dat")
-    val block = Block.read(stream)
-    val coinbase = block.tx.head
-    assert(!Block.witnessReservedValue(coinbase).isDefined && !Block.witnessCommitment(coinbase).isDefined && Block.checkWitnessCommitment(block))
-  }
 }
