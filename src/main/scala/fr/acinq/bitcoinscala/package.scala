@@ -5,6 +5,7 @@ import fr.acinq.bitcoinscala.KotlinUtils._
 import scodec.bits.ByteVector
 
 import java.math.BigInteger
+import scala.jdk.CollectionConverters.SeqHasAsJava
 
 /**
  * see https://en.bitcoin.it/wiki/Protocol_specification
@@ -120,45 +121,10 @@ package object bitcoinscala {
    * @return the address of this public key script on this chain
    */
   def computeScriptAddress(chainHash: ByteVector32, script: Seq[ScriptElt]): String = {
-    val base58PubkeyPrefix = chainHash match {
-      case Block.LivenetGenesisBlock.hash => Base58.Prefix.PubkeyAddress
-      case Block.TestnetGenesisBlock.hash | Block.RegtestGenesisBlock.hash => Base58.Prefix.PubkeyAddressTestnet
-      case _ => throw new IllegalArgumentException(s"invalid chain hash $chainHash")
-    }
-    val base58ScriptPrefix = chainHash match {
-      case Block.LivenetGenesisBlock.hash => Base58.Prefix.ScriptAddress
-      case Block.TestnetGenesisBlock.hash | Block.RegtestGenesisBlock.hash => Base58.Prefix.ScriptAddressTestnet
-      case _ => throw new IllegalArgumentException(s"invalid chain hash $chainHash")
-    }
-    val hrp = chainHash match {
-      case Block.LivenetGenesisBlock.hash => "bc"
-      case Block.TestnetGenesisBlock.hash => "tb"
-      case Block.RegtestGenesisBlock.hash => "bcrt"
-      case _ => throw new IllegalArgumentException(s"invalid chain hash $chainHash")
-    }
-    script match {
-      case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pubKeyHash, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil => Base58Check.encode(base58PubkeyPrefix, pubKeyHash)
-      case OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil => Base58Check.encode(base58ScriptPrefix, scriptHash)
-      case OP_0 :: OP_PUSHDATA(pubKeyHash, _) :: Nil if pubKeyHash.length == 20 => Bech32.encodeWitnessAddress(hrp, 0, pubKeyHash)
-      case OP_0 :: OP_PUSHDATA(scriptHash, _) :: Nil if scriptHash.length == 32 => Bech32.encodeWitnessAddress(hrp, 0, scriptHash)
-      case OP_1 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 1, program)
-      case OP_2 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 2, program)
-      case OP_3 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 3, program)
-      case OP_4 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 4, program)
-      case OP_5 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 5, program)
-      case OP_6 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 6, program)
-      case OP_7 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 7, program)
-      case OP_8 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 8, program)
-      case OP_9 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 9, program)
-      case OP_10 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 10, program)
-      case OP_11 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 11, program)
-      case OP_12 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 12, program)
-      case OP_13 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 13, program)
-      case OP_14 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 14, program)
-      case OP_15 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 15, program)
-      case OP_16 :: OP_PUSHDATA(program, _) :: Nil if 2 <= program.length && program.length <= 40 => Bech32.encodeWitnessAddress(hrp, 16, program)
-      case _ => throw new IllegalArgumentException(s"invalid pubkey script ${Script.write(script)}")
-    }
+    // TODO: addressFromPublicKeyScript behaves differently and can return null, this should be changed
+    val address = bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava)
+    require(address != null, "invalid chain hash or script")
+    address
   }
 
   /**
