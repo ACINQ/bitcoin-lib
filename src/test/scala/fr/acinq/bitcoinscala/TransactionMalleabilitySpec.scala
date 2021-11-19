@@ -1,6 +1,6 @@
 package fr.acinq.bitcoinscala
 
-import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
+import fr.acinq.bitcoin.{Base58, ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.FlatSpec
 import scodec.bits._

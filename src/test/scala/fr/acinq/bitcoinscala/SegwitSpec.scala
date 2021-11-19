@@ -1,6 +1,6 @@
 package fr.acinq.bitcoinscala
 
-import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
+import fr.acinq.bitcoin.{Base58, Base58Check, ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.FunSuite
 import scodec.bits._
@@ -65,7 +65,7 @@ class SegwitSpec extends FunSuite {
   test("create p2wpkh tx") {
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
     val pub1 = priv1.publicKey
-    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.value))
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.value).toArray)
 
     assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
 
@@ -109,7 +109,7 @@ class SegwitSpec extends FunSuite {
   test("create p2wsh tx") {
     val priv1 = PrivateKey.fromBase58("QRY5zPUH6tWhQr2NwFXNpMbiLQq9u2ztcSZ6RwMPjyKv36rHP2xT", Base58.Prefix.SecretKeySegnet)._1
     val pub1 = priv1.publicKey
-    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.value))
+    val address1 = Base58Check.encode(Base58.Prefix.PubkeyAddressSegnet, Crypto.hash160(pub1.value).toArray)
 
     assert(address1 == "D6YX7dpieYu8j1bV8B4RgksNmDk3sNJ4Ap")
 
@@ -166,7 +166,7 @@ class SegwitSpec extends FunSuite {
     val script = Script.write(Script.pay2wpkh(pub1))
 
     // which we embeed into a standard p2sh script
-    val p2shaddress = Base58Check.encode(Base58.Prefix.ScriptAddressSegnet, Crypto.hash160(script))
+    val p2shaddress = Base58Check.encode(Base58.Prefix.ScriptAddressSegnet, Crypto.hash160(script).toArray)
     assert(p2shaddress === "MDbNMghDbaaizHz8pSgMqu9qJXvKwouqkM")
 
     // this tx send 0.5 btc to our p2shaddress

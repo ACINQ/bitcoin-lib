@@ -1,7 +1,8 @@
 package fr.acinq.bitcoinscala
 
 import com.google.common.io.BaseEncoding
-import fr.acinq.bitcoinscala.Base58.Prefix
+import fr.acinq.bitcoin.Base58.Prefix
+import fr.acinq.bitcoin.Base58Check
 import fr.acinq.bitcoinscala.Crypto.PublicKey
 import org.scalatest.FlatSpec
 import scodec.bits._
@@ -12,19 +13,19 @@ class ScriptSpec extends FlatSpec {
     val script = Script.parse(blob)
     val pk = Script.publicKey(script)
     val hash = Crypto.hash160(pk)
-    assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
+    assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash.toArray) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
   }
   it should "parse 'pay to public key' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("76a91433e81a941e64cda12c6a299ed322ddbdd03f8d0e88ac")
     val script = Script.parse(blob)
     val hash = Script.publicKeyHash(script)
-    assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
+    assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash.toArray) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
   }
   it should "parse 'pay to script' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("a914a90003b4ddef4be46fc61e7f2167da9d234944e287")
     val script = Script.parse(blob)
     val OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil = script
-    val multisigAddress = Base58Check.encode(Prefix.ScriptAddressTestnet, scriptHash)
+    val multisigAddress = Base58Check.encode(Prefix.ScriptAddressTestnet, scriptHash.toArray)
     assert(multisigAddress === "2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
   }
   it should "detect 'pay to script' scripts" in {

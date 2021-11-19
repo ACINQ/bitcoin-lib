@@ -1,7 +1,7 @@
 package fr.acinq.bitcoinscala
 
-import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
-import fr.acinq.bitcoinscala.Base58.Prefix
+import fr.acinq.bitcoin.Base58
+import fr.acinq.bitcoin.{Base58Check, ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.{FunSuite, Matchers}
 import scodec.bits._
@@ -25,7 +25,7 @@ class MultisigSpec extends FunSuite with Matchers {
     redeemScript should equal(hex"52210394d30868076ab1ea7736ed3bdbec99497a6ad30b25afd709cdf3804cd389996a21032c58bc9615a6ff24e9132cef33f1ef373d97dc6da7933755bc8bb86dbee9f55c2102c4d72d99ca5ad12c17c9cfe043dc4e777075e8835af96f46d8e3ccd929fe192653ae")
 
     // 196 = prefix for P2SH adress on testnet
-    Base58Check.encode(Prefix.ScriptAddressTestnet, multisigAddress) should equal("2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
+    Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, multisigAddress.toArray) should equal("2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
 
     // we want to redeem the first output of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
@@ -67,7 +67,7 @@ class MultisigSpec extends FunSuite with Matchers {
       txIn = List(TxIn(OutPoint(previousTx, 0), ByteVector.empty, 0xffffffffL)),
       txOut = List(TxOut(
         amount = amount,
-        publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+        publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
       lockTime = 0L
     )
 
