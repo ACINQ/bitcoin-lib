@@ -125,6 +125,8 @@ object OP_PUSHDATA {
   else if (data.length < 0xffffffff) new OP_PUSHDATA(data, 0x4e)
   else throw new IllegalArgumentException(s"data is ${data.length}, too big for OP_PUSHDATA")
 
+  def apply(data: Array[Byte]): OP_PUSHDATA = apply(ByteVector.view(data))
+
   def apply(pub: PublicKey): OP_PUSHDATA = OP_PUSHDATA(pub.value)
 
   def isMinimal(data: ByteVector, code: Int): Boolean = if (data.length == 0) code == ScriptElt.elt2code(OP_0)

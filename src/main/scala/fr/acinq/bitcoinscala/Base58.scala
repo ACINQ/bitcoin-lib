@@ -1,7 +1,6 @@
 package fr.acinq.bitcoinscala
 
-import java.nio.ByteOrder
-
+import fr.acinq.bitcoin
 import scodec.bits.ByteVector
 
 /*
@@ -18,17 +17,16 @@ import scodec.bits.ByteVector
 object Base58 {
 
   object Prefix {
-    val PubkeyAddress = 0.toByte
-    val ScriptAddress = 5.toByte
-    val SecretKey = 128.toByte
-    val PubkeyAddressTestnet = 111.toByte
-    val ScriptAddressTestnet = 196.toByte
-    val SecretKeyTestnet = 239.toByte
-    val PubkeyAddressSegnet = 30.toByte
-    val ScriptAddressSegnet = 50.toByte
-    val SecretKeySegnet = 158.toByte
+    val PubkeyAddress = bitcoin.Base58.Prefix.PubkeyAddress
+    val ScriptAddress = bitcoin.Base58.Prefix.ScriptAddress
+    val SecretKey = bitcoin.Base58.Prefix.SecretKey
+    val PubkeyAddressTestnet = bitcoin.Base58.Prefix.PubkeyAddressTestnet
+    val ScriptAddressTestnet = bitcoin.Base58.Prefix.ScriptAddressTestnet
+    val SecretKeyTestnet = bitcoin.Base58.Prefix.SecretKeyTestnet
+    val PubkeyAddressSegnet = bitcoin.Base58.Prefix.PubkeyAddressSegnet
+    val ScriptAddressSegnet = bitcoin.Base58.Prefix.ScriptAddressSegnet
+    val SecretKeySegnet = bitcoin.Base58.Prefix.SecretKeySegnet
   }
-
 }
 
 /**
@@ -49,8 +47,6 @@ object Base58 {
   *
   */
 object Base58Check {
-  def checksum(data: ByteVector) = Crypto.hash256(data).take(4)
-
   /**
     * Encode data in Base58Check format.
     * For example, to create an address from a public key you could use:
@@ -59,9 +55,7 @@ object Base58Check {
     * @param data   date to be encoded
     * @return a Base58 string
     */
-  def encode(prefix: Byte, data: ByteVector): String = {
-    encode(ByteVector(prefix), data)
-  }
+  def encode(prefix: Byte, data: ByteVector): String = encode(ByteVector(prefix), data)
 
   /**
     *
@@ -69,21 +63,14 @@ object Base58Check {
     * @param data   data to be encoded
     * @return a Base58 String
     */
-  def encode(prefix: Int, data: ByteVector): String = {
-    encode(Protocol.writeUInt32(prefix, ByteOrder.BIG_ENDIAN), data)
-  }
-
+  def encode(prefix: Int, data: ByteVector): String = bitcoin.Base58Check.encode(prefix, data.toArray)
   /**
     *
     * @param prefix version prefix (several bytes, as used with BIP32 ExtendedKeys for example)
     * @param data   data to be encoded
     * @return a Base58 String
     */
-  def encode(prefix: ByteVector, data: ByteVector): String = {
-    val prefixAndData = prefix ++ data
-    (prefixAndData ++ checksum(prefixAndData)).toBase58
-  }
-
+  def encode(prefix: ByteVector, data: ByteVector): String = bitcoin.Base58Check.encode(prefix.toArray, data.toArray)
   /**
     * Decodes Base58 data that has been encoded with a single byte prefix
     *
@@ -93,8 +80,8 @@ object Base58Check {
     * @return a (prefix, data) tuple
     */
   def decode(encoded: String): (Byte, ByteVector) = {
-    val (prefix, data) = decodeWithPrefixLen(encoded, 1)
-    (prefix(0), data)
+    val decoded = bitcoin.Base58Check.decodeWithPrefixLen(encoded, 1)
+    (decoded.getFirst.head, ByteVector.view(decoded.getSecond))
   }
 
   /**
@@ -106,8 +93,8 @@ object Base58Check {
     * @return a (prefix, data) tuple
     */
   def decodeWithIntPrefix(encoded: String): (Int, ByteVector) = {
-    val (prefix, data) = decodeWithPrefixLen(encoded, 4)
-    (Protocol.uint32(prefix.toArray, ByteOrder.BIG_ENDIAN).toInt, data)
+    val decoded = bitcoin.Base58Check.decodeWithIntPrefix(encoded)
+    (decoded.getFirst, ByteVector.view(decoded.getSecond))
   }
 
   /**
@@ -119,10 +106,7 @@ object Base58Check {
     * @return a (prefix, data) tuple
     */
   def decodeWithPrefixLen(encoded: String, prefixLen: Int): (ByteVector, ByteVector) = {
-    val raw = ByteVector.fromValidBase58(encoded)
-    val versionAndHash = raw.dropRight(4)
-    val checksum = raw.takeRight(4)
-    require(checksum == Base58Check.checksum(versionAndHash), s"invalid Base58Check data $encoded")
-    (versionAndHash.take(prefixLen), versionAndHash.drop(prefixLen))
+    val decoded = bitcoin.Base58Check.decodeWithPrefixLen(encoded, prefixLen)
+    (ByteVector.view(decoded.getFirst), ByteVector.view(decoded.getSecond))
   }
 }
