@@ -1,6 +1,7 @@
 package fr.acinq.bitcoinscala
 
-import fr.acinq.bitcoinscala.Base58.Prefix
+import fr.acinq.bitcoin.Base58.Prefix
+import fr.acinq.bitcoin.{Base58, Base58Check}
 import fr.acinq.bitcoinscala.Crypto._
 import org.scalatest.FlatSpec
 import scodec.bits._
@@ -15,10 +16,13 @@ class CryptoSpec extends FlatSpec {
     val address = "mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY"
     val privateKey = "cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp"
 
-    val (version, data) = Base58Check.decode(privateKey)
+    val (version, data) = {
+      val decoded = Base58Check.decode(privateKey)
+      (decoded.getFirst, ByteVector.view(decoded.getSecond))
+    }
     val priv = PrivateKey(data)
     val publicKey = priv.publicKey
-    val computedAddress = Base58Check.encode(Prefix.PubkeyAddressTestnet, Crypto.hash160(publicKey.value))
+    val computedAddress = Base58Check.encode(Prefix.PubkeyAddressTestnet, Crypto.hash160(publicKey.value).toArray)
     assert(computedAddress === address)
   }
 
@@ -28,7 +32,7 @@ class CryptoSpec extends FlatSpec {
     val publicKey = privateKey.publicKey
     assert(publicKey.toUncompressedBin === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
 
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin))
+    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin).toArray)
     assert(address === "16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM")
   }
 
@@ -37,7 +41,7 @@ class CryptoSpec extends FlatSpec {
     val publicKey = privateKey.publicKey
     assert(publicKey.toUncompressedBin === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
 
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin))
+    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin).toArray)
     assert(address === "19FgFQGZy47NcGTJ4hfNdGMwS8EATqoa1X")
   }
 

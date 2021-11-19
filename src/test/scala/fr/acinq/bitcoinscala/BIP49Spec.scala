@@ -2,6 +2,7 @@ package fr.acinq.bitcoinscala
 
 import fr.acinq.bitcoinscala.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoinscala.DeterministicWallet.KeyPath
+import fr.acinq.bitcoin.Base58
 import org.scalatest.FunSuite
 import scodec.bits._
 

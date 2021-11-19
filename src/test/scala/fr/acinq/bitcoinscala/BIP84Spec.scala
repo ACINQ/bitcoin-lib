@@ -1,5 +1,6 @@
 package fr.acinq.bitcoinscala
 
+import fr.acinq.bitcoin.Base58
 import fr.acinq.bitcoinscala.Crypto.PublicKey
 import fr.acinq.bitcoinscala.DeterministicWallet.KeyPath
 import org.scalatest.FunSuite

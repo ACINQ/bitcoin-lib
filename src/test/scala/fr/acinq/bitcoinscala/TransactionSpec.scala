@@ -1,7 +1,7 @@
 package fr.acinq.bitcoinscala
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
+import fr.acinq.bitcoin.{Base58, Base58Check, ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto._
 import fr.acinq.bitcoinscala.Protocol._
 import org.scalatest.{FunSuite, Matchers}
@@ -103,7 +103,7 @@ class TransactionSpec extends FunSuite with Matchers {
       txOut = List(
         TxOut(
           amount = amount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
+          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
       ),
       lockTime = 0L
     )
@@ -120,7 +120,7 @@ class TransactionSpec extends FunSuite with Matchers {
     // this is the public key that is associated to the private key we used for signing
     val publicKey = privateKey.publicKey
     // we check that is really is the public key that is encoded) the address the previous tx was paid to
-    val providedHash = Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY")._2
+    val providedHash = ByteVector.view(Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY").getSecond)
     val computedHash = publicKey.hash160
     assert(providedHash == computedHash)
 
@@ -143,7 +143,10 @@ class TransactionSpec extends FunSuite with Matchers {
   // same as above, but using Transaction.sign() instead of signing the tx manually
   test("create and verify pay2pk transactions with 1 input/1 output using helper method") {
     val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
-    val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = Base58Check.decode(to)
+    val (Base58.Prefix.PubkeyAddressTestnet, pubkeyHash) = {
+      val decoded = Base58Check.decode(to)
+      (decoded.getFirst.byteValue(), ByteVector.view(decoded.getSecond))
+    }
     val amount = 10000 sat
 
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
@@ -199,10 +202,10 @@ class TransactionSpec extends FunSuite with Matchers {
       txOut = List(
         TxOut(
           amount = destAmount,
-          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(destAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
+          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(destAddress).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
         TxOut(
           amount = changeAmount,
-          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(changeAddress)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(changeAddress).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
       lockTime = 0L
     )
 
@@ -307,10 +310,10 @@ class TransactionSpec extends FunSuite with Matchers {
       ),
       txOut = List(TxOut(
         amount = amount1,
-        publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest1)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
+        publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest1).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil),
         TxOut(
           amount = amount2,
-          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest2)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
+          publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(dest2).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil)),
       lockTime = 0L
     )
 

@@ -1,8 +1,9 @@
 package fr.acinq.bitcoinscala.samples
 
+import fr.acinq.bitcoin.{Base58, Base58Check}
 import fr.acinq.bitcoinscala.Crypto.PublicKey
 import fr.acinq.bitcoinscala.DeterministicWallet._
-import fr.acinq.bitcoinscala.{Base58, Base58Check, Crypto, DeterministicWallet, MnemonicCode, Script}
+import fr.acinq.bitcoinscala.{Crypto, DeterministicWallet, MnemonicCode, Script}
 
 object FindMyAddresses extends App {
   /**
@@ -15,7 +16,7 @@ object FindMyAddresses extends App {
   val testnet = true
 
   // A BIP49 wallet would use p2sh-of-p2wpkh
-  def address(pub: PublicKey): String = Base58Check.encode(if (testnet) Base58.Prefix.ScriptAddressTestnet else Base58.Prefix.ScriptAddress, Crypto.hash160(Script.write(Script.pay2wpkh(pub))))
+  def address(pub: PublicKey): String = Base58Check.encode(if (testnet) Base58.Prefix.ScriptAddressTestnet else Base58.Prefix.ScriptAddress, Crypto.hash160(Script.write(Script.pay2wpkh(pub))).toArray)
 
   // step #1: compute the seed from the mnemonic code
   val seed = MnemonicCode.toSeed(mnemonics, passphrase)

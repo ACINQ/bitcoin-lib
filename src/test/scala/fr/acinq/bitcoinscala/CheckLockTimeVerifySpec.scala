@@ -1,6 +1,6 @@
 package fr.acinq.bitcoinscala
 
-import fr.acinq.bitcoin.{ScriptFlags, SigHash, SigVersion}
+import fr.acinq.bitcoin.{Base58, Base58Check, ScriptFlags, SigHash, SigVersion}
 import fr.acinq.bitcoinscala.Crypto.PrivateKey
 import org.scalatest.FlatSpec
 import scodec.bits._
@@ -48,7 +48,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = ByteVector.empty) :: Nil,
-        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 100L
       )
 
@@ -68,7 +68,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = ByteVector.empty) :: Nil,
-        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 99L
       )
 
@@ -90,7 +90,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
       val tmpTx = Transaction(
         version = 1L,
         txIn = TxIn(OutPoint(tx.hash, 0), sequence = 0L, signatureScript = ByteVector.empty) :: Nil,
-        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to)._2) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
+        txOut = TxOut(amount = 100 sat, publicKeyScript = OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) :: Nil,
         lockTime = 0L
       )
 
