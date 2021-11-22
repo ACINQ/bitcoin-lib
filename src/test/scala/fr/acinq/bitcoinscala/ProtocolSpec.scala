@@ -15,28 +15,6 @@ class ProtocolSpec extends FlatSpec {
     val publicKeyHash = Script.publicKeyHash(script)
     assert(Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, publicKeyHash.toArray) === "mkZBYBiq6DNoQEKakpMJegyDbw2YiNQnHT")
   }
-  it should "decode proof-of-work difficulty" in {
-    assert(decodeCompact(0) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x00123456) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x01003456) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x02000056) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x03000000) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x04000000) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x00923456) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x01803456) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x02800056) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x03800000) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x04800000) === (BigInteger.ZERO, false, false))
-    assert(decodeCompact(0x01123456) === (BigInteger.valueOf(0x12), false, false))
-    assert(decodeCompact(0x01fedcba) === (BigInteger.valueOf(0x7e), true, false))
-    assert(decodeCompact(0x02123456) === (BigInteger.valueOf(0x1234), false, false))
-    assert(decodeCompact(0x03123456) === (BigInteger.valueOf(0x123456), false, false))
-    assert(decodeCompact(0x04123456) === (BigInteger.valueOf(0x12345600), false, false))
-    assert(decodeCompact(0x04923456) === (BigInteger.valueOf(0x12345600), true, false))
-    assert(decodeCompact(0x05009234) === (new BigInteger(1, hex"92340000".toArray), false, false))
-    assert(decodeCompact(0x20123456) === (new BigInteger(1, hex"1234560000000000000000000000000000000000000000000000000000000000".toArray), false, false))
-    val (_, false, true) = decodeCompact(0xff123456L)
-  }
   it should "read and write version messages" in {
     val version = Version(
       0x00011172L,
