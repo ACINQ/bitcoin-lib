@@ -174,4 +174,19 @@ class CryptoSpec extends FlatSpec {
       assert(pub == pub1 || pub == pub2)
     }
   }
+
+  it should "perform basic operations on public keys" in {
+    val priv1 = PrivateKey(ByteVector.fromValidHex("01" * 32))
+    val priv2 = PrivateKey(ByteVector.fromValidHex("02" * 32))
+    val pub1 = priv1.publicKey
+    val pub2 = priv2.publicKey
+
+    val priv3 = priv1 + priv2
+    assert(priv3.publicKey == pub1 + pub2)
+    assert(priv1 * PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000001") ==  priv1)
+    assert(priv1 * PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000002") ==  priv1 + priv1)
+    assert(priv1 + priv2 - priv2 == priv1)
+    assert(pub1 + pub2 - pub2 == pub1)
+    assert(pub1 * priv2 == pub2 * priv1)
+  }
 }

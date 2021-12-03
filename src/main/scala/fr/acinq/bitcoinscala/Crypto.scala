@@ -80,9 +80,7 @@ object Crypto {
 
     def add(that: PublicKey): PublicKey = PublicKey(this.pub plus that.pub)
 
-    def add(that: PrivateKey): PublicKey = PublicKey(this.pub plus that.priv.publicKey())
-
-    def subtract(that: PublicKey): PublicKey = PublicKey(this.pub plus that.pub)
+    def subtract(that: PublicKey): PublicKey = PublicKey(this.pub minus that.pub)
 
     def multiply(that: PrivateKey): PublicKey = PublicKey(this.pub times that.priv)
 
