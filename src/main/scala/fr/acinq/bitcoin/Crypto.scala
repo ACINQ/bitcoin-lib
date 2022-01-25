@@ -169,6 +169,9 @@ object Crypto {
 
     // used only if secp256k1 is not available
     lazy val ecpoint = curve.getCurve.decodePoint(value.toArray)
+
+    // x coordinate only
+    def x : ByteVector32 = ByteVector32(value.drop(1))
   }
 
   object PublicKey {
