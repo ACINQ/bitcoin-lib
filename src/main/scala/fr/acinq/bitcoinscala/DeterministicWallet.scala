@@ -28,7 +28,7 @@ object DeterministicWallet {
   object KeyPath {
     val Root = KeyPath(new bitcoin.KeyPath(""))
 
-    def apply(path: Seq[Long]): KeyPath = new KeyPath(new bitcoin.KeyPath(path.map(x => Long.box(x)).toList.asJava))
+    def apply(path: Seq[Long]): KeyPath = KeyPath(new bitcoin.KeyPath(path.map(x => Long.box(x)).toList.asJava))
 
     /**
      *
@@ -62,7 +62,7 @@ object DeterministicWallet {
   }
 
   object ExtendedPrivateKey {
-    def apply(secretkeybytes: ByteVector32, chaincode: ByteVector32, depth: Int, derivationPath: KeyPath, parent: Long) = new ExtendedPrivateKey(
+    def apply(secretkeybytes: ByteVector32, chaincode: ByteVector32, depth: Int, derivationPath: KeyPath, parent: Long): ExtendedPrivateKey = ExtendedPrivateKey(
       new bitcoin.DeterministicWallet.ExtendedPrivateKey(secretkeybytes, chaincode, depth, derivationPath.keyPath, parent)
     )
 
@@ -87,7 +87,7 @@ object DeterministicWallet {
   }
 
   object ExtendedPublicKey {
-    def apply(publicKey: ByteVector, chaincode: ByteVector32, depth: Int, derivationPath: KeyPath, parent: Long) = new ExtendedPublicKey(
+    def apply(publicKey: ByteVector, chaincode: ByteVector32, depth: Int, derivationPath: KeyPath, parent: Long): ExtendedPublicKey = ExtendedPublicKey(
       new bitcoin.DeterministicWallet.ExtendedPublicKey(publicKey, chaincode, depth, derivationPath.keyPath, parent)
     )
 

@@ -45,7 +45,7 @@ object Crypto {
   }
 
   object PrivateKey {
-    def apply(data: ByteVector): PrivateKey = new PrivateKey(new bitcoin.PrivateKey(data.toArray))
+    def apply(data: ByteVector): PrivateKey = PrivateKey(new bitcoin.PrivateKey(data.toArray))
 
     /**
      * @param data serialized private key in bitcoin format
