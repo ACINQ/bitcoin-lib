@@ -167,17 +167,17 @@
         <dependency>
             <groupId>fr.acinq.bitcoin</groupId>
             <artifactId>bitcoin-kmp-jvm</artifactId>
-            <version>0.8.2</version>
+            <version>0.8.3</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
             <artifactId>secp256k1-kmp-jvm</artifactId>
-            <version>0.6.2</version>
+            <version>0.6.3</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
             <artifactId>secp256k1-kmp-jni-jvm</artifactId>
-            <version>0.6.2</version>
+            <version>0.6.3</version>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
