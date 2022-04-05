@@ -1,18 +1,15 @@
 package fr.acinq.bitcoin.scalacompat
 
-import java.io.InputStreamReader
-
 import org.json4s.DefaultFormats
 import org.json4s.jackson.JsonMethods
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
 
+import java.io.InputStreamReader
 import scala.util.Random
 
 object MnemonicCodeSpec {
-
   case class TestVectors(english: Array[Array[String]])
-
 }
 
 class MnemonicCodeSpec extends FunSuite {
@@ -25,19 +22,19 @@ class MnemonicCodeSpec extends FunSuite {
 
     val stream = classOf[MnemonicCodeSpec].getResourceAsStream("/bip39_vectors.json")
     val vectors = JsonMethods.parse(new InputStreamReader(stream)).extract[TestVectors]
-    vectors.english.map(_ match {
+    vectors.english.map {
       case Array(raw, mnemonics, seed, xprv) =>
         val bin = ByteVector.fromValidHex(raw)
         assert(toMnemonics(bin).mkString(" ") === mnemonics)
         assert(toSeed(toMnemonics(bin), "TREZOR") === ByteVector.fromValidHex(seed))
         val master = DeterministicWallet.generate(ByteVector.fromValidHex(seed))
         assert(DeterministicWallet.encode(master, DeterministicWallet.xprv) == xprv)
-    })
+    }
   }
 
-  test("validate mnemonics(valid)") {
+  test("validate mnemonics") {
     val random = new Random()
-    for (i <- 0 to 100) {
+    for (_ <- 0 to 100) {
       for (length <- Seq(16, 20, 24, 28, 32, 36, 40)) {
         val entropy = new Array[Byte](length)
         random.nextBytes(entropy)

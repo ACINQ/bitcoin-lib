@@ -1,9 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
-import fr.acinq.bitcoin.Base58
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
-import fr.acinq.bitcoin.{Base58Check, ScriptFlags, SigHash, SigVersion}
-import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
+import fr.acinq.bitcoin.{Base58, Base58Check, ScriptFlags, SigHash, SigVersion}
 import org.scalatest.{FunSuite, Matchers}
 import scodec.bits._
 
@@ -20,13 +18,12 @@ class MultisigSpec extends FunSuite with Matchers {
   val redeemScript = Script.write(Script.createMultiSigMofN(2, List(pub1, pub2, pub3)))
   val multisigAddress = Crypto.hash160(redeemScript)
 
-  test("create and sign multisig transactions") {
-
+  test("create and sign p2sh multisig transactions") {
     // tested with bitcoin core client using command: createmultisig 2 "[\"0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A\",\"032C58BC9615A6FF24E9132CEF33F1EF373D97DC6DA7933755BC8BB86DBEE9F55C\",\"02C4D72D99CA5AD12C17C9CFE043DC4E777075E8835AF96F46D8E3CCD929FE1926\"]"
-    redeemScript should equal(hex"52210394d30868076ab1ea7736ed3bdbec99497a6ad30b25afd709cdf3804cd389996a21032c58bc9615a6ff24e9132cef33f1ef373d97dc6da7933755bc8bb86dbee9f55c2102c4d72d99ca5ad12c17c9cfe043dc4e777075e8835af96f46d8e3ccd929fe192653ae")
+    assert(redeemScript === hex"52210394d30868076ab1ea7736ed3bdbec99497a6ad30b25afd709cdf3804cd389996a21032c58bc9615a6ff24e9132cef33f1ef373d97dc6da7933755bc8bb86dbee9f55c2102c4d72d99ca5ad12c17c9cfe043dc4e777075e8835af96f46d8e3ccd929fe192653ae")
 
     // 196 = prefix for P2SH adress on testnet
-    Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, multisigAddress.toArray) should equal("2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
+    assert(Base58Check.encode(Base58.Prefix.ScriptAddressTestnet, multisigAddress.toArray) === "2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
 
     // we want to redeem the first output of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
@@ -53,7 +50,7 @@ class MultisigSpec extends FunSuite with Matchers {
     // the id of this tx on testnet is af416176497f898b1eaf545ecec2a42b833488c2e4324f2cde732f875f2a5b34
   }
 
-  test("spend multisig transaction") {
+  test("spend p2sh multisig transaction") {
     //this is the P2SH multisig input transaction
     val previousTx = Transaction.read("0100000001ea1df27ca8a897c985f163407e2c20cbc310ca891ca361c207ba8f4b7073e541000000008b483045022100940f7bcb380fb6db698f71928bda8926f76305ff868919e8ef7729647606bf7702200d32f1231860cb7e6777447c4038627bee7f47bc54005f681b62ce71d4a6a7f10141042adeabf9817a4d34adf1fe8e0fd457a3c0c6378afd63325dbaaaccd4f254002f9cc4148f603beb0e874facd3a3e68f5d002a65c0d3658452a4e55a57f5c3b768ffffffff01a0bb0d000000000017a914a90003b4ddef4be46fc61e7f2167da9d234944e28700000000")
 
@@ -86,5 +83,22 @@ class MultisigSpec extends FunSuite with Matchers {
     // the id of this tx on testnet is f137884feb9a951bf9b159432ebb771ec76fa6e7332c06cb8a6b718148f101af
     // redeem the tx
     Transaction.correctlySpends(signedTx, List(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
+  }
+
+  test("create and spend p2wsh multisig transactions") {
+    // The following transaction contains a multisig p2wsh output.
+    val amount = 250_000 sat
+    val multiSigScript = Script.createMultiSigMofN(2, Seq(pub1, pub2, pub3))
+    val tx = Transaction(2, Nil, Seq(TxOut(amount, Script.pay2wsh(multiSigScript))), 0)
+    assert(Script.getWitnessVersion(tx.txOut.head.publicKeyScript) === Some(0))
+    assert(tx.txOut.head.publicKeyScript === hex"0020634fec484fd82d49b07e492fc8df4cf97ccbef4d736b4bab61d80f56ce26a66b")
+
+    // The following transaction spends the multisig output and sends funds to the first signer.
+    val spendingTx = Transaction(2, Seq(TxIn(OutPoint(tx, 0), Nil, 0)), Seq(TxOut(amount, Script.pay2wpkh(pub1))), 0)
+    val sig1 = Transaction.signInput(spendingTx, 0, multiSigScript, SigHash.SIGHASH_ALL, 250_000 sat, SigVersion.SIGVERSION_WITNESS_V0, key1)
+    val sig2 = Transaction.signInput(spendingTx, 0, multiSigScript, SigHash.SIGHASH_ALL, 250_000 sat, SigVersion.SIGVERSION_WITNESS_V0, key2)
+    val witness = Script.witnessMultiSigMofN(Seq(pub1, pub2, pub3), Seq(sig1, sig2))
+    val signedTx = spendingTx.updateWitness(0, witness)
+    Transaction.correctlySpends(signedTx, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 }

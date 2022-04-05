@@ -4,7 +4,6 @@ import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import org.scalatest.FlatSpec
 import scodec.bits._
 
-import java.math.BigInteger
 import java.nio.ByteOrder
 import scala.util.Random
 

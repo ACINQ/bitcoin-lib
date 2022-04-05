@@ -2,8 +2,7 @@ package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
 import fr.acinq.bitcoin.scalacompat.Crypto.PublicKey
-import Crypto._
-import KotlinUtils._
+import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import scodec.bits.ByteVector
 
 import scala.jdk.CollectionConverters.{ListHasAsScala, SeqHasAsJava}
@@ -33,6 +32,13 @@ object Script {
   def isNativeWitnessScript(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isNativeWitnessScript(script.map(scala2kmp).asJava)
 
   def isNativeWitnessScript(script: ByteVector): Boolean = isNativeWitnessScript(parse(script))
+
+  def getWitnessVersion(script: Seq[ScriptElt]): Option[Int] = bitcoin.Script.getWitnessVersion(script.map(scala2kmp).asJava) match {
+    case null => None
+    case version => Some(version)
+  }
+
+  def getWitnessVersion(script: ByteVector): Option[Int] = getWitnessVersion(parse(script))
 
   def checkLockTime(lockTime: Long, tx: Transaction, inputIndex: Int): Boolean = bitcoin.Script.INSTANCE.checkLockTime(lockTime, tx, inputIndex)
 
@@ -117,6 +123,13 @@ object Script {
   def createMultiSigMofN(m: Int, pubkeys: Seq[PublicKey]): Seq[ScriptElt] = bitcoin.Script.createMultiSigMofN(m, pubkeys.map(_.pub).asJava).asScala.map(kmp2scala).toList
 
   /**
+   * @param pubKeys are the public keys signatures will be checked against.
+   * @param sigs    are the signatures for a subset of the public keys.
+   * @return script witness for the pay-to-witness-script-hash script containing a multisig script.
+   */
+  def witnessMultiSigMofN(pubKeys: Seq[PublicKey], sigs: Seq[ByteVector]): ScriptWitness = bitcoin.Script.witnessMultiSigMofN(pubKeys.map(_.pub).asJava, sigs.map(scala2kmp).asJava)
+
+  /**
    * @param pubKeyHash public key hash
    * @return a pay-to-public-key-hash script
    */
@@ -178,14 +191,4 @@ object Script {
    * @return script witness for the corresponding pay-to-witness-public-key-hash script
    */
   def witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = bitcoin.Script.witnessPay2wpkh(pubKey, sig)
-
-  /**
-   * @param pubKeys are the public keys signatures will be checked against.
-   * @param sigs    are the signatures for a subset of the public keys.
-   * @return script witness for the pay-to-witness-script-hash script containing a multisig script.
-   */
-  def witnessMultiSigMofN(pubKeys: Seq[PublicKey], sigs: Seq[ByteVector]): ScriptWitness = {
-    val redeemScript = Script.write(Script.createMultiSigMofN(sigs.size, pubKeys))
-    ScriptWitness(ByteVector.empty +: sigs :+ redeemScript)
-  }
 }

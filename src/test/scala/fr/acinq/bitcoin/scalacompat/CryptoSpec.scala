@@ -1,9 +1,8 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin.Base58.Prefix
-import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey}
-import fr.acinq.bitcoin.{Base58, Base58Check}
 import fr.acinq.bitcoin.scalacompat.Crypto._
+import fr.acinq.bitcoin.{Base58, Base58Check}
 import org.scalatest.FlatSpec
 import scodec.bits._
 
@@ -12,12 +11,12 @@ import scala.util.Random
 
 class CryptoSpec extends FlatSpec {
 
-  "Crypto" should "import private keys" in {
+  it should "import private keys" in {
     // exported from the bitcoin client running in testnet mode
     val address = "mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY"
     val privateKey = "cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp"
 
-    val (version, data) = {
+    val (_, data) = {
       val decoded = Base58Check.decode(privateKey)
       (decoded.getFirst, ByteVector.view(decoded.getSecond))
     }
@@ -29,33 +28,38 @@ class CryptoSpec extends FlatSpec {
 
   // see https://en.bitcoin.it/wiki/Technical_background_of_Bitcoin_addresses
   it should "generate public keys from private keys" in {
-    val privateKey = PrivateKey(hex"18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725")
-    val publicKey = privateKey.publicKey
-    assert(publicKey.toUncompressedBin === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
-
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin).toArray)
-    assert(address === "16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM")
-  }
-
-  it should "generate public keys from private keys 2" in {
-    val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
-    val publicKey = privateKey.publicKey
-    assert(publicKey.toUncompressedBin === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
-
-    val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin).toArray)
-    assert(address === "19FgFQGZy47NcGTJ4hfNdGMwS8EATqoa1X")
+    {
+      val privateKey = PrivateKey(hex"18E14A7B6A307F426A94F8114701E7C8E774E7F9A47E2C2035DB29A206321725")
+      val publicKey = privateKey.publicKey
+      assert(publicKey.toUncompressedBin === hex"0450863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b23522cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6")
+      val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin).toArray)
+      assert(address === "16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM")
+    }
+    {
+      val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+      val publicKey = privateKey.publicKey
+      assert(publicKey.toUncompressedBin === hex"04D7E9DD0C618C65DC2E3972E2AA406CCD34E5E77895C96DC48AF0CB16A1D9B8CE0C0A3E2F4CD494FF54FBE4F5A95B410C0BF022EB2B6F23AE39F40DB79FAA6827")
+      val address = Base58Check.encode(Prefix.PubkeyAddress, Crypto.hash160(publicKey.toUncompressedBin).toArray)
+      assert(address === "19FgFQGZy47NcGTJ4hfNdGMwS8EATqoa1X")
+    }
   }
 
   it should "validate public key at instantiation" in {
-    intercept[Throwable] { // can be IllegalArgumentException or AssertFailException depending on whether bouncycastle or libsecp256k1 is used
-      // by default we check
-      PublicKey(hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", checkValid = true)
+    val pubkeyInvalidEncoding = hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    val pubkeyNotOnCurve = hex"020000000000000000000000000000000000000000000000000000000000000007"
+    // By default we verify public key validity.
+    intercept[IllegalArgumentException] {
+      PublicKey(pubkeyInvalidEncoding)
     }
-    // key is invalid but we don't check it
-    PublicKey(hex"04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", checkValid = false)
+    intercept[IllegalArgumentException] {
+      PublicKey(pubkeyNotOnCurve)
+    }
+    // But we can disable that check and create invalid public keys.
+    PublicKey(pubkeyInvalidEncoding, checkValid = false)
+    PublicKey(pubkeyNotOnCurve, checkValid = false)
   }
 
-  it should "allow unsafe initialization of public keys" in {
+  it should "allow initialization of public keys from compressed or uncompressed encoding" in {
     val privateKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
     val publicKey = privateKey.publicKey
     val rawCompressed = publicKey.value
@@ -66,6 +70,38 @@ class CryptoSpec extends FlatSpec {
     val publicKeyCompressed2 = PublicKey.fromBin(rawUncompressed)
     assert(publicKey === publicKeyCompressed1)
     assert(publicKey === publicKeyCompressed2)
+  }
+
+  it should "allow initialization of invalid private keys" in {
+    val validPrivKey = PrivateKey(hex"BCF69F7AFF3273B864F9DD76896FACE8E3D3CF69A133585C8177816F14FC9B55")
+    assert(!validPrivKey.isZero)
+    assert(validPrivKey.isValid)
+    val zeroPrivKey = PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000000")
+    assert(zeroPrivKey.isZero)
+    assert(!zeroPrivKey.isValid)
+    val aboveCurveOrder = PrivateKey(hex"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
+    assert(!aboveCurveOrder.isZero)
+    assert(!aboveCurveOrder.isValid)
+  }
+
+  it should "perform arithmetic over private keys" in {
+    val privkey1 = PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000005")
+    val privkey2 = PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000002")
+    assert(privkey1 + privkey2 === PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000007"))
+    assert(privkey1 + privkey2 === privkey2 + privkey1)
+    assert(privkey1 - privkey2 === PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000003"))
+    assert(privkey2 - privkey1 === PrivateKey(hex"fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd036413e"))
+    assert(privkey1 * privkey2 === PrivateKey(hex"000000000000000000000000000000000000000000000000000000000000000a"))
+    assert(privkey2 * privkey1 === PrivateKey(hex"000000000000000000000000000000000000000000000000000000000000000a"))
+  }
+
+  it should "perform arithmetic over public keys" in {
+    val privkey1 = PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000005")
+    val privkey2 = PrivateKey(hex"0000000000000000000000000000000000000000000000000000000000000002")
+    assert(privkey1.publicKey + privkey2.publicKey === (privkey1 + privkey2).publicKey)
+    assert(privkey1.publicKey - privkey2.publicKey === (privkey1 - privkey2).publicKey)
+    assert(privkey1.publicKey * privkey2 === (privkey1 * privkey2).publicKey)
+    assert(privkey2.publicKey * privkey1 === (privkey1 * privkey2).publicKey)
   }
 
   it should "sign and verify signatures" in {
@@ -107,7 +143,8 @@ class CryptoSpec extends FlatSpec {
       (
         hex"e91671c46231f833a6406ccbea0e3e392c76c167bac1cb013f6f1013980455c2",
         "There is a computer disease that anybody who works with computers knows about. It's a very serious disease and it interferes completely with the work. The trouble with computers is that you 'play' with them!",
-        hex"3045022100b552edd27580141f3b2a5463048cb7cd3e047b97c9f98076c32dbdf85a68718b0220279fa72dd19bfae05577e06c7c0c1900c371fcd5893f7e1d56a37d30174671f6")
+        hex"3045022100b552edd27580141f3b2a5463048cb7cd3e047b97c9f98076c32dbdf85a68718b0220279fa72dd19bfae05577e06c7c0c1900c371fcd5893f7e1d56a37d30174671f6"
+      )
     )
 
     dataset.map {

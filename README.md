@@ -1,7 +1,5 @@
 # Simple Scala Bitcoin Library
 
-Simple bitcoin library written in Scala.
-
 [![Build Status](https://github.com/ACINQ/bitcoin-lib/workflows/Build%20&%20Test/badge.svg)](https://github.com/ACINQ/bitcoin-lib/actions?query=workflow%3A%22Build+%26+Test%22)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
@@ -13,21 +11,23 @@ This is a simple scala library which implements most of the bitcoin protocol:
 * block headers, block and tx parsing
 * tx creation, signature and verification
 * script parsing and execution (including OP_CLTV and OP_CSV)
-* pay to public key tx
-* pay to script tx / multisig tx
+* standard scripts (p2pkh, p2sh, p2wpkh, p2wsh)
 * BIP 32 (deterministic wallets)
 * BIP 39 (mnemonic code for generating deterministic keys)
 * BIP 173 (Base32 address format for native v0-16 witness outputs)
 * BIP 174 (Partially Signed Bitcoin Transaction Format)
 * BIP 350 (Bech32m format)
 
+It is actually a wrapper on top of our [Kotlin Bitcoin Library](https://github.com/ACINQ/bitcoin-kmp) that makes it easier to use in scala projects.
+All the features are implemented in Kotlin in the `fr.acinq.bitcoin` namespace and the scala wrappers can be found in the `fr.acinq.bitcoin.scalacompat` namespace.
+
 ## Objectives
 
-Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocole are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes. And, of course, we use it for our own work on Lightning (see https://github.com/ACINQ/eclair).
+Our goal is not to re-implement a full Bitcoin node but to build a library that can be used to build applications that rely on bitcoind to interface with the Bitcoin network (to retrieve and index transactions and blocks, for example...). We use it very often to build quick prototypes and test new ideas. Besides, some parts of the protocol are fairly simple and "safe" to re-implement (BIP32/BIP39 for example), especially for indexing/analysis purposes. And, of course, we use it for our own work on Lightning (see <https://github.com/ACINQ/eclair>).
 
 ## Status
 
-* [X] Message parsing (blocks, transactions, inv, ...)
+* [X] Message parsing (blocks, transactions, ...)
 * [X] Building transactions (P2PK, P2PKH, P2SH, P2WPKH, P2WSH)
 * [X] Signing transactions
 * [X] Verifying signatures
@@ -51,21 +51,18 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
 <dependencies>
   <dependency>
     <groupId>fr.acinq</groupId>
-    <artifactId>bitcoin-lib_2.11</artifactId>
-    <version>0.16</version>
+    <artifactId>bitcoin-lib_2.13</artifactId>
+    <version>0.22</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.17-SNAPSHOT, the latest released version is 0.16.
-
-## Segwit support
-
-Bitcoin-lib, starting with version 0.9.7, fully supports segwit (see below for more information) and is on par with the segwit code in Bitcoin Core 0.13.1.
+The latest snapshot (development) version is 0.23-SNAPSHOT, the latest released version is 0.22.
 
 ## libsecp256k1 support
 
-Bitcoin-lib embeds JNI bindings for libsecp256k1, which is must faster than BouncyCastle. It will extract and load native bindings for your operating system in a temporary directory. If this process fails it will fallback to BouncyCastle.
+Bitcoin-lib embeds JNI bindings for libsecp256k1 through [secp256k1-kmp](https://github.com/ACINQ/secp256k1-kmp/).
+It will extract and load native bindings for your operating system in a temporary directory.
 
 JNI libraries are included for:
 
@@ -73,13 +70,11 @@ JNI libraries are included for:
 * Windows 64 bits
 * Osx 64 bits
 
-You can use your own library native library by specifying its path with `-Dfr.acinq.secp256k1.lib.path` and optionally its name with `-Dfr.acinq.secp256k1.lib.name` (if unspecified bitcoin-lib will use the standard name for your OS i.e. libsecp256k1.so on Linux, secp256k1.dll on Windows, ...).
-
-You can also specify the temporary directory where the library will be extracted with `-Djava.io.tmpdir` or `-Dfr.acinq.secp256k1.tmpdir` (if you want to use a different directory from `-Djava.io.tmpdir`).
+Please have a look at the [secp256k1-kmp documentation](https://github.com/ACINQ/secp256k1-kmp/) for advanced scenarios.
 
 ## Usage
 
-Please have a look at unit tests, more samples will be added soon.
+Please have a look at unit tests of this library and of [bitcoin-kmp](https://github.com/ACINQ/bitcoin-kmp), they will contain the most up-to-date samples.
 
 ### Basic type: public keys, private keys, addresses
 
@@ -97,8 +92,8 @@ mvn scala:console
 scala> import fr.acinq.bitcoin._
 import fr.acinq.bitcoin._
 
-scala> import fr.acinq.bitcoin.Crypto._
-import fr.acinq.bitcoin.Crypto._
+scala> import fr.acinq.bitcoin.scalacompat.Crypto._
+import fr.acinq.bitcoin.scalacompat.Crypto._
 
 scala> import scodec.bits._
 import scodec.bits._
@@ -107,7 +102,7 @@ scala> val priv = PrivateKey(hex"1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edc
 priv: fr.acinq.bitcoin.Crypto.PrivateKey = PrivateKey(1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd)
 
 scala> val pub = priv.publicKey
-pub: fr.acinq.bitcoin.Crypto.PublicKey = 03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a    ^
+pub: fr.acinq.bitcoin.Crypto.PublicKey = PublicKey(03f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a)
 
 scala> Base58Check.encode(Base58.Prefix.PubkeyAddress, pub.hash160)
 res0: String = 1J7mdg5rbQyUHENYdx39WVWK7fsLpEoXZy
@@ -410,67 +405,6 @@ This sample demonstrates how to serialize, create and verify a P2WSH transaction
     Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx1.txid === ByteVector32(hex"98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5"))
     // this tx was published on segnet as 98f5668176b0c1b14653f96f71987fd325c3d46b9efb677ab0606ea5555791d5
-```
-
-#### Partially Signed Transactions
-
-Bitcoin-lib provides low-level support for reading, writing and manipulating PSBTs.
-Bitcoin-lib is *not* compatible with Bitcoin Core versions before 0.20.1, because we include the `nonWitnessUtxo` for segwit inputs: see [BIP 174 - note 8](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#cite_note-8) for details.
-
-```scala
-    val aliceKeyNonWitness = PrivateKey(hex"2c6ba77e9184c5b6c6215f84ef0e00558884dec7d23a027f0573d11bf77aff46")
-    val bobKeyNonWitness = PrivateKey(hex"a4ed1609f90afbb52e37b44a0c548aed5c878bc0f029fc9a1131c4402e9234e0")
-    val aliceKeyWitness = PrivateKey(hex"68cfa8072f964148cb0dcedae42bbab417872739afef513314b29619ff3de9c4")
-    val bobKeyWitness = PrivateKey(hex"11f4a287b28488c18351c5fa1136a5b30c2de63c30827b9460ff62bc246b366d")
-
-    // This PSBT has been initialized with an unsigned transaction containing two multi-sig inputs:
-    val Success(psbtNotFunded) = Psbt.read(hex"70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000000000000000000".toArray)
-    assert(psbtNotFunded.global.version === 0)
-    assert(psbtNotFunded.global.tx.txIn.length === 2)
-    assert(psbtNotFunded.global.tx.txOut.length === 2)
-
-    // Provide information about the first input:
-    val tx1 = Transaction.read(hex"0200000001aad73931018bd25f84ae400b68848be09db706eac2ac18298babee71ab656f8b0000000048473044022058f6fc7c6a33e1b31548d481c826c015bd30135aad42cd67790dab66d2ad243b02204a1ced2604c6735b6393e5b41691dd78b00f0c5942fb9f751856faa938157dba01feffffff0280f0fa020000000017a9140fb9463421696b82c833af241c78c17ddbde493487d0f20a270100000017a91429ca74f8a08f81999428185c97b5d852e4063f618765000000".toArray)
-    val Success(oneInputFilled) = psbtNotFunded.updateNonWitnessInput(
-      tx1,
-      outputIndex = 0,
-      Some(Script.createMultiSigMofN(2, Seq(aliceKeyNonWitness.publicKey, bobKeyNonWitness.publicKey)))
-    )
-
-    // Provide information about the second input:
-    val tx2 = Transaction.read(hex"0200000000010158e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7501000000171600145f275f436b09a8cc9a2eb2a2f528485c68a56323feffffff02d8231f1b0100000017a914aed962d6654f9a2b36608eb9d64d2b260db4f1118700c2eb0b0000000017a914b7f5faf40e3d40a5a459b1db3535f2b72fa921e88702483045022100a22edcc6e5bc511af4cc4ae0de0fcd75c7e04d8c1c3a8aa9d820ed4b967384ec02200642963597b9b1bc22c75e9f3e117284a962188bf5e8a74c895089046a20ad770121035509a48eb623e10aace8bfd0212fdb8a8e5af3c94b0b133b95e114cab89e4f7965000000".toArray)
-    val Success(bothInputsFilled) = oneInputFilled.updateWitnessInput(
-      tx2,
-      outputIndex = 1,
-      Some(Script.pay2wsh(Script.createMultiSigMofN(2, Seq(aliceKeyWitness.publicKey, bobKeyWitness.publicKey)))),
-      Some(Script.createMultiSigMofN(2, Seq(aliceKeyWitness.publicKey, bobKeyWitness.publicKey)))
-    )
-
-    // Alice signs both inputs:
-    val Success(SignPsbtResult(signedByAlice, _)) = bothInputsFilled
-      .sign(aliceKeyNonWitness, 0)
-      .flatMap(_.psbt.sign(aliceKeyWitness, 1))
-
-    // Bob signs both inputs:
-    val Success(SignPsbtResult(signedByBob, _)) = signedByAlice
-      .sign(bobKeyNonWitness, 0)
-      .flatMap(_.psbt.sign(bobKeyWitness, 1))
-
-    // Finalize inputs and extract transaction:
-    val Success(tx) = {
-      // The first input is a non-witness 2-of-2 multi-sig:
-      val redeemScript = Script.write(Script.createMultiSigMofN(2, Seq(aliceKeyNonWitness.publicKey, bobKeyNonWitness.publicKey)))
-      val scriptSig = OP_0 +: signedByBob.inputs.head.partialSigs.values.map(sig => OP_PUSHDATA(sig)).toSeq :+ OP_PUSHDATA(redeemScript)
-      val Success(firstInputFinalized) = signedByBob.finalizeNonWitnessInput(inputIndex = 0, scriptSig)
-      // The second input is a witness 2-of-2 multi-sig:
-      val witnessScript = Script.write(Script.createMultiSigMofN(2, Seq(aliceKeyWitness.publicKey, bobKeyWitness.publicKey)))
-      val scriptWitness = ScriptWitness(ByteVector.empty +: signedByBob.inputs(1).partialSigs.values.toSeq :+ witnessScript)
-      val Success(bothInputsFinalized) = firstInputFinalized.finalizeWitnessInput(inputIndex = 1, scriptWitness)
-      bothInputsFinalized.extract()
-    }
-
-    // Transaction is ready to be broadcast.
-    Transaction.correctlySpends(tx, Seq(tx1, tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 ```
 
 ### Wallet features

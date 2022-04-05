@@ -1,8 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import KotlinUtils._
-import fr.acinq.secp256k1.Secp256k1
+import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import scodec.bits.ByteVector
 
 object Crypto {
@@ -177,7 +176,7 @@ object Crypto {
 
   def isPubKeyCompressed(key: ByteVector): Boolean = bitcoin.Crypto.isPubKeyCompressed(key.toArray)
 
-  def isDefinedHashtypeSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDefinedHashTypeSignature(sig.toArray)
+  def isDefinedHashTypeSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDefinedHashTypeSignature(sig.toArray)
 
   def compact2der(signature: ByteVector64): ByteVector = bitcoin.Crypto.compact2der(signature)
 

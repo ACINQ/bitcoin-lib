@@ -2,9 +2,8 @@ package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
-import Crypto.PrivateKey
-import KotlinUtils._
-import Protocol._
+import fr.acinq.bitcoin.scalacompat.KotlinUtils._
+import fr.acinq.bitcoin.scalacompat.Protocol._
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
