@@ -2,9 +2,8 @@ package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
 import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey}
-import Crypto.{PrivateKey, PublicKey}
-import KotlinUtils._
-import Protocol._
+import fr.acinq.bitcoin.scalacompat.KotlinUtils._
+import fr.acinq.bitcoin.scalacompat.Protocol._
 import scodec.bits.ByteVector
 
 import java.io.OutputStream
@@ -101,11 +100,7 @@ object DeterministicWallet {
   def encode(input: ExtendedPublicKey, prefix: Int): String = bitcoin.DeterministicWallet.encode(input.pub, prefix)
 
   def write(input: ExtendedPublicKey, output: OutputStream): Unit = {
-    writeUInt8(input.depth, output)
-    writeUInt32(input.parent.toInt, output, ByteOrder.BIG_ENDIAN)
-    writeUInt32(input.path.lastChildNumber.toInt, output, ByteOrder.BIG_ENDIAN)
-    writeBytes(input.chaincode.toArray, output)
-    writeBytes(input.publickeybytes.toArray, output)
+    fr.acinq.bitcoin.DeterministicWallet.write(input.pub, OutputStreamWrapper(output))
   }
 
   /**
@@ -161,27 +156,27 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey = derivePublicKey(parent, keyPath.path)
 
   // p2pkh mainnet
-  val xprv = 0x0488ade4
-  val xpub = 0x0488b21e
+  val xprv = bitcoin.DeterministicWallet.xprv
+  val xpub = bitcoin.DeterministicWallet.xpub
 
   // p2sh-of-p2wpkh mainnet
-  val yprv = 0x049d7878
-  val ypub = 0x049d7cb2
+  val yprv = bitcoin.DeterministicWallet.yprv
+  val ypub = bitcoin.DeterministicWallet.ypub
 
   // p2wpkh mainnet
-  val zprv = 0x04b2430c
-  val zpub = 0x04b24746
+  val zprv = bitcoin.DeterministicWallet.zprv
+  val zpub = bitcoin.DeterministicWallet.zpub
 
   // p2pkh testnet
-  val tprv = 0x04358394
-  val tpub = 0x043587cf
+  val tprv = bitcoin.DeterministicWallet.tprv
+  val tpub = bitcoin.DeterministicWallet.tpub
 
   // p2sh-of-p2wpkh testnet
-  val uprv = 0x044a4e28
-  val upub = 0x044a5262
+  val uprv = bitcoin.DeterministicWallet.uprv
+  val upub = bitcoin.DeterministicWallet.upub
 
   // p2wpkh testnet
-  val vprv = 0x045f18bc
-  val vpub = 0x045f1cf6
+  val vprv = bitcoin.DeterministicWallet.vprv
+  val vpub = bitcoin.DeterministicWallet.vpub
 }
 

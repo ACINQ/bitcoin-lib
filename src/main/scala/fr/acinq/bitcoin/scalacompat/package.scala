@@ -5,7 +5,6 @@ import fr.acinq.bitcoin.scalacompat.Crypto.PublicKey
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import scodec.bits.ByteVector
 
-import java.math.BigInteger
 import scala.jdk.CollectionConverters.SeqHasAsJava
 
 /**
@@ -84,11 +83,11 @@ package object scalacompat {
    * @param script    public key script
    * @return the address of this public key script on this chain
    */
-  def computeScriptAddress(chainHash: ByteVector32, script: Seq[ScriptElt]): String = {
-    // TODO: addressFromPublicKeyScript behaves differently and can return null, this should be changed
-    val address = bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava)
-    require(address != null, "invalid chain hash or script")
-    address
+  def computeScriptAddress(chainHash: ByteVector32, script: Seq[ScriptElt]): Option[String] = {
+    bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava) match {
+      case null => None
+      case address => Some(address)
+    }
   }
 
   /**
@@ -96,6 +95,6 @@ package object scalacompat {
    * @param script    public key script
    * @return the address of this public key script on this chain
    */
-  def computeScriptAddress(chainHash: ByteVector32, script: ByteVector): String = computeScriptAddress(chainHash, Script.parse(script))
+  def computeScriptAddress(chainHash: ByteVector32, script: ByteVector): Option[String] = computeScriptAddress(chainHash, Script.parse(script))
 
 }

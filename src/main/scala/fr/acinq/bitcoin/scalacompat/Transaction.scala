@@ -2,9 +2,8 @@ package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
-import Crypto.PrivateKey
-import KotlinUtils._
-import Protocol._
+import fr.acinq.bitcoin.scalacompat.KotlinUtils._
+import fr.acinq.bitcoin.scalacompat.Protocol._
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
@@ -13,14 +12,11 @@ import scala.jdk.CollectionConverters.MapHasAsJava
 object OutPoint extends BtcSerializer[OutPoint] {
   def apply(tx: Transaction, index: Int) = new OutPoint(ByteVector32(tx.hash), index)
 
-  override def read(input: InputStream, protocolVersion: Long): OutPoint = OutPoint(hash(input), uint32(input))
+  override def read(input: InputStream, protocolVersion: Long): OutPoint = kmp2scala(fr.acinq.bitcoin.OutPoint.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: OutPoint, out: OutputStream, protocolVersion: Long): Unit = {
-    out.write(input.hash.toArray)
-    writeUInt32(input.index.toInt, out)
-  }
+  override def write(input: OutPoint, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.OutPoint.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
 
-  def isCoinbase(input: OutPoint) = input.index == 0xffffffffL && input.hash == ByteVector32.Zeroes
+  def isCoinbase(input: OutPoint) = scala2kmp(input).isCoinbase
 
   def isNull(input: OutPoint) = isCoinbase(input)
 }
@@ -47,13 +43,9 @@ case class OutPoint(hash: ByteVector32, index: Long) extends BtcSerializable[Out
 object TxIn extends BtcSerializer[TxIn] {
   def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long): TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
 
-  override def read(input: InputStream, protocolVersion: Long): TxIn = TxIn(outPoint = OutPoint.read(input), signatureScript = script(input), sequence = uint32(input))
+  override def read(input: InputStream, protocolVersion: Long): TxIn = kmp2scala(fr.acinq.bitcoin.TxIn.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = {
-    OutPoint.write(input.outPoint, out)
-    writeScript(input.signatureScript.toArray, out)
-    writeUInt32(input.sequence.toInt, out)
-  }
+  override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxIn.write(scala2kmp(input), OutputStreamWrapper(out),protocolVersion)
 
   override def validate(input: TxIn): Unit = {
     require(input.signatureScript.length <= bitcoin.Script.MaxScriptElementSize, s"signature script is ${input.signatureScript.length} bytes, limit is ${bitcoin.Script.MaxScriptElementSize} bytes")
@@ -87,12 +79,9 @@ case class TxIn(outPoint: OutPoint, signatureScript: ByteVector, sequence: Long,
 object TxOut extends BtcSerializer[TxOut] {
   def apply(amount: Satoshi, publicKeyScript: Seq[ScriptElt]): TxOut = new TxOut(amount, Script.write(publicKeyScript))
 
-  override def read(input: InputStream, protocolVersion: Long): TxOut = TxOut(Satoshi(uint64(input)), script(input))
+  override def read(input: InputStream, protocolVersion: Long): TxOut = kmp2scala(fr.acinq.bitcoin.TxOut.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: TxOut, out: OutputStream, protocolVersion: Long): Unit = {
-    writeUInt64(input.amount.toLong, out)
-    writeScript(input.publicKeyScript.toArray, out)
-  }
+  override def write(input: TxOut, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxOut.write(scala2kmp(input), OutputStreamWrapper(out),protocolVersion)
 
   override def validate(input: TxOut): Unit = {
     import input._
@@ -115,11 +104,9 @@ case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerial
 object ScriptWitness extends BtcSerializer[ScriptWitness] {
   val empty = ScriptWitness(Seq.empty[ByteVector])
 
-  override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit =
-    writeCollection[ByteVector](t.stack, (b: ByteVector, o: OutputStream, _: Long) => writeScript(b.toArray, o), out, protocolVersion)
+  override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.ScriptWitness.write(scala2kmp(t), OutputStreamWrapper(out),protocolVersion)
 
-  override def read(in: InputStream, protocolVersion: Long): ScriptWitness =
-    ScriptWitness(readCollection[ByteVector](in, (i: InputStream, _: Long) => script(i), None, protocolVersion))
+  override def read(in: InputStream, protocolVersion: Long): ScriptWitness = kmp2scala(fr.acinq.bitcoin.ScriptWitness.read(InputStreamWrapper(in), protocolVersion))
 }
 
 /**
@@ -157,9 +144,9 @@ object Transaction extends BtcSerializer[Transaction] {
     fr.acinq.bitcoin.Transaction.validate(input)
   }
 
-  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion | bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS).length.toInt
+  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = fr.acinq.bitcoin.Transaction.baseSize(scala2kmp(tx), protocolVersion)
 
-  def totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = write(tx, protocolVersion).length.toInt
+  def totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = fr.acinq.bitcoin.Transaction.totalSize(scala2kmp(tx), protocolVersion)
 
   def weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
 

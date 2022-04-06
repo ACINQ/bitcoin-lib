@@ -1,6 +1,5 @@
 package fr.acinq.bitcoin.scalacompat.reference
 
-import fr.acinq.bitcoin.scalacompat.{ByteVector32, Crypto, Script}
 import fr.acinq.bitcoin.scalacompat._
 import org.json4s.JsonAST.{JArray, JDouble, JString}
 import org.json4s.jackson.JsonMethods
@@ -9,6 +8,7 @@ import org.scalatest.FunSuite
 import scodec.bits.ByteVector
 
 import java.io.InputStreamReader
+import scala.annotation.tailrec
 import scala.util.Try
 
 /**
@@ -17,7 +17,13 @@ import scala.util.Try
  */
 
 object ScriptSpec {
+
+  import scala.jdk.CollectionConverters.MapHasAsScala
+
+  val name2code: Map[String, Int] = fr.acinq.bitcoin.ScriptEltMapping.elt2code.asScala.map { case (k, v) => (k.toString.split('_').last.split('@').head, v.intValue()) }.toMap
+
   def parseFromText(input: String): ByteVector = {
+    @tailrec
     def parseInternal(tokens: List[String], acc: ByteVector = ByteVector.empty): ByteVector = tokens match {
       case Nil => acc
       case head :: tail if head.matches("^-?[0-9]*$") => head.toLong match {
@@ -30,7 +36,7 @@ object ScriptSpec {
           val bytes = Script.encodeNumber(value)
           parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(bytes) :: Nil))
       }
-      case head :: tail if ScriptElt.name2code.get(head).isDefined => parseInternal(tail, acc :+ ScriptElt.name2code(head).toByte)
+      case head :: tail if name2code.contains(head) => parseInternal(tail, acc :+ name2code(head).toByte)
       case head :: tail if head.startsWith("0x") => parseInternal(tail, acc ++ ByteVector.fromValidHex(head))
       case head :: tail if head.startsWith("'") && head.endsWith("'") => parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(ByteVector.view(head.stripPrefix("'").stripSuffix("'").getBytes("UTF-8"))) :: Nil))
     }
@@ -104,8 +110,8 @@ object ScriptSpec {
 
     var count = 0
     // use tail to skip the first line of the .json file
-    json.extract[List[List[JValue]]].tail.foreach(_ match {
-      case JString(comment) :: Nil => ()
+    json.extract[List[List[JValue]]].tail.foreach {
+      case JString(_) :: Nil => ()
       case JString(scriptSig) :: JString(scriptPubKey) :: JString(flags) :: JString(expected) :: JString(comments) :: Nil =>
         ScriptSpec.runTest(Seq.empty[String], scriptSig, scriptPubKey, flags, Some(comments), expected)
         count = count + 1
@@ -135,7 +141,7 @@ object ScriptSpec {
         ScriptSpec.runTest(witnessText, amount, scriptSig, scriptPubKey, flags, None, expected)
         count = count + 1
       case unexpected => throw new RuntimeException(s"cannot parse $unexpected")
-    })
+    }
     count
   }
 }

@@ -1,10 +1,10 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
+import fr.acinq.secp256k1.Hex
 import org.scalatest.FlatSpec
 import scodec.bits._
 
-import java.math.BigInteger
 import java.nio.ByteOrder
 import scala.util.Random
 
@@ -127,7 +127,7 @@ class DeterministicWalletSpec extends FlatSpec {
     // now we have: the master public key, and a child private key, and we want to climb the tree back up
     // to the master private key
     val m42 = derivePrivateKey(m, 42L)
-    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes ++ writeUInt32(42, ByteOrder.BIG_ENDIAN))
+    val I = Crypto.hmac512(m_pub.chaincode, m_pub.publickeybytes ++ hex"0000002a")
     val IL = I.take(32)
     val recovered = m42.privateKey - PrivateKey(IL)
     assert(recovered == m.privateKey)
