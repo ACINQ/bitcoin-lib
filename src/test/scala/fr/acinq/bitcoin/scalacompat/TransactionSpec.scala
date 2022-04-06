@@ -12,57 +12,6 @@ import java.io.ByteArrayOutputStream
 
 class TransactionSpec extends FunSuite with Matchers {
 
-  test("create and sign transaction") {
-    val srcTx = ByteVector.fromValidHex("dcd82df7b26f0eacd226b8fbd366672c854284ba8080f79e1307138c7f1a1f6d").reverse.toArray
-    // for some reason it has to be reversed
-    val amount = 9000000
-    // amount) satoshi
-    val vout = 0
-    // output)dex
-    val destAdress = ByteVector.fromValidHex("76a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac").toArray
-    val out = new ByteArrayOutputStream()
-    writeUInt32(1, out) //version
-    writeVarint(1, out) // nb of inputs
-    out.write(srcTx) // tx) id
-    writeUInt32(vout, out)
-    writeScript(ByteVector.fromValidHex("76a914ea2902457015b386bd2323b2b99591b96138d62a88ac").toArray, out) //scriptPubKey of prev tx for signing
-    writeUInt32(0xffffffff, out) // sequence
-    writeVarint(1, out) // number of outputs
-    writeUInt64(amount, out)
-    writeScript(destAdress, out) //output script
-    writeUInt32(0, out)
-    writeUInt32(1, out)
-    // hash code type
-    val serialized = ByteVector.view(out.toByteArray)
-    val hashed = Crypto.hash256(serialized)
-    val pkey = PrivateKey.fromBase58("92f9274aR3s6zd1vuAgxquv4KP5S5thJadF3k54NHuTV4fXL1vW", Base58.Prefix.SecretKeyTestnet)._1
-    val sig = Crypto.compact2der(Crypto.sign(hashed, pkey))
-    // DER encoded
-    val sigOut = new ByteArrayOutputStream()
-    writeUInt8(sig.length.toInt + 1, sigOut) // +1 because of the hash code
-    sigOut.write(sig.toArray)
-    writeUInt8(1, sigOut)
-    // hash code type
-    val pub = pkey.publicKey.toUncompressedBin
-    writeUInt8(pub.length.toInt, sigOut)
-    sigOut.write(pub.toArray)
-    val sigScript = sigOut.toByteArray
-
-    val signedOut = new ByteArrayOutputStream()
-    writeUInt32(1, signedOut) //version
-    writeVarint(1, signedOut) // nb of inputs
-    signedOut.write(srcTx) // tx) id
-    writeUInt32(vout, signedOut) // output)dex
-    writeScript(sigScript, signedOut)
-    writeUInt32(0xffffffff, signedOut) // sequence
-    writeVarint(1, signedOut) // number of outputs
-    writeUInt64(amount, signedOut) // amount) satoshi
-    writeScript(destAdress, signedOut) //output script
-    writeUInt32(0, signedOut)
-    val res = ByteVector.view(signedOut.toByteArray)
-    assert(res === hex"01000000016d1f1a7f8c1307139ef78080ba8442852c6766d3fbb826d2ac0e6fb2f72dd8dc000000008b483045022100bdd23d0f98a4173a64fa432b8bf4ac41261a671f2c6c690d57ac839866d78bb202207bddb87ca95c9cef45de30a75144e5513571aa7938635b9e051b1c20f01088a60141044aec194c55c97f4519535f50f5539c6915045ecb79a36281dee6db55ffe1ad2e55f4a1c0e0950d3511e8f205b45cafa348a4a2ab2359246cb3c93f6532c4e8f5ffffffff0140548900000000001976a914c622640075eaeda95a5ac26fa05a0b894a3def8c88ac00000000")
-  }
-
   test("read and write transactions") {
     val hex = hex"0100000003864d5e5ec82c9e6f4ac52b8fa47b77f8616bbc26fcf668432c097c5add169584010000006a47304402203be0cff1faacadce3b02d615a8ac15532f9a90bd30e109eaa3e01bfa3a97d90b0220355f3bc382e35b9cae24e5d674f200b289bb948675ce1b5c931029ccb23ae836012102fd18c2a069488288ae93c2157dff3fd657a39426e8753512a5547f046b4a2cbbffffffffd587b10688e6d56225dd4dc488b74229a353e4613cbe1deadaef52b56616baa9000000008b483045022100ab98145e8526b32e821beeaed41a98da68c3c75ee13c477ee0e3d66a626217e902204d015af2e7dba834bbe421dd0b1353a1060dafee58c284dd763e07639858f9340141043ca81d9fe7996372eb21b2588af07c7fbdb6d4fc1da13aaf953c520ba1da4f87d53dfcba3525369fdb248e60233fdf6df0a8183a6dd5699c9a6f5c537367c627ffffffff94a162b4aab080a09fa982a5d7f586045ba2a4c653c98ff47b952d43c25b45fd000000008a47304402200e0c0223d169282a48731b58ff0673c00205deb3f3f4f28d99b50730ada1571402202fa9f051762d8e0199791ea135df1f393578c1eea530bec00fa16f6bba7e3aa3014104626f9b06c44bcfd5d2f6bdeab456591287e2d2b2e299815edf0c9fd0f23c21364ed5dbe97c9c6e2be40fff40c31f8561a9dee015146fe59ecf68b8a377292c72ffffffff02c0c62d00000000001976a914e410e8bc694e8a39c32a273eb1d71930f63648fe88acc0cf6a00000000001976a914324505870d6f21dca7d2f90642cd9603553f6fa688ac00000000"
     val tx = Transaction.read(hex.toArray)
@@ -80,65 +29,6 @@ class TransactionSpec extends FunSuite with Matchers {
     assert(tx.txOut(0).publicKeyScript === Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hex"d0c59903c5bac2868760e90fd521a4665aa76520") :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
     assert(tx.txOut(1).publicKeyScript === Script.write(OP_HASH160 :: OP_PUSHDATA(hex"3545e6e33b832c47050f24d3eeb93c9c03948bc7") :: OP_EQUAL :: Nil))
     assert(tx.bin === hex)
-  }
-
-  test("create and verify pay2pk transactions with 1 input/1 output") {
-    val to = "mi1cMMSL9BZwTQZYpweE1nTmwRxScirPp3"
-    val amount = 10000 sat
-    val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
-
-    val previousTx = Transaction.read("0100000001b021a77dcaad3a2da6f1611d2403e1298a902af8567c25d6e65073f6b52ef12d000000006a473044022056156e9f0ad7506621bc1eb963f5133d06d7259e27b13fcb2803f39c7787a81c022056325330585e4be39bcf63af8090a2deff265bc29a3fb9b4bf7a31426d9798150121022dfb538041f111bb16402aa83bd6a3771fa8aa0e5e9b0b549674857fafaf4fe0ffffffff0210270000000000001976a91415c23e7f4f919e9ff554ec585cb2a67df952397488ac3c9d1000000000001976a9148982824e057ccc8d4591982df71aa9220236a63888ac00000000")
-    // create a transaction where the sig script is the pubkey script of the tx we want to redeem
-    // the pubkey script is just a wrapper around the pub key hash
-    // what it means is that we will sign a block of data that contains txid + from + to + amount
-
-    // step  #1: creation a new transaction that reuses the previous transaction's output pubkey script
-    val tx1 = Transaction(
-      version = 1L,
-      txIn = List(
-        TxIn(
-          OutPoint(previousTx, 0),
-          signatureScript = previousTx.txOut(0).publicKeyScript,
-          sequence = 0xFFFFFFFFL)
-      ),
-      txOut = List(
-        TxOut(
-          amount = amount,
-          publicKeyScript = Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(Base58Check.decode(to).getSecond) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
-      ),
-      lockTime = 0L
-    )
-
-    // step #2: serialize transaction and add SIGHASHTYPE
-    val serializedTx1AndHashType = Transaction.write(tx1) ++ writeUInt32(1)
-
-    // step #3: hash the result
-    val hashed = Crypto.hash256(serializedTx1AndHashType)
-
-    // step #4: sign transaction hash
-    val sig = Crypto.compact2der(Crypto.sign(hashed, privateKey)) // DER encoded
-
-    // this is the public key that is associated to the private key we used for signing
-    val publicKey = privateKey.publicKey
-    // we check that is really is the public key that is encoded) the address the previous tx was paid to
-    val providedHash = ByteVector.view(Base58Check.decode("mhW1BQDyhbTsnHEuB1n7yuj9V81TbeRfTY").getSecond)
-    val computedHash = publicKey.hash160
-    assert(providedHash == computedHash)
-
-    // step #5: now we replace the sigscript with sig + public key, and we get what would be sent to the btc network
-    val tx2 = tx1.copy(txIn = List(
-      TxIn(
-        OutPoint(previousTx, 0),
-        signatureScript = Script.write(OP_PUSHDATA(sig :+ 1.toByte) :: OP_PUSHDATA(publicKey) :: Nil),
-        sequence = 0xFFFFFFFFL
-      )
-    ))
-
-    // check signature
-    assert(Crypto.verifySignature(hashed, Crypto.der2compact(sig), publicKey))
-
-    // check script
-    Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
 
   // same as above, but using Transaction.sign() instead of signing the tx manually

@@ -100,11 +100,7 @@ object DeterministicWallet {
   def encode(input: ExtendedPublicKey, prefix: Int): String = bitcoin.DeterministicWallet.encode(input.pub, prefix)
 
   def write(input: ExtendedPublicKey, output: OutputStream): Unit = {
-    writeUInt8(input.depth, output)
-    writeUInt32(input.parent.toInt, output, ByteOrder.BIG_ENDIAN)
-    writeUInt32(input.path.lastChildNumber.toInt, output, ByteOrder.BIG_ENDIAN)
-    writeBytes(input.chaincode.toArray, output)
-    writeBytes(input.publickeybytes.toArray, output)
+    fr.acinq.bitcoin.DeterministicWallet.write(input.pub, OutputStreamWrapper(output))
   }
 
   /**
