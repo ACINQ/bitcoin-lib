@@ -19,11 +19,6 @@ object Block {
     val hash: ByteVector32 = fr.acinq.bitcoin.Block.RegtestGenesisBlock.hash
   }
 
-  object SegnetGenesisBlock {
-    val blockId: ByteVector32 = fr.acinq.bitcoin.Block.SegnetGenesisBlock.blockId
-    val hash: ByteVector32 = fr.acinq.bitcoin.Block.SegnetGenesisBlock.hash
-  }
-
   object SignetGenesisBlock {
     val blockId: ByteVector32 = fr.acinq.bitcoin.Block.SignetGenesisBlock.blockId
     val hash: ByteVector32 = fr.acinq.bitcoin.Block.SignetGenesisBlock.hash
