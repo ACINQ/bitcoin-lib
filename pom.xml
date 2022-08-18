@@ -167,7 +167,7 @@
         <dependency>
             <groupId>fr.acinq.bitcoin</groupId>
             <artifactId>bitcoin-kmp-jvm</artifactId>
-            <version>0.8.4</version>
+            <version>0.8.5</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
