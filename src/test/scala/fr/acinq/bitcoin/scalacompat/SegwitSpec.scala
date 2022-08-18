@@ -85,9 +85,9 @@ class SegwitSpec extends FunSuite {
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx2.txid == ByteVector32(hex"f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3"))
-    // this tx was published on segnet as f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3
+    // this tx was published on testnet as f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3
 
-    // and now we create a segwit tx that spends the P2WPK output
+    // and now we create a testnet tx that spends the P2WPK output
     val tx3 = {
       val tmp: Transaction = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = ByteVector.empty, witness = ScriptWitness.empty) :: Nil,
@@ -104,7 +104,7 @@ class SegwitSpec extends FunSuite {
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx3.txid == ByteVector32(hex"739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa"))
-    // this tx was published on segnet as 739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa
+    // this tx was published on testnet as 739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa
   }
 
   test("create p2wsh tx") {
@@ -138,9 +138,9 @@ class SegwitSpec extends FunSuite {
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx2.txid == ByteVector32(hex"2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9"))
-    // this tx was published on segnet as 2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9
+    // this tx was published on testnet as 2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9
 
-    // and now we create a segwit tx that spends the P2WSH output
+    // and now we create a testnet tx that spends the P2WSH output
     val tx3 = {
       val tmp: Transaction = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx2.hash, 0), sequence = 0xffffffffL, signatureScript = ByteVector.empty) :: Nil,
@@ -156,7 +156,7 @@ class SegwitSpec extends FunSuite {
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx3.txid == ByteVector32(hex"4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a"))
-    // this tx was published on segnet as 4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a
+    // this tx was published on testnet as 4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a
   }
 
   test("create p2pkh embedded in p2sh") {
@@ -189,6 +189,6 @@ class SegwitSpec extends FunSuite {
 
     Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx1.txid === ByteVector32(hex"4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86"))
-    // this tx was published on segnet as 4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86
+    // this tx was published on testnet as 4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86
   }
 }
