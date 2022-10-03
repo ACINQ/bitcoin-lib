@@ -73,7 +73,7 @@ object KotlinUtils {
   }
 
   implicit def kmp2scala(input: bitcoin.ScriptElt): ScriptElt = input match {
-    case oppushdata: bitcoin.OP_PUSHDATA => OP_PUSHDATA(oppushdata.data, oppushdata.code)
+    case oppushdata: bitcoin.OP_PUSHDATA => OP_PUSHDATA(oppushdata.data, oppushdata.opCode)
     case _ => scriptEltMapKmp2Scala2Map(input)
   }
 
@@ -173,6 +173,7 @@ object KotlinUtils {
     OP_HASH256 -> bitcoin.OP_HASH256.INSTANCE,
     OP_CODESEPARATOR -> bitcoin.OP_CODESEPARATOR.INSTANCE,
     OP_CHECKSIG -> bitcoin.OP_CHECKSIG.INSTANCE,
+    OP_CHECKSIGADD -> bitcoin.OP_CHECKSIGADD.INSTANCE,
     OP_CHECKSIGVERIFY -> bitcoin.OP_CHECKSIGVERIFY.INSTANCE,
     OP_CHECKMULTISIG -> bitcoin.OP_CHECKMULTISIG.INSTANCE,
     OP_CHECKMULTISIGVERIFY -> bitcoin.OP_CHECKMULTISIGVERIFY.INSTANCE,
@@ -186,7 +187,6 @@ object KotlinUtils {
     OP_NOP8 -> bitcoin.OP_NOP8.INSTANCE,
     OP_NOP9 -> bitcoin.OP_NOP9.INSTANCE,
     OP_NOP10 -> bitcoin.OP_NOP10.INSTANCE,
-    OP_SMALLINTEGER -> bitcoin.OP_SMALLINTEGER.INSTANCE,
     OP_INVALIDOPCODE -> bitcoin.OP_INVALIDOPCODE.INSTANCE)
 
   private val scriptEltMapKmp2Scala2Map: Map[bitcoin.ScriptElt, ScriptElt] = scriptEltMapScala2Kmp.map { case (k, v) => v -> k }

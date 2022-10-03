@@ -48,7 +48,7 @@ object TxIn extends BtcSerializer[TxIn] {
   override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxIn.write(scala2kmp(input), OutputStreamWrapper(out),protocolVersion)
 
   override def validate(input: TxIn): Unit = {
-    require(input.signatureScript.length <= bitcoin.Script.MaxScriptElementSize, s"signature script is ${input.signatureScript.length} bytes, limit is ${bitcoin.Script.MaxScriptElementSize} bytes")
+    require(input.signatureScript.length <= bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE, s"signature script is ${input.signatureScript.length} bytes, limit is ${bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE} bytes")
   }
 
   def coinbase(script: ByteVector): TxIn = {
@@ -87,7 +87,7 @@ object TxOut extends BtcSerializer[TxOut] {
     import input._
     require(amount.toLong >= 0, s"invalid txout amount: $amount")
     require(amount.toLong <= BtcAmount.MaxMoney, s"invalid txout amount: $amount")
-    require(publicKeyScript.length < bitcoin.Script.MaxScriptElementSize, s"public key script is ${publicKeyScript.length} bytes, limit is ${bitcoin.Script.MaxScriptElementSize} bytes")
+    require(publicKeyScript.length < bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE, s"public key script is ${publicKeyScript.length} bytes, limit is ${bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE} bytes")
   }
 }
 

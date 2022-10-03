@@ -51,7 +51,7 @@ object Script {
    * @param tx         transaction that is being verified
    * @param inputIndex 0-based index of the tx input that is being processed
    */
-  case class Context(tx: Transaction, inputIndex: Int, amount: Satoshi) {
+  case class Context(tx: Transaction, inputIndex: Int, amount: Satoshi, prevouts: List[TxOut] = Nil) {
     require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
   }
 
@@ -63,11 +63,9 @@ object Script {
    */
   class Runner(context: Context, scriptFlag: Int = MANDATORY_SCRIPT_VERIFY_FLAGS) {
 
-    private val runner = new bitcoin.Script.Runner(
-      new bitcoin.Script.Context(context.tx, context.inputIndex, context.amount), scriptFlag, null
-    )
+    private val runner = new bitcoin.Script.Runner(new bitcoin.Script.Context(context.tx, context.inputIndex, context.amount, context.prevouts.map(scala2kmp).asJava), scriptFlag)
 
-    def verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteVector): Unit = runner.verifyWitnessProgram(witness, witnessVersion, program.toArray)
+    def verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteVector, isP2sh: Boolean = false): Unit = runner.verifyWitnessProgram(witness, witnessVersion, program.toArray, isP2sh)
 
     def verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector): Boolean = verifyScripts(scriptSig, scriptPubKey, ScriptWitness.empty)
 

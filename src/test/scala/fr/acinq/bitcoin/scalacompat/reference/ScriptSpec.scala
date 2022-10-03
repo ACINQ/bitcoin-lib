@@ -20,7 +20,7 @@ object ScriptSpec {
 
   import scala.jdk.CollectionConverters.MapHasAsScala
 
-  val name2code: Map[String, Int] = fr.acinq.bitcoin.ScriptEltMapping.elt2code.asScala.map { case (k, v) => (k.toString.split('_').last.split('@').head, v.intValue()) }.toMap
+  val name2code: Map[String, Int] = fr.acinq.bitcoin.ScriptEltMapping.INSTANCE.getName2code.asScala.map { case (k, v) => k -> v.intValue() }.toMap
 
   def parseFromText(input: String): ByteVector = {
     @tailrec
