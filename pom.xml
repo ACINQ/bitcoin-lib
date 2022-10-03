@@ -10,7 +10,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.version>2.13.3</scala.version>
+        <scala.version>2.13.9</scala.version>
         <scala.version.short>2.13</scala.version.short>
         <maven.compiler.release>11</maven.compiler.release>
     </properties>
@@ -51,36 +51,33 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
-                <version>4.3.1</version>
+                <version>4.7.2</version>
                 <configuration>
-                    <args>
-                        <arg>-deprecation</arg>
+                    <args combine.children="append">
                         <arg>-feature</arg>
                         <arg>-language:postfixOps</arg>
                         <arg>-language:implicitConversions</arg>
-                        <arg>-Xfatal-warnings</arg>
+                        <arg>-Werror</arg>
                         <arg>-unchecked</arg>
-                        <arg>-nobootcp</arg>
-                        <arg>-target:jvm-1.8</arg>
+                        <arg>-deprecation</arg>
                     </args>
+                    <jvmArgs>
+                        <jvmArg>-Xmx1024m</jvmArg>
+                        <jvmArg>-Xms1024m</jvmArg>
+                        <jvmArg>-Xss32m</jvmArg>
+                    </jvmArgs>
                     <scalaCompatVersion>${scala.version.short}</scalaCompatVersion>
                 </configuration>
                 <executions>
                     <execution>
-                        <id>process-resources</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
-                    </execution>
-                    <execution>
+                        <id>scalac</id>
                         <goals>
                             <goal>compile</goal>
                             <goal>testCompile</goal>
                         </goals>
                     </execution>
                     <execution>
-                        <id>attach-javadocs</id>
+                        <id>scaladoc</id>
                         <goals>
                             <goal>doc-jar</goal>
                         </goals>

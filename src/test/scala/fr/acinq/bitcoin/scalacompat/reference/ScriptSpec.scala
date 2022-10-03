@@ -39,6 +39,7 @@ object ScriptSpec {
       case head :: tail if name2code.contains(head) => parseInternal(tail, acc :+ name2code(head).toByte)
       case head :: tail if head.startsWith("0x") => parseInternal(tail, acc ++ ByteVector.fromValidHex(head))
       case head :: tail if head.startsWith("'") && head.endsWith("'") => parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(ByteVector.view(head.stripPrefix("'").stripSuffix("'").getBytes("UTF-8"))) :: Nil))
+      case _=> throw new RuntimeException(s"cannot parse $tokens")
     }
 
     try {

@@ -8,17 +8,19 @@ import org.scalatest.FlatSpec
 import scodec.bits._
 
 class ScriptSpec extends FlatSpec {
+  import ScriptSpec._
+
   it should "parse signature scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("47304402202b4da291cc39faf8433911988f9f49fc5c995812ca2f94db61468839c228c3e90220628bff3ff32ec95825092fa051cba28558a981fcf59ce184b14f2e215e69106701410414b38f4be3bb9fa0f4f32b74af07152b2f2f630bc02122a491137b6c523e46f18a0d5034418966f93dfc37cc3739ef7b2007213a302b7fba161557f4ad644a1c")
     val script = Script.parse(blob)
-    val pk = Script.publicKey(script)
+    val Some(pk) = publicKey(script)
     val hash = Crypto.hash160(pk)
     assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash.toArray) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
   }
   it should "parse 'pay to public key' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("76a91433e81a941e64cda12c6a299ed322ddbdd03f8d0e88ac")
     val script = Script.parse(blob)
-    val hash = Script.publicKeyHash(script)
+    val Some(hash) = publicKeyHash(script)
     assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash.toArray) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
   }
   it should "parse 'pay to script' scripts" in {
@@ -46,5 +48,34 @@ class ScriptSpec extends FlatSpec {
     for (i <- -1 to 16) {
       assert(Script.decodeNumber(Script.encodeNumber(i), checkMinimalEncoding = true) === i)
     }
+  }
+}
+
+object ScriptSpec {
+  /**
+   * extract a public key hash from a public key script
+   *
+   * @param script public key script
+   * @return the public key hash wrapped in the script
+   */
+  def publicKeyHash(script: List[ScriptElt]): Option[ByteVector] = script match {
+    case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: OP_NOP :: Nil => Some(data) // non standard pay to pubkey...
+    case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil => Some(data) // standard pay to pubkey
+    case OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUAL :: Nil if data.size == 20 => Some(data) // standard pay to script
+    case _ => None
+  }
+
+  def publicKeyHash(script: ByteVector): Option[ByteVector] = publicKeyHash(Script.parse(script))
+
+  /**
+   * extract a public key from a signature script
+   *
+   * @param script signature script
+   * @return the public key wrapped in the script
+   */
+  def publicKey(script: List[ScriptElt]): Option[ByteVector] = script match {
+    case OP_PUSHDATA(data1, _) :: OP_PUSHDATA(data2, _) :: Nil if data1.length > 2 && data2.length > 2 => Some(data2)
+    case OP_PUSHDATA(data, _) :: OP_CHECKSIG :: Nil => Some(data)
+    case _ => None
   }
 }

@@ -88,31 +88,6 @@ object Script {
   }
 
   /**
-   * extract a public key hash from a public key script
-   *
-   * @param script public key script
-   * @return the public key hash wrapped in the script
-   */
-  def publicKeyHash(script: List[ScriptElt]): ByteVector = script match {
-    case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: OP_NOP :: Nil => data // non standard pay to pubkey...
-    case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil => data // standard pay to pubkey
-    case OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUAL :: Nil if data.size == 20 => data // standard pay to script
-  }
-
-  def publicKeyHash(script: ByteVector): ByteVector = publicKeyHash(parse(script))
-
-  /**
-   * extract a public key from a signature script
-   *
-   * @param script signature script
-   * @return the public key wrapped in the script
-   */
-  def publicKey(script: List[ScriptElt]): ByteVector = script match {
-    case OP_PUSHDATA(data1, _) :: OP_PUSHDATA(data2, _) :: Nil if data1.length > 2 && data2.length > 2 => data2
-    case OP_PUSHDATA(data, _) :: OP_CHECKSIG :: Nil => data
-  }
-
-  /**
    * Creates a m-of-n multisig script.
    *
    * @param m       is the number of required signatures
