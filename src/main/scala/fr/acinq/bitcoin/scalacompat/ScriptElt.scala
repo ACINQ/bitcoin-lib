@@ -105,6 +105,7 @@ case object OP_HASH256 extends ScriptElt
 case object OP_CODESEPARATOR extends ScriptElt
 case object OP_CHECKSIG extends ScriptElt
 case object OP_CHECKSIGVERIFY extends ScriptElt
+case object OP_CHECKSIGADD extends ScriptElt
 case object OP_CHECKMULTISIG extends ScriptElt
 case object OP_CHECKMULTISIGVERIFY extends ScriptElt
 case object OP_NOP1 extends ScriptElt
@@ -154,9 +155,7 @@ object ScriptElt {
   }
 
   // ScriptElt -> code
-  def elt2code(elt: ScriptElt): Int = {
-    bitcoin.ScriptEltMapping.elt2code.get(KotlinUtils.scala2kmp(elt))
-  }
+  def elt2code(elt: ScriptElt): Int = KotlinUtils.scala2kmp(elt).getCode
 
   def isPush(op: ScriptElt, size: Int): Boolean = {
     op match {

@@ -5,6 +5,7 @@ import fr.acinq.bitcoin.scalacompat.{Protocol, Script}
 
 import java.io.{InputStream, InputStreamReader}
 import fr.acinq.bitcoin.scalacompat._
+import fr.acinq.bitcoin.scalacompat.reference.ScriptSpec.{parseFromText, parseScriptFlags}
 import org.json4s.DefaultFormats
 import org.json4s.JsonAST.{JArray, JInt, JString, JValue}
 import org.json4s.jackson.JsonMethods
@@ -17,42 +18,40 @@ object TransactionSpec {
   def process(json: JValue, valid: Boolean): Unit = {
     implicit val format = DefaultFormats
     var comment = ""
-    json.extract[List[List[JValue]]].map(_ match {
+    json.extract[List[List[JValue]]].foreach {
       case JString(value) :: Nil => comment = value
-      case JArray(m) :: JString(serializedTransaction) :: JString(verifyFlags) :: Nil => {
+      case JArray(m) :: JString(serializedTransaction) :: JString(verifyFlags) :: Nil =>
         val prevoutMap = collection.mutable.HashMap.empty[OutPoint, ByteVector]
         val prevamountMap = collection.mutable.HashMap.empty[OutPoint, Satoshi]
-        m.map(_ match {
+        m.map {
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) => {
-            val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
+            val prevoutScript = parseFromText(scriptPubKey)
             prevoutMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> prevoutScript
           }
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey), JInt(amount))) => {
-            val prevoutScript = ScriptSpec.parseFromText(scriptPubKey)
+            val prevoutScript = parseFromText(scriptPubKey)
             prevoutMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> prevoutScript
             prevamountMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> Satoshi(amount.toLong)
           }
-        })
+          case _ => ()
+        }
 
         val tx = Transaction.read(serializedTransaction, Protocol.PROTOCOL_VERSION)
         Try {
           Transaction.validate(tx)
-          for (i <- 0 until tx.txIn.length if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
+          for (i <- tx.txIn.indices if !OutPoint.isCoinbase(tx.txIn(i).outPoint)) {
             val prevOutputScript = prevoutMap(tx.txIn(i).outPoint)
-            val amount = prevamountMap.get(tx.txIn(i).outPoint).getOrElse(0 sat)
-            val ctx = new Script.Context(tx, i, amount)
-            val runner = new Script.Runner(ctx, ScriptSpec.parseScriptFlags(verifyFlags))
+            val amount = prevamountMap.getOrElse(tx.txIn(i).outPoint, 0 sat)
+            val ctx = Script.Context(tx, i, amount)
+            val runner = new Script.Runner(ctx, parseScriptFlags(verifyFlags))
             if (!runner.verifyScripts(tx.txIn(i).signatureScript, prevOutputScript, tx.txIn(i).witness)) throw new RuntimeException(s"tx ${tx.txid} does not spend its input # $i")
           }
         } match {
-          case Success(_) if valid => ()
-          case Success(_) if !valid => throw new RuntimeException(s"$serializedTransaction should not be valid, [$comment]")
-          case Failure(_) if !valid => ()
-          case Failure(t) if valid => throw new RuntimeException(s"$serializedTransaction should be valid, [$comment]", t)
+          case Success(_) => if (!valid) throw new RuntimeException(s"$serializedTransaction should not be valid, [$comment]")
+          case Failure(t) => if (valid) throw new RuntimeException(s"$serializedTransaction should be valid, [$comment]", t)
         }
-      }
       case unexpected => throw new RuntimeException(s"unexpected: $unexpected")
-    })
+    }
   }
 
   def process(stream: InputStream, valid: Boolean): Unit = {

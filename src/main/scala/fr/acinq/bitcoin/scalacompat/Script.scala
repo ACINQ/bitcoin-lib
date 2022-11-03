@@ -51,7 +51,7 @@ object Script {
    * @param tx         transaction that is being verified
    * @param inputIndex 0-based index of the tx input that is being processed
    */
-  case class Context(tx: Transaction, inputIndex: Int, amount: Satoshi) {
+  case class Context(tx: Transaction, inputIndex: Int, amount: Satoshi, prevouts: List[TxOut] = Nil) {
     require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
   }
 
@@ -63,11 +63,9 @@ object Script {
    */
   class Runner(context: Context, scriptFlag: Int = MANDATORY_SCRIPT_VERIFY_FLAGS) {
 
-    private val runner = new bitcoin.Script.Runner(
-      new bitcoin.Script.Context(context.tx, context.inputIndex, context.amount), scriptFlag, null
-    )
+    private val runner = new bitcoin.Script.Runner(new bitcoin.Script.Context(context.tx, context.inputIndex, context.amount, context.prevouts.map(scala2kmp).asJava), scriptFlag)
 
-    def verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteVector): Unit = runner.verifyWitnessProgram(witness, witnessVersion, program.toArray)
+    def verifyWitnessProgram(witness: ScriptWitness, witnessVersion: Long, program: ByteVector, isP2sh: Boolean = false): Unit = runner.verifyWitnessProgram(witness, witnessVersion, program.toArray, isP2sh)
 
     def verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector): Boolean = verifyScripts(scriptSig, scriptPubKey, ScriptWitness.empty)
 
@@ -85,31 +83,6 @@ object Script {
      * @return true if the scripts were successfully verified
      */
     def verifyScripts(scriptSig: ByteVector, scriptPubKey: ByteVector, witness: ScriptWitness): Boolean = runner.verifyScripts(scriptSig, scriptPubKey, witness)
-  }
-
-  /**
-   * extract a public key hash from a public key script
-   *
-   * @param script public key script
-   * @return the public key hash wrapped in the script
-   */
-  def publicKeyHash(script: List[ScriptElt]): ByteVector = script match {
-    case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: OP_NOP :: Nil => data // non standard pay to pubkey...
-    case OP_DUP :: OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil => data // standard pay to pubkey
-    case OP_HASH160 :: OP_PUSHDATA(data, _) :: OP_EQUAL :: Nil if data.size == 20 => data // standard pay to script
-  }
-
-  def publicKeyHash(script: ByteVector): ByteVector = publicKeyHash(parse(script))
-
-  /**
-   * extract a public key from a signature script
-   *
-   * @param script signature script
-   * @return the public key wrapped in the script
-   */
-  def publicKey(script: List[ScriptElt]): ByteVector = script match {
-    case OP_PUSHDATA(data1, _) :: OP_PUSHDATA(data2, _) :: Nil if data1.length > 2 && data2.length > 2 => data2
-    case OP_PUSHDATA(data, _) :: OP_CHECKSIG :: Nil => data
   }
 
   /**
