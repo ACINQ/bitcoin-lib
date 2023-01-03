@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.PublicKey
+import fr.acinq.bitcoin.scalacompat.Crypto.{PublicKey, XonlyPublicKey}
 import scodec.bits.ByteVector
 
 // @formatter:off
@@ -130,6 +130,8 @@ object OP_PUSHDATA {
   def apply(data: Array[Byte]): OP_PUSHDATA = apply(ByteVector.view(data))
 
   def apply(pub: PublicKey): OP_PUSHDATA = OP_PUSHDATA(pub.value)
+
+  def apply(pub: XonlyPublicKey): OP_PUSHDATA = OP_PUSHDATA(KotlinUtils.kmp2scala(pub.pub.value))
 
   def isMinimal(data: ByteVector, code: Int): Boolean = if (data.length == 0) code == ScriptElt.elt2code(OP_0)
   else if (data.length == 1 && data(0) >= 1 && data(0) <= 16) code == ScriptElt.elt2code(OP_1) + (data(0) - 1)
