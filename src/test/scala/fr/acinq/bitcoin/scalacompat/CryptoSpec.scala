@@ -112,6 +112,14 @@ class CryptoSpec extends FlatSpec {
     assert(Crypto.verifySignature(data, sig, publicKey))
   }
 
+  it should "sign and verify Schnorr signatures" in {
+    val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
+    val publicKey = privateKey.publicKey
+    val data = Crypto.sha256(ByteVector("this is a test".getBytes("UTF-8")))
+    val sig = Crypto.signSchnorr(data, privateKey)
+    assert(Crypto.verifySignatureSchnorr(data, sig, publicKey))
+  }
+
   it should "generate deterministic signatures" in {
     // dataset from https://bitcointalk.org/index.php?topic=285142.msg3299061#msg3299061
     val dataset = Seq(

@@ -191,6 +191,14 @@ object Crypto {
   def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = bitcoin.Crypto.verifySignature(data.toArray, signature, publicKey.pub)
 
   /**
+   * @param data      data
+   * @param signature signature
+   * @param publicKey public key
+   * @return true is signature is valid for this data with this public key
+   */
+  def verifySignatureSchnorr(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean = bitcoin.Crypto.verifySignatureSchnorr(data, signature, publicKey.xOnly())
+
+  /**
    * @param privateKey private key
    * @return the corresponding public key
    */
@@ -207,6 +215,16 @@ object Crypto {
   def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = bitcoin.Crypto.sign(data, privateKey.priv)
 
   def sign(data: ByteVector, privateKey: PrivateKey): ByteVector64 = sign(data.toArray, privateKey)
+
+  /**
+   * Compute the Schnorr signature of data with private key
+   *
+   * @param data       data to sign
+   * @param privateKey private key. If you are using bitcoin "compressed" private keys make sure to only use the first 32 bytes of
+   *                   the key (there is an extra "1" appended to the key)
+   * @return a signature in compact format (64 bytes)
+   */
+  def signSchnorr(data: ByteVector32, privateKey: PrivateKey): ByteVector64 = bitcoin.Crypto.signSchnorr(data, privateKey, bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE, null)
 
   /**
    * Recover public keys from a signature and the message that was signed. This method will return 2 public keys, and the signature
