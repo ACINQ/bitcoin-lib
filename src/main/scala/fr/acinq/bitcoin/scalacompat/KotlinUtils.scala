@@ -52,6 +52,11 @@ object KotlinUtils {
 
   implicit def scala2kmp(input: PublicKey): bitcoin.PublicKey = new bitcoin.PublicKey(input.value)
 
+  implicit def scala2kmp(input: Script.ExecutionData): bitcoin.Script.ExecutionData =
+    new bitcoin.Script.ExecutionData(input.annex.map(scala2kmp).orNull, input.tapleafHash.map(scala2kmp).orNull, input.validationWeightLeft.map(i => Integer.valueOf(i)).orNull, input.codeSeparatorPos)
+
+  implicit def kmp2scala(input: bitcoin.Script.ExecutionData): Script.ExecutionData = Script.ExecutionData(Option(input.getAnnex), Option(input.getTapleafHash), Option(input.getValidationWeightLeft), input.getCodeSeparatorPos)
+
   case class InputStreamWrapper(is: InputStream) extends bitcoin.io.Input {
     // NB: on the JVM we will use a ByteArrayInputStream, which guarantees that the result will be correct.
     override def getAvailableBytes: Int = is.available()
@@ -66,6 +71,8 @@ object KotlinUtils {
 
     override def write(i: Int): Unit = os.write(i)
   }
+
+  implicit def eitherkmp2either[L, R](input: fr.acinq.bitcoin.utils.Either[L, R]): Either[L, R] = if (input.isLeft) Left(input.getLeft) else Right(input.getRight)
 
   implicit def scala2kmp(input: ScriptElt): bitcoin.ScriptElt = input match {
     case OP_PUSHDATA(data, _) => new bitcoin.OP_PUSHDATA(data)

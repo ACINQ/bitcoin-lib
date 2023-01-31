@@ -114,7 +114,7 @@ class CryptoSpec extends FlatSpec {
 
   it should "sign and verify Schnorr signatures" in {
     val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
-    val publicKey = privateKey.publicKey
+    val publicKey = privateKey.publicKey.xOnly
     val data = Crypto.sha256(ByteVector("this is a test".getBytes("UTF-8")))
     val sig = Crypto.signSchnorr(data, privateKey)
     assert(Crypto.verifySignatureSchnorr(data, sig, publicKey))

@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.PublicKey
+import fr.acinq.bitcoin.scalacompat.Crypto.{PublicKey, XonlyPublicKey}
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import scodec.bits.ByteVector
 
@@ -53,6 +53,12 @@ object Script {
    */
   case class Context(tx: Transaction, inputIndex: Int, amount: Satoshi, prevouts: List[TxOut] = Nil) {
     require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
+  }
+
+  case class ExecutionData(annex: Option[ByteVector], tapleafHash: Option[ByteVector32], validationWeightLeft: Option[Int] = None, codeSeparatorPos: Long = 0xFFFFFFFFL)
+
+  object ExecutionData {
+    val empty = ExecutionData(None, None)
   }
 
   /**
@@ -157,6 +163,8 @@ object Script {
   def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = pay2wpkh(pubKey.hash160)
 
   def isPay2wpkh(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isPay2wsh(script.map(scala2kmp).asJava)
+
+  def pay2tr(publicKey: XonlyPublicKey): Seq[ScriptElt] = bitcoin.Script.pay2tr(publicKey.pub).asScala.map(kmp2scala).toList
 
   /**
    * @param pubKey public key

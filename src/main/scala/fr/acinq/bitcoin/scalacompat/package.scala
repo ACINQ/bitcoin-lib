@@ -5,7 +5,7 @@ import fr.acinq.bitcoin.scalacompat.Crypto.PublicKey
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import scodec.bits.ByteVector
 
-import scala.jdk.CollectionConverters.SeqHasAsJava
+import scala.jdk.CollectionConverters.{ListHasAsScala, SeqHasAsJava}
 
 /**
  * see https://en.bitcoin.it/wiki/Protocol_specification
@@ -97,4 +97,7 @@ package object scalacompat {
    */
   def computeScriptAddress(chainHash: ByteVector32, script: ByteVector): Option[String] = computeScriptAddress(chainHash, Script.parse(script))
 
+  def addressToPublicKeyScript(chainHash: ByteVector32, address: String): Seq[ScriptElt] = fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript(chainHash, address).asScala.map(kmp2scala).toList
+
+  def addressFromPublicKeyScript(chainHash: ByteVector32, script: Seq[ScriptElt]): String = fr.acinq.bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava)
 }

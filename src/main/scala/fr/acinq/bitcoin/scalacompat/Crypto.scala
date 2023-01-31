@@ -32,6 +32,8 @@ object Crypto {
 
     def publicKey: PublicKey = PublicKey(priv.publicKey())
 
+    def xOnlyPublicKey(): XonlyPublicKey = XonlyPublicKey(publicKey)
+
     /**
      * @param prefix Private key prefix
      * @return the private key in Base58 (WIF) compressed format
@@ -73,6 +75,8 @@ object Crypto {
   case class PublicKey(pub: bitcoin.PublicKey) {
     val value: ByteVector = pub.value
 
+    def xOnly = XonlyPublicKey(pub.xOnly())
+
     def hash160: ByteVector = ByteVector.view(pub.hash160())
 
     def isValid: Boolean = pub.isValid
@@ -111,6 +115,44 @@ object Crypto {
       require(!checkValid || Crypto.isPubKeyValidStrict(input), "public key is invalid")
       PublicKey(new bitcoin.PublicKey(bitcoin.PublicKey.compress(input.toArray)))
     }
+  }
+
+  /**
+   * x-only pubkey, used with Schnorr signatures (see https://github.com/bitcoin/bips/tree/master/bip-0340)
+   * we only store the x coordinate of the pubkey, the y coordinate is always even
+   */
+  case class XonlyPublicKey(pub: bitcoin.XonlyPublicKey) {
+    val publicKey = PublicKey(pub.getPublicKey)
+
+    def tweak(tapTweak: bitcoin.Crypto.TaprootTweak): ByteVector32 = pub.tweak(tapTweak)
+
+    /**
+     * "tweaks" this key with an optional merkle root
+     *
+     * @param tapTweak taproot tweak
+     * @return an (x-only pubkey, parity) pair
+     */
+    def outputKey(tapTweak: bitcoin.Crypto.TaprootTweak): (XonlyPublicKey, Boolean) = {
+      val p = pub.outputKey(tapTweak)
+      (XonlyPublicKey(p.getFirst), p.getSecond)
+    }
+
+    /**
+     * add a public key to this x-only key
+     *
+     * @param that public key
+     * @return a (key, parity) pair where `key` is the x-only-pubkey for `this` + `that` and `parity` is true if `this` + `that` is odd
+     */
+    def add(that: PublicKey): (XonlyPublicKey, Boolean) = {
+      val p = pub.plus(that.pub)
+      (XonlyPublicKey(p.getFirst), p.getSecond)
+    }
+
+    def +(that: PublicKey): (XonlyPublicKey, Boolean) = add(that)
+  }
+
+  object XonlyPublicKey {
+    def apply(pub: PublicKey) = new XonlyPublicKey(new bitcoin.XonlyPublicKey(pub.pub))
   }
 
   /**
@@ -196,7 +238,9 @@ object Crypto {
    * @param publicKey public key
    * @return true is signature is valid for this data with this public key
    */
-  def verifySignatureSchnorr(data: ByteVector32, signature: ByteVector64, publicKey: PublicKey): Boolean = bitcoin.Crypto.verifySignatureSchnorr(data, signature, publicKey.xOnly())
+  def verifySignatureSchnorr(data: ByteVector32, signature: ByteVector64, publicKey: XonlyPublicKey): Boolean = {
+    bitcoin.Crypto.verifySignatureSchnorr(data, signature, publicKey.pub)
+  }
 
   /**
    * @param privateKey private key
@@ -224,7 +268,9 @@ object Crypto {
    *                   the key (there is an extra "1" appended to the key)
    * @return a signature in compact format (64 bytes)
    */
-  def signSchnorr(data: ByteVector32, privateKey: PrivateKey): ByteVector64 = bitcoin.Crypto.signSchnorr(data, privateKey, bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE, null)
+  def signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: bitcoin.Crypto.SchnorrTweak = bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
+    bitcoin.Crypto.signSchnorr(data, privateKey, schnorrTweak, auxrand32.map(scala2kmp).orNull)
+  }
 
   /**
    * Recover public keys from a signature and the message that was signed. This method will return 2 public keys, and the signature
@@ -240,4 +286,6 @@ object Crypto {
     val p = bitcoin.Crypto.recoverPublicKey(signature, message.toArray)
     (PublicKey(p.getFirst), PublicKey(p.getSecond))
   }
+
+  def taggedHash(input: Array[Byte], tag: String): ByteVector32 = bitcoin.Crypto.taggedHash(input, tag)
 }

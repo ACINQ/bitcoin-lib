@@ -1,13 +1,13 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
+import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, signSchnorr}
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import fr.acinq.bitcoin.scalacompat.Protocol._
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
-import scala.jdk.CollectionConverters.MapHasAsJava
+import scala.jdk.CollectionConverters.{MapHasAsJava, SeqHasAsJava}
 
 object OutPoint extends BtcSerializer[OutPoint] {
   def apply(tx: Transaction, index: Int) = new OutPoint(ByteVector32(tx.hash), index)
@@ -57,6 +57,8 @@ object TxIn extends BtcSerializer[TxIn] {
   }
 
   def coinbase(script: Seq[ScriptElt]): TxIn = coinbase(Script.write(script))
+
+  val SEQUENCE_FINAL = fr.acinq.bitcoin.TxIn.SEQUENCE_FINAL
 }
 
 /**
@@ -216,6 +218,17 @@ object Transaction extends BtcSerializer[Transaction] {
    */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector32 =
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
+
+  /**
+   * @param tx            transaction to sign
+   * @param inputIndex    index of the transaction input being signed
+   * @param inputs        UTXOs spent by this transaction
+   * @param sighashType   signature hash type
+   * @param sigVersion    signature version
+   * @param executionData execution context of a transaction script
+   */
+  def hashForSigningSchnorr(tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, sigVersion: Int, executionData: Script.ExecutionData = Script.ExecutionData.empty): ByteVector32 =
+    bitcoin.Transaction.hashForSigningSchnorr(tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, sigVersion, executionData)
 
   /**
    * sign a tx input

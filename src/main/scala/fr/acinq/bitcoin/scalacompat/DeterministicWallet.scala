@@ -151,9 +151,13 @@ object DeterministicWallet {
 
   def derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey = derivePrivateKey(parent, keyPath.path)
 
+  def derivePrivateKey(parent: ExtendedPrivateKey, path: String): ExtendedPrivateKey = derivePrivateKey(parent, KeyPath(path))
+
   def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent)(derivePublicKey)
 
   def derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey = derivePublicKey(parent, keyPath.path)
+
+  def derivePublicKey(parent: ExtendedPublicKey, path: String): ExtendedPublicKey = derivePublicKey(parent, KeyPath(path))
 
   // p2pkh mainnet
   val xprv = bitcoin.DeterministicWallet.xprv
