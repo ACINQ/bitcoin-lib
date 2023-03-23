@@ -1,7 +1,7 @@
 # Simple Scala Bitcoin Library
 
 [![Build Status](https://github.com/ACINQ/bitcoin-lib/workflows/Build%20&%20Test/badge.svg)](https://github.com/ACINQ/bitcoin-lib/actions?query=workflow%3A%22Build+%26+Test%22)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/fr.acinq/bitcoin-lib_2.13)](https://search.maven.org/search?q=g:fr.acinq%20a:bitcoin-lib_2.13*)[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 ## Overview
 
@@ -52,12 +52,12 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.13</artifactId>
-    <version>0.22</version>
+    <version>0.27</version>
   </dependency>
 </dependencies>
 ```
 
-The latest snapshot (development) version is 0.23-SNAPSHOT, the latest released version is 0.22.
+The latest snapshot (development) version is 0.28-SNAPSHOT, the latest released version is 0.27.
 
 ## libsecp256k1 support
 
