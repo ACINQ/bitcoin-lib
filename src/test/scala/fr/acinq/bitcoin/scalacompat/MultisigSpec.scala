@@ -28,7 +28,7 @@ class MultisigSpec extends FunSuite with Matchers {
     // we want to redeem the first output of 41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea
     // using our private key 92TgRLMLLdwJjT1JrrmTTWEpZ8uG7zpHEgSVPTbwfAs27RpdeWM
     val txIn = TxIn(
-      OutPoint(ByteVector32(hex"41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea".reverse), 0),
+      OutPoint(TxId.fromValidHex("41e573704b8fba07c261a31c89ca10c3cb202c7e4063f185c997a8a87cf21dea"), 0),
       signatureScript = ByteVector.empty, // empy signature script
       sequence = 0xFFFFFFFFL)
 

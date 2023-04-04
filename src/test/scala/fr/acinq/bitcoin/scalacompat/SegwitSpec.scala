@@ -2,7 +2,6 @@ package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import fr.acinq.bitcoin.{Base58, Base58Check, ScriptFlags, SigHash, SigVersion}
-import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import org.scalatest.FunSuite
 import scodec.bits._
 
@@ -84,7 +83,7 @@ class SegwitSpec extends FunSuite {
       tmp.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(priv1.publicKey) :: Nil)
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx2.txid == ByteVector32(hex"f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3"))
+    assert(tx2.txid == TxId.fromValidHex("f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3"))
     // this tx was published on testnet as f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3
 
     // and now we create a testnet tx that spends the P2WPK output
@@ -103,7 +102,7 @@ class SegwitSpec extends FunSuite {
     }
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx3.txid == ByteVector32(hex"739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa"))
+    assert(tx3.txid == TxId.fromValidHex("739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa"))
     // this tx was published on testnet as 739e7cba97af259d2c089690adea00aa78b1c8d7995aa9377be58fe5332378aa
   }
 
@@ -137,7 +136,7 @@ class SegwitSpec extends FunSuite {
       //Transaction.sign(tmp, Seq(SignData(tx1.txOut(1).publicKeyScript, priv1)))
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx2.txid == ByteVector32(hex"2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9"))
+    assert(tx2.txid == TxId.fromValidHex("2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9"))
     // this tx was published on testnet as 2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9
 
     // and now we create a testnet tx that spends the P2WSH output
@@ -155,7 +154,7 @@ class SegwitSpec extends FunSuite {
     }
 
     Transaction.correctlySpends(tx3, Seq(tx2), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx3.txid == ByteVector32(hex"4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a"))
+    assert(tx3.txid == TxId.fromValidHex("4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a"))
     // this tx was published on testnet as 4817f79def9d9f559ddaa636f0c196e79f31bc959feead77b4151733114c652a
   }
 
@@ -174,7 +173,6 @@ class SegwitSpec extends FunSuite {
     val tx = Transaction.read("02000000000101d9ee0034f9ae4fac7a4017d78e26e1c492d507e16f3535ecbc2ea72cb1c4c6f501000000232200208a15b02dab825f2a4b60b58a7c8591c659a3eb18765fd9d926332c0cea574e2ffdffffff02d292e4000000000017a914aefbc2c20e0c312a616cf7c4ebbacc5c9a04432787404b4c000000000017a914c32f5922344dbe1abd4fb1744b560b5d1875353987040047304402205fbba2ab917efc23209fe04086fb5f714e527d088e2a5ec19590ec4b566a8c2d02206607f3e42eaff5d30dd6297dcb4d48300a75819a358c0bc20396e393ab1594260147304402206a0df35cb8fc58fb21b111d432abc7f9f74836ad1e35c63be2f0c772d4a2ce49022076c4c96a7a9d18577a5e762a3dc3e4b728fd950284c133eb3147707b9181f90b01475221039c40944fe4f90f46760621a1ca66d3141f7e81ccccfa2cf4550fdb9b432c52ed2102976af59e7b61fb3c7a6a2553d7b030a5e292fdda6eba439b4a24af494b3475c752aebebb2300", pversion)
 
     // let's spend it:
-
     val tx1 = {
       val tmp: Transaction = Transaction(version = 1,
         txIn = TxIn(OutPoint(tx.hash, 1), sequence = 0xffffffffL, signatureScript = ByteVector.empty) :: Nil,
@@ -188,7 +186,7 @@ class SegwitSpec extends FunSuite {
     }
 
     Transaction.correctlySpends(tx1, Seq(tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
-    assert(tx1.txid === ByteVector32(hex"4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86"))
+    assert(tx1.txid === TxId.fromValidHex("4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86"))
     // this tx was published on testnet as 4807cb10f50df84acd7766245133f902d22d91b7e8bfe77c4bbcb0cf9b017a86
   }
 }

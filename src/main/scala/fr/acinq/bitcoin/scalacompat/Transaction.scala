@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, signSchnorr}
+import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import fr.acinq.bitcoin.scalacompat.Protocol._
 import scodec.bits.ByteVector
@@ -9,8 +9,38 @@ import scodec.bits.ByteVector
 import java.io.{InputStream, OutputStream}
 import scala.jdk.CollectionConverters.{MapHasAsJava, SeqHasAsJava}
 
+/**
+ * This is the double hash of a transaction serialized without witness data.
+ * Note that this is confusingly called `txid` in some context (e.g. in lightning messages).
+ */
+case class TxHash(value: ByteVector32) {
+  override def toString = value.toString
+}
+
+object TxHash {
+  def apply(txid: TxId): TxHash = TxHash(txid.value.reverse)
+
+  def fromValidHex(hash: String): TxHash = TxHash(ByteVector32.fromValidHex(hash))
+}
+
+/**
+ * This contains the same data as [[TxHash]], but encoded with the opposite endianness.
+ * Some explorers and bitcoin RPCs use this encoding for their inputs.
+ */
+case class TxId(value: ByteVector32) {
+  override def toString = value.toString
+}
+
+object TxId {
+  def apply(hash: TxHash): TxId = TxId(hash.value.reverse)
+
+  def fromValidHex(txid: String): TxId = TxId(ByteVector32.fromValidHex(txid))
+}
+
 object OutPoint extends BtcSerializer[OutPoint] {
-  def apply(tx: Transaction, index: Int) = new OutPoint(ByteVector32(tx.hash), index)
+  def apply(tx: Transaction, index: Long): OutPoint = OutPoint(tx.hash, index)
+
+  def apply(txid: TxId, index: Long): OutPoint = OutPoint(TxHash(txid), index)
 
   override def read(input: InputStream, protocolVersion: Long): OutPoint = kmp2scala(fr.acinq.bitcoin.OutPoint.read(InputStreamWrapper(input), protocolVersion))
 
@@ -22,20 +52,18 @@ object OutPoint extends BtcSerializer[OutPoint] {
 }
 
 /**
- * an out point is a reference to a specific output in a specific transaction that we want to claim
+ * An OutPoint is a reference to a specific output in a specific transaction.
  *
- * @param hash  reversed sha256(sha256(tx)) where tx is the transaction we want to refer to
- * @param index index of the output in tx that we want to refer to
+ * @param hash  sha256(sha256(tx)) where tx is the transaction we want to refer to.
+ * @param index index of the output in tx that we want to refer to.
  */
-case class OutPoint(hash: ByteVector32, index: Long) extends BtcSerializable[OutPoint] {
+case class OutPoint(hash: TxHash, index: Long) extends BtcSerializable[OutPoint] {
   // The genesis block contains inputs with index = -1, so we cannot require it to be >= 0
   require(index >= -1)
 
-  /**
-   *
-   * @return the id of the transaction this output belongs to
-   */
-  val txid: ByteVector32 = hash.reverse
+  val txid: TxId = TxId(hash)
+
+  override def toString = s"$txid:$index"
 
   override def serializer: BtcSerializer[OutPoint] = OutPoint
 }
@@ -45,7 +73,7 @@ object TxIn extends BtcSerializer[TxIn] {
 
   override def read(input: InputStream, protocolVersion: Long): TxIn = kmp2scala(fr.acinq.bitcoin.TxIn.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxIn.write(scala2kmp(input), OutputStreamWrapper(out),protocolVersion)
+  override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxIn.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
 
   override def validate(input: TxIn): Unit = {
     require(input.signatureScript.length <= bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE, s"signature script is ${input.signatureScript.length} bytes, limit is ${bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE} bytes")
@@ -53,7 +81,7 @@ object TxIn extends BtcSerializer[TxIn] {
 
   def coinbase(script: ByteVector): TxIn = {
     require(script.length >= 2 && script.length <= 100, "coinbase script length must be between 2 and 100")
-    TxIn(OutPoint(ByteVector32.Zeroes, 0xffffffffL), script, sequence = 0xffffffffL)
+    TxIn(OutPoint(TxHash(ByteVector32.Zeroes), 0xffffffffL), script, sequence = 0xffffffffL)
   }
 
   def coinbase(script: Seq[ScriptElt]): TxIn = coinbase(Script.write(script))
@@ -83,7 +111,7 @@ object TxOut extends BtcSerializer[TxOut] {
 
   override def read(input: InputStream, protocolVersion: Long): TxOut = kmp2scala(fr.acinq.bitcoin.TxOut.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: TxOut, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxOut.write(scala2kmp(input), OutputStreamWrapper(out),protocolVersion)
+  override def write(input: TxOut, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxOut.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
 
   override def validate(input: TxOut): Unit = {
     import input._
@@ -106,7 +134,7 @@ case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerial
 object ScriptWitness extends BtcSerializer[ScriptWitness] {
   val empty: ScriptWitness = ScriptWitness(Seq.empty[ByteVector])
 
-  override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.ScriptWitness.write(scala2kmp(t), OutputStreamWrapper(out),protocolVersion)
+  override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.ScriptWitness.write(scala2kmp(t), OutputStreamWrapper(out), protocolVersion)
 
   override def read(in: InputStream, protocolVersion: Long): ScriptWitness = kmp2scala(fr.acinq.bitcoin.ScriptWitness.read(InputStreamWrapper(in), protocolVersion))
 }
@@ -286,8 +314,8 @@ object Transaction extends BtcSerializer[Transaction] {
 case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) extends BtcSerializable[Transaction] {
 
   // standard transaction hash, used to identify transactions (in transactions outputs for example)
-  lazy val hash: ByteVector32 = Crypto.hash256(Transaction.write(this, bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS))
-  lazy val txid: ByteVector32 = hash.reverse
+  lazy val hash: TxHash = TxHash(Crypto.hash256(Transaction.write(this, bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)))
+  lazy val txid: TxId = TxId(hash)
   // witness transaction hash that includes witness data. used to compute the witness commitment included in the coinbase
   // transaction of segwit blocks
   lazy val whash: ByteVector32 = Crypto.hash256(Transaction.write(this))

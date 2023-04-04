@@ -3,12 +3,8 @@ package fr.acinq.bitcoin.scalacompat
 import fr.acinq.bitcoin
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import fr.acinq.bitcoin.{Base58, Base58Check, ScriptFlags, SigHash, SigVersion}
-import fr.acinq.bitcoin.scalacompat.Crypto._
-import fr.acinq.bitcoin.scalacompat.Protocol._
 import org.scalatest.{FunSuite, Matchers}
 import scodec.bits._
-
-import java.io.ByteArrayOutputStream
 
 class TransactionSpec extends FunSuite with Matchers {
 
@@ -24,7 +20,7 @@ class TransactionSpec extends FunSuite with Matchers {
     val tx = Transaction.read(hex.toArray, Protocol.PROTOCOL_VERSION | bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)
     assert(tx.version === 2)
     assert(tx.txIn.isEmpty)
-    assert(tx.txid === ByteVector32(hex"062d74b3c6183147c30a02addf3c8cd0df10a049ced5677247edd8f114ddb6fb"))
+    assert(tx.txid === TxId.fromValidHex("062d74b3c6183147c30a02addf3c8cd0df10a049ced5677247edd8f114ddb6fb"))
     assert(tx.txOut.length === 2)
     assert(tx.txOut.head.publicKeyScript === Script.write(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(hex"d0c59903c5bac2868760e90fd521a4665aa76520") :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil))
     assert(tx.txOut(1).publicKeyScript === Script.write(OP_HASH160 :: OP_PUSHDATA(hex"3545e6e33b832c47050f24d3eeb93c9c03948bc7") :: OP_EQUAL :: Nil))

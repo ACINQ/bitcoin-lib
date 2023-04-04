@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey}
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
@@ -19,6 +19,22 @@ object KotlinUtils {
   implicit def kmp2scala(input: bitcoin.ByteVector): ByteVector = ByteVector(input.toByteArray)
 
   implicit def scala2kmp(input: ByteVector): bitcoin.ByteVector = new bitcoin.ByteVector(input.toArray)
+
+  implicit def kmp2scala(input: bitcoin.TxId): TxId = TxId(input.value)
+
+  implicit def scala2kmp(input: TxId): bitcoin.TxId = new bitcoin.TxId(input.value)
+
+  implicit def kmp2scala(input: bitcoin.TxHash): TxHash = TxHash(input.value)
+
+  implicit def scala2kmp(input: TxHash): bitcoin.TxHash = new bitcoin.TxHash(input.value)
+
+  implicit def kmp2scala(input: bitcoin.BlockId): BlockId = BlockId(input.value)
+
+  implicit def scala2kmp(input: BlockId): bitcoin.BlockId = new bitcoin.BlockId(input.value)
+
+  implicit def kmp2scala(input: bitcoin.BlockHash): BlockHash = BlockHash(input.value)
+
+  implicit def scala2kmp(input: BlockHash): bitcoin.BlockHash = new bitcoin.BlockHash(input.value)
 
   implicit def kmp2scala(input: bitcoin.OutPoint): OutPoint = OutPoint(input.hash, input.index)
 

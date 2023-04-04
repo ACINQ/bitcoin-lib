@@ -29,7 +29,7 @@ object LexicographicalOrdering {
 
   def isLessThan(a: OutPoint, b: OutPoint): Boolean = {
     if (a.txid == b.txid) a.index < b.index
-    else isLessThan(a.txid, b.txid)
+    else isLessThan(a.txid.value, b.txid.value)
   }
 
   def isLessThan(a: TxIn, b: TxIn): Boolean = isLessThan(a.outPoint, b.outPoint)

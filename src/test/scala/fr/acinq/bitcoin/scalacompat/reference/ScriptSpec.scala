@@ -39,7 +39,7 @@ object ScriptSpec {
       case head :: tail if name2code.contains(head) => parseInternal(tail, acc :+ name2code(head).toByte)
       case head :: tail if head.startsWith("0x") => parseInternal(tail, acc ++ ByteVector.fromValidHex(head))
       case head :: tail if head.startsWith("'") && head.endsWith("'") => parseInternal(tail, acc ++ Script.write(OP_PUSHDATA(ByteVector.view(head.stripPrefix("'").stripSuffix("'").getBytes("UTF-8"))) :: Nil))
-      case _=> throw new RuntimeException(s"cannot parse $tokens")
+      case _ => throw new RuntimeException(s"cannot parse $tokens")
     }
 
     try {
@@ -78,12 +78,12 @@ object ScriptSpec {
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
   def creditTx(scriptPubKey: ByteVector, amount: Btc): Transaction = Transaction(version = 1,
-    txIn = TxIn(OutPoint(ByteVector32.Zeroes, -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
+    txIn = TxIn(OutPoint(TxId(ByteVector32.Zeroes), -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
     txOut = TxOut(amount, scriptPubKey) :: Nil,
     lockTime = 0)
 
   def spendingTx(scriptSig: ByteVector, tx: Transaction): Transaction = Transaction(version = 1,
-    txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
+    txIn = TxIn(OutPoint(tx, 0), scriptSig, 0xffffffff) :: Nil,
     txOut = TxOut(tx.txOut.head.amount, ByteVector.empty) :: Nil,
     lockTime = 0)
 
