@@ -10,7 +10,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.version>2.13.9</scala.version>
+        <scala.version>2.13.10</scala.version>
         <scala.version.short>2.13</scala.version.short>
         <maven.compiler.release>11</maven.compiler.release>
     </properties>
@@ -171,17 +171,17 @@
         <dependency>
             <groupId>fr.acinq.bitcoin</groupId>
             <artifactId>bitcoin-kmp-jvm</artifactId>
-            <version>0.11.1</version>
+            <version>0.12.0</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
             <artifactId>secp256k1-kmp-jni-jvm</artifactId>
-            <version>0.8.0</version>
+            <version>0.10.0</version>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib-jdk8</artifactId>
-            <version>1.6.21</version>
+            <version>1.8.21</version>
         </dependency>
         <dependency>
             <groupId>org.scodec</groupId>
