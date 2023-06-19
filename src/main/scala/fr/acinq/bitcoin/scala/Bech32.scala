@@ -8,6 +8,20 @@ import scodec.bits.ByteVector
 object Bech32 {
   val alphabet = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
+  sealed trait Encoding {
+    val constant: Int
+  }
+
+  object Encoding {
+    object Bech32 extends Encoding {
+      override val constant: Int = 1
+    }
+
+    object Bech32m extends Encoding {
+      override val constant: Int = 0x2bc830a3
+    }
+  }
+
   // 5 bits integer
   // Bech32 works with 5bits values, we use this type to make it explicit: whenever you see Int5 it means 5bits values, and
   // whenever you see Byte it means 8bits values
@@ -56,12 +70,12 @@ object Bech32 {
   }
 
   /**
-    * decodes a bech32 string
-    *
-    * @param bech32 bech32 string
-    * @return a (hrp, data) tuple
-    */
-  def decode(bech32: String): (String, Array[Int5]) = {
+   * decodes a bech32 string
+   *
+   * @param bech32 bech32 string
+   * @return a (hrp, data) tuple
+   */
+  def decode(bech32: String): (String, Array[Int5], Encoding) = {
     require(bech32.toLowerCase == bech32 || bech32.toUpperCase == bech32, "mixed case strings are not valid bech32")
     bech32.foreach(c => require(c >= 33 && c <= 126, "invalid character"))
     val input = bech32.toLowerCase()
@@ -75,30 +89,37 @@ object Bech32 {
       data(i) = elt
     }
     val checksum = polymod(expand(hrp), data)
-    require(checksum == 1, s"invalid checksum for $bech32")
-    (hrp, data.dropRight(6))
+    val encoding = checksum match {
+      case Encoding.Bech32.constant => Encoding.Bech32
+      case Encoding.Bech32m.constant => Encoding.Bech32m
+      case _ => throw new IllegalArgumentException(s"invalid checksum for $bech32")
+    }
+    (hrp, data.dropRight(6), encoding)
   }
 
   /**
-    *
-    * @param hrp  Human Readable Part
-    * @param data data (a sequence of 5 bits integers)
-    * @return a checksum computed over hrp and data
-    */
-  private def checksum(hrp: String, data: Array[Int5]): Array[Int5] = {
+   *
+   * @param hrp  Human Readable Part
+   * @param data data (a sequence of 5 bits integers)
+   * @return a checksum computed over hrp and data
+   */
+  private def checksum(hrp: String, data: Array[Int5]): Array[Int5] = checksum(hrp, data, Encoding.Bech32)
+
+  private def checksum(hrp: String, data: Array[Int5], encoding: Encoding): Array[Int5] = {
     val values = expand(hrp) ++ data
-    val poly = polymod(values, Array(0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte)) ^ 1.toByte
+    val poly = polymod(values, Array(0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte)) ^ encoding.constant
     val result = new Array[Int5](6)
     for (i <- 0 to 5) result(i) = ((poly >>> 5 * (5 - i)) & 31).toByte
     result
   }
 
   /**
-    *
-    * @param input a sequence of 8 bits integers
-    * @return a sequence of 5 bits integers
-    */
+   *
+   * @param input a sequence of 8 bits integers
+   * @return a sequence of 5 bits integers
+   */
   private def eight2five(input: Array[Byte]): Array[Int5] = {
+    /**/
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
@@ -145,9 +166,13 @@ object Bech32 {
     * @return a bech32 encoded witness address
     */
   def encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: ByteVector): String = {
-    // prepend witness version: 0
+    require(witnessVersion >= 0 && witnessVersion <= 16, s"invalid witness version $witnessVersion")
+    val encoding = witnessVersion match {
+      case 0 => Encoding.Bech32
+      case _ => Encoding.Bech32m
+    }
     val data1 = witnessVersion +: Bech32.eight2five(data.toArray)
-    val checksum = Bech32.checksum(hrp, data1)
+    val checksum = Bech32.checksum(hrp, data1, encoding)
     hrp + "1" + new String((data1 ++ checksum).map(i => alphabet(i)))
   }
 
@@ -161,25 +186,29 @@ object Bech32 {
     */
   def decodeWitnessAddress(address: String): (String, Byte, ByteVector) = {
     if (address.indexWhere(_.isLower) != -1 && address.indexWhere(_.isUpper) != -1) throw new IllegalArgumentException("input mixes lowercase and uppercase characters")
-    val (hrp, data) = decode(address)
+    val (hrp, data, encoding) = decode(address)
     require(hrp == "bc" || hrp == "tb" || hrp == "bcrt", s"invalid HRP $hrp")
     val version = data(0)
     require(version >= 0 && version <= 16, "invalid segwit version")
     val bin = five2eight(data.drop(1))
     require(bin.length >= 2 && bin.length <= 40, s"invalid witness program length ${bin.length}")
+    if (version == 0) require(encoding == Encoding.Bech32, "version 0 must be encoded with Bech32")
     if (version == 0) require(bin.length == 20 || bin.length == 32, s"invalid witness program length ${bin.length}")
+    if (version != 0) require(encoding == Encoding.Bech32m, "version 1 to 16 must be encoded with Bech32m")
     (hrp, version, ByteVector.view(bin))
   }
 
   /**
-    *
-    * @param hrp   human readable prefix
-    * @param int5s 5-bit data
-    * @return hrp + data encoded as a Bech32 string
-    */
-  def encode(hrp: String, int5s: Array[Int5]): String = {
+   *
+   * @param hrp   human readable prefix
+   * @param int5s 5-bit data
+   * @return hrp + data encoded as a Bech32 string
+   */
+  def encode(hrp: String, int5s: Array[Int5]): String = encode(hrp, int5s, Encoding.Bech32)
+
+  def encode(hrp: String, int5s: Array[Int5], encoding: Encoding): String = {
     require(hrp.toLowerCase == hrp || hrp.toUpperCase == hrp, "mixed case strings are not valid bech32 prefixes")
-    val checksum = Bech32.checksum(hrp, int5s)
+    val checksum = Bech32.checksum(hrp, int5s, encoding)
     hrp + "1" + new String((int5s ++ checksum).map(i => alphabet(i)))
   }
 }
