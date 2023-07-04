@@ -83,21 +83,22 @@ package object scalacompat {
    * @param script    public key script
    * @return the address of this public key script on this chain
    */
-  def computeScriptAddress(chainHash: ByteVector32, script: Seq[ScriptElt]): Option[String] = {
-    bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava) match {
-      case null => None
-      case address => Some(address)
-    }
-  }
+  def computeScriptAddress(chainHash: ByteVector32, script: Seq[ScriptElt]): Either[AddressFromPublicKeyScriptResult.Failure, String] = addressFromPublicKeyScript(chainHash, script)
 
   /**
    * @param chainHash hash of the chain (i.e. hash of the genesis block of the chain we're on)
    * @param script    public key script
    * @return the address of this public key script on this chain
    */
-  def computeScriptAddress(chainHash: ByteVector32, script: ByteVector): Option[String] = computeScriptAddress(chainHash, Script.parse(script))
+  def computeScriptAddress(chainHash: ByteVector32, script: ByteVector): Either[AddressFromPublicKeyScriptResult.Failure, String] = computeScriptAddress(chainHash, Script.parse(script))
 
-  def addressToPublicKeyScript(chainHash: ByteVector32, address: String): Seq[ScriptElt] = fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript(chainHash, address).asScala.map(kmp2scala).toList
+  def addressToPublicKeyScript(chainHash: ByteVector32, address: String): Either[AddressToPublicKeyScriptResult.Failure, Seq[ScriptElt]] = fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript(chainHash, address) match {
+    case success: AddressToPublicKeyScriptResult.Success => Right(success.getResult.asScala.map(kmp2scala).toList)
+    case failure: AddressToPublicKeyScriptResult.Failure => Left(failure)
+  }
 
-  def addressFromPublicKeyScript(chainHash: ByteVector32, script: Seq[ScriptElt]): String = fr.acinq.bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava)
+  def addressFromPublicKeyScript(chainHash: ByteVector32, script: Seq[ScriptElt]): Either[AddressFromPublicKeyScriptResult.Failure, String] = fr.acinq.bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava) match {
+    case success: AddressFromPublicKeyScriptResult.Success => Right(success.getAddress)
+    case failure: AddressFromPublicKeyScriptResult.Failure => Left(failure)
+  }
 }
