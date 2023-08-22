@@ -10,7 +10,7 @@ import org.scalatest.FlatSpec
 import scodec.bits.ByteVector
 
 class SighashSpec extends FlatSpec {
-  implicit val format = DefaultFormats
+  implicit val format: DefaultFormats = DefaultFormats
 
   "bitcoin-lib" should "pass reference client sighash tests" in {
     val stream = classOf[SighashSpec].getResourceAsStream("/data/sighash.json")
