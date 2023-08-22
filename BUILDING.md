@@ -22,7 +22,7 @@ $./configure --enable-experimental --enable-module_ecdh --enable-jni && make cle
 $ cp ./.libs/libsecp256k1.so ../src/main/resources/fr/acinq/native/Linux/x86_64/
 ```
 
-### For windows 64 bits
+### For Windows 64 bits
 
 Windows bindings are cross-built on Linux. You need to install the mingw toolchain and have JAVA_HOME point to a Windows JDK
                       

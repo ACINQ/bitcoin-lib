@@ -6,17 +6,17 @@ import org.scalatest.{FunSuite, Matchers}
 import scodec.bits._
 
 class MultisigSpec extends FunSuite with Matchers {
-  val key1 = PrivateKey(hex"C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01")
-  val pub1 = key1.publicKey
+  val key1: PrivateKey = PrivateKey(hex"C0B91A94A26DC9BE07374C2280E43B1DE54BE568B2509EF3CE1ADE5C9CF9E8AA01")
+  val pub1: Crypto.PublicKey = key1.publicKey
 
-  val key2 = PrivateKey(hex"5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01")
-  val pub2 = key2.publicKey
+  val key2: PrivateKey = PrivateKey(hex"5C3D081615591ABCE914D231BA009D8AE0174759E4A9AE821D97E28F122E2F8C01")
+  val pub2: Crypto.PublicKey = key2.publicKey
 
-  val key3 = PrivateKey(hex"29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01")
-  val pub3 = key3.publicKey
+  val key3: PrivateKey = PrivateKey(hex"29322B8277C344606BA1830D223D5ED09B9E1385ED26BE4AD14075F054283D8C01")
+  val pub3: Crypto.PublicKey = key3.publicKey
 
-  val redeemScript = Script.write(Script.createMultiSigMofN(2, List(pub1, pub2, pub3)))
-  val multisigAddress = Crypto.hash160(redeemScript)
+  val redeemScript: ByteVector = Script.write(Script.createMultiSigMofN(2, List(pub1, pub2, pub3)))
+  val multisigAddress: ByteVector = Crypto.hash160(redeemScript)
 
   test("create and sign p2sh multisig transactions") {
     // tested with bitcoin core client using command: createmultisig 2 "[\"0394D30868076AB1EA7736ED3BDBEC99497A6AD30B25AFD709CDF3804CD389996A\",\"032C58BC9615A6FF24E9132CEF33F1EF373D97DC6DA7933755BC8BB86DBEE9F55C\",\"02C4D72D99CA5AD12C17C9CFE043DC4E777075E8835AF96F46D8E3CCD929FE1926\"]"

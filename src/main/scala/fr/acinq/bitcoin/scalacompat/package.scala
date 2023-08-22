@@ -29,15 +29,15 @@ package object scalacompat {
   }
 
   implicit final class SatoshiLong(private val n: Long) extends AnyVal {
-    def sat = Satoshi(n)
+    def sat: Satoshi = Satoshi(n)
   }
 
   implicit final class MilliBtcDouble(private val n: Double) extends AnyVal {
-    def millibtc = MilliBtc(n)
+    def millibtc: MilliBtc = MilliBtc(n)
   }
 
   implicit final class BtcDouble(private val n: Double) extends AnyVal {
-    def btc = Btc(n)
+    def btc: Btc = Btc(n)
   }
 
   // @formatter:off

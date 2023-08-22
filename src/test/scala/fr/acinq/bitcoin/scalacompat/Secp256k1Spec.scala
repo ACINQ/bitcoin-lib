@@ -17,7 +17,7 @@ import scala.util.{Random, Try}
   * libsecp256k1.so should be in the .libs/ directory
   */
 class Secp256k1Spec extends FunSuite {
-  val nativeSecp256k1 = try {
+  val nativeSecp256k1: Option[Secp256k1] = try {
     Some(Secp256k1.get())
   }
   catch {

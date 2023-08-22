@@ -3,11 +3,9 @@ package fr.acinq.bitcoin.scalacompat
 import fr.acinq.bitcoin
 import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
-import fr.acinq.bitcoin.scalacompat.Protocol._
 import scodec.bits.ByteVector
 
 import java.io.OutputStream
-import java.nio.ByteOrder
 import scala.jdk.CollectionConverters.{ListHasAsScala, SeqHasAsJava}
 
 /**
@@ -22,11 +20,11 @@ object DeterministicWallet {
 
     def derive(number: Long): KeyPath = KeyPath(keyPath.derive(number))
 
-    override def toString = keyPath.toString
+    override def toString: String = keyPath.toString
   }
 
   object KeyPath {
-    val Root = KeyPath(new bitcoin.KeyPath(""))
+    val Root: KeyPath = KeyPath(new bitcoin.KeyPath(""))
 
     def apply(path: Seq[Long]): KeyPath = KeyPath(new bitcoin.KeyPath(path.map(x => Long.box(x)).toList.asJava))
 
@@ -56,7 +54,7 @@ object DeterministicWallet {
 
     def publicKey: PublicKey = privateKey.publicKey
 
-    override def toString = priv.toString
+    override def toString: String = priv.toString
   }
 
   object ExtendedPrivateKey {
@@ -81,7 +79,7 @@ object DeterministicWallet {
 
     def publicKey: PublicKey = pub.getPublicKey
 
-    override def toString = pub.toString
+    override def toString: String = pub.toString
   }
 
   object ExtendedPublicKey {
@@ -158,27 +156,27 @@ object DeterministicWallet {
   def derivePublicKey(parent: ExtendedPublicKey, path: String): ExtendedPublicKey = derivePublicKey(parent, KeyPath(path))
 
   // p2pkh mainnet
-  val xprv = bitcoin.DeterministicWallet.xprv
-  val xpub = bitcoin.DeterministicWallet.xpub
+  val xprv: Int = bitcoin.DeterministicWallet.xprv
+  val xpub: Int = bitcoin.DeterministicWallet.xpub
 
   // p2sh-of-p2wpkh mainnet
-  val yprv = bitcoin.DeterministicWallet.yprv
-  val ypub = bitcoin.DeterministicWallet.ypub
+  val yprv: Int = bitcoin.DeterministicWallet.yprv
+  val ypub: Int = bitcoin.DeterministicWallet.ypub
 
   // p2wpkh mainnet
-  val zprv = bitcoin.DeterministicWallet.zprv
-  val zpub = bitcoin.DeterministicWallet.zpub
+  val zprv: Int = bitcoin.DeterministicWallet.zprv
+  val zpub: Int = bitcoin.DeterministicWallet.zpub
 
   // p2pkh testnet
-  val tprv = bitcoin.DeterministicWallet.tprv
-  val tpub = bitcoin.DeterministicWallet.tpub
+  val tprv: Int = bitcoin.DeterministicWallet.tprv
+  val tpub: Int = bitcoin.DeterministicWallet.tpub
 
   // p2sh-of-p2wpkh testnet
-  val uprv = bitcoin.DeterministicWallet.uprv
-  val upub = bitcoin.DeterministicWallet.upub
+  val uprv: Int = bitcoin.DeterministicWallet.uprv
+  val upub: Int = bitcoin.DeterministicWallet.upub
 
   // p2wpkh testnet
-  val vprv = bitcoin.DeterministicWallet.vprv
-  val vpub = bitcoin.DeterministicWallet.vpub
+  val vprv: Int = bitcoin.DeterministicWallet.vprv
+  val vpub: Int = bitcoin.DeterministicWallet.vpub
 }
 

@@ -58,7 +58,7 @@ object Script {
   case class ExecutionData(annex: Option[ByteVector], tapleafHash: Option[ByteVector32], validationWeightLeft: Option[Int] = None, codeSeparatorPos: Long = 0xFFFFFFFFL)
 
   object ExecutionData {
-    val empty = ExecutionData(None, None)
+    val empty: ExecutionData = ExecutionData(None, None)
   }
 
   /**

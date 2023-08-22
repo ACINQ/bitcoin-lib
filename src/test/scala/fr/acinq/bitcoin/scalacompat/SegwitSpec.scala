@@ -80,7 +80,7 @@ class SegwitSpec extends FunSuite {
         txOut = TxOut(0.039 btc, Script.pay2wpkh(pub1)) :: Nil,
         lockTime = 0
       )
-      val sig = Transaction.signInput(tmp, 0, tx1.txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, priv1)
+      val sig = Transaction.signInput(tmp, 0, tx1.txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, priv1)
       tmp.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(priv1.publicKey) :: Nil)
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -97,7 +97,7 @@ class SegwitSpec extends FunSuite {
       // mind this: the pubkey script used for signing is not the prevout pubscript (which is just a push
       // of the pubkey hash), but the actual script that is evaluated by the script engine, in this case a PAY2PKH script
       val pubKeyScript = Script.pay2pkh(pub1)
-      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SigHash.SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
+      val sig = Transaction.signInput(tmp, 0, pubKeyScript, SigHash.SIGHASH_ALL, tx2.txOut.head.amount, SigVersion.SIGVERSION_WITNESS_V0, priv1)
       val witness = ScriptWitness(Seq(sig, pub1.value))
       tmp.updateWitness(0, witness)
     }
@@ -148,8 +148,8 @@ class SegwitSpec extends FunSuite {
         lockTime = 0
       )
       val pubKeyScript = Script.write(Script.createMultiSigMofN(2, Seq(pub2, pub3)))
-      val sig2 = Transaction.signInput(tmp, 0, pubKeyScript, SigHash.SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv2)
-      val sig3 = Transaction.signInput(tmp, 0, pubKeyScript, SigHash.SIGHASH_ALL, tx2.txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, priv3)
+      val sig2 = Transaction.signInput(tmp, 0, pubKeyScript, SigHash.SIGHASH_ALL, tx2.txOut.head.amount, SigVersion.SIGVERSION_WITNESS_V0, priv2)
+      val sig3 = Transaction.signInput(tmp, 0, pubKeyScript, SigHash.SIGHASH_ALL, tx2.txOut.head.amount, SigVersion.SIGVERSION_WITNESS_V0, priv3)
       val witness = ScriptWitness(Seq(ByteVector.empty, sig2, sig3, pubKeyScript))
       tmp.updateWitness(0, witness)
     }

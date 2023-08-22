@@ -18,7 +18,7 @@ class MnemonicCodeSpec extends FunSuite {
   import MnemonicCodeSpec._
 
   test("reference tests") {
-    implicit val format = DefaultFormats
+    implicit val format: DefaultFormats.type = DefaultFormats
 
     val stream = classOf[MnemonicCodeSpec].getResourceAsStream("/bip39_vectors.json")
     val vectors = JsonMethods.parse(new InputStreamReader(stream)).extract[TestVectors]

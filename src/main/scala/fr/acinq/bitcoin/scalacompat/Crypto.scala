@@ -42,7 +42,7 @@ object Crypto {
 
     def toHex: String = priv.toHex
 
-    override def toString = priv.toString
+    override def toString: String = priv.toString
   }
 
   object PrivateKey {
@@ -75,7 +75,7 @@ object Crypto {
   case class PublicKey(pub: bitcoin.PublicKey) {
     val value: ByteVector = pub.value
 
-    def xOnly = XonlyPublicKey(pub.xOnly())
+    def xOnly: XonlyPublicKey = XonlyPublicKey(pub.xOnly())
 
     def hash160: ByteVector = ByteVector.view(pub.hash160())
 
@@ -99,7 +99,7 @@ object Crypto {
 
     def toHex: String = pub.toHex
 
-    override def toString = pub.toString
+    override def toString: String = pub.toString
   }
 
   object PublicKey {
@@ -122,7 +122,7 @@ object Crypto {
    * we only store the x coordinate of the pubkey, the y coordinate is always even
    */
   case class XonlyPublicKey(pub: bitcoin.XonlyPublicKey) {
-    val publicKey = PublicKey(pub.getPublicKey)
+    val publicKey: PublicKey = PublicKey(pub.getPublicKey)
 
     def tweak(tapTweak: bitcoin.Crypto.TaprootTweak): ByteVector32 = pub.tweak(tapTweak)
 
