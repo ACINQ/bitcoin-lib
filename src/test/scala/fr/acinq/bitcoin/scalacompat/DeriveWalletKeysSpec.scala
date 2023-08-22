@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import org.scalatest.FunSuite
+import scodec.bits.ByteVector
 
 /**
   * check that we can restore BIP44, BIP49 and BIP84 wallets and generate valid xpubs and addresses.
@@ -13,8 +14,8 @@ class DeriveWalletKeysSpec extends FunSuite {
   import DeriveWalletKeysSpec._
 
   val mnemonics = "gun please vital unable phone catalog explain raise erosion zoo truly exist"
-  val seed = MnemonicCode.toSeed(mnemonics, "")
-  val master = DeterministicWallet.generate(seed)
+  val seed: ByteVector = MnemonicCode.toSeed(mnemonics, "")
+  val master: DeterministicWallet.ExtendedPrivateKey = DeterministicWallet.generate(seed)
 
   test("restore BIP44 wallet") {
     val account = DeterministicWallet.derivePrivateKey(master, DeterministicWallet.KeyPath("m/44'/1'/0'"))
@@ -51,17 +52,17 @@ object DeriveWalletKeysSpec {
 
   object BIP84 extends DerivationScheme
 
-  def deriveAddresses(xpub: String, derivationScheme: Option[DerivationScheme] = None) = {
+  def deriveAddresses(xpub: String, derivationScheme: Option[DerivationScheme] = None): IndexedSeq[String] = {
     val (prefix, master) = DeterministicWallet.ExtendedPublicKey.decode(xpub)
     for (i <- 0L until 5L) yield {
       val pub = DeterministicWallet.derivePublicKey(master, 0L :: i :: Nil)
       val address = prefix match {
-        case DeterministicWallet.tpub if derivationScheme == Some(BIP44) => computeBIP44Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
-        case DeterministicWallet.tpub if derivationScheme == Some(BIP49) => computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
+        case DeterministicWallet.tpub if derivationScheme.contains(BIP44) => computeBIP44Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
+        case DeterministicWallet.tpub if derivationScheme.contains(BIP49) => computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
         case DeterministicWallet.upub => computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
         case DeterministicWallet.vpub => computeBIP84Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
-        case DeterministicWallet.xpub if derivationScheme == Some(BIP44) => computeBIP44Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
-        case DeterministicWallet.xpub if derivationScheme == Some(BIP49) => computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
+        case DeterministicWallet.xpub if derivationScheme.contains(BIP44) => computeBIP44Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
+        case DeterministicWallet.xpub if derivationScheme.contains(BIP49) => computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
         case DeterministicWallet.ypub => computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
         case DeterministicWallet.zpub => computeBIP84Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
       }

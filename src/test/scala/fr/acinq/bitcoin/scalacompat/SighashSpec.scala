@@ -20,7 +20,7 @@ class SighashSpec extends FunSuite {
     val publicKeys = privateKeys.map(_.publicKey)
 
     val previousTx = Seq(
-      Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2pkh(publicKeys(0))) :: Nil, lockTime = 0),
+      Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2pkh(publicKeys.head)) :: Nil, lockTime = 0),
       Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2pkh(publicKeys(1))) :: Nil, lockTime = 0)
     )
 
@@ -29,9 +29,9 @@ class SighashSpec extends FunSuite {
 
     // add an input
     val tx1 = {
-      val tmp = tx.addInput(TxIn(OutPoint(previousTx(0), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
-      val sig: ByteVector = Transaction.signInput(tmp, 0, Script.pay2pkh(publicKeys(0)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(0).txOut(0).amount, SigVersion.SIGVERSION_BASE, privateKeys(0))
-      tmp.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKeys(0).value) :: Nil)
+      val tmp = tx.addInput(TxIn(OutPoint(previousTx.head, 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
+      val sig: ByteVector = Transaction.signInput(tmp, 0, Script.pay2pkh(publicKeys.head), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(0).txOut.head.amount, SigVersion.SIGVERSION_BASE, privateKeys.head)
+      tmp.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKeys.head.value) :: Nil)
 
     }
     Transaction.correctlySpends(tx1, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -39,13 +39,13 @@ class SighashSpec extends FunSuite {
     // add another input: the first input's sig si still valid !
     val tx2 = {
       val tmp = tx1.addInput(TxIn(OutPoint(previousTx(1), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
-      val sig: ByteVector = Transaction.signInput(tmp, 1, Script.pay2pkh(publicKeys(1)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(1).txOut(0).amount, SigVersion.SIGVERSION_BASE, privateKeys(1))
+      val sig: ByteVector = Transaction.signInput(tmp, 1, Script.pay2pkh(publicKeys(1)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(1).txOut.head.amount, SigVersion.SIGVERSION_BASE, privateKeys(1))
       tmp.updateSigScript(1, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKeys(1).value) :: Nil)
     }
     Transaction.correctlySpends(tx2, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // but I cannot change the tx output
-    val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut(0).copy(amount = 40 millibtc)))
+    val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut.head.copy(amount = 40 millibtc)))
     intercept[RuntimeException] {
       Transaction.correctlySpends(tx3, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
@@ -60,7 +60,7 @@ class SighashSpec extends FunSuite {
     val publicKeys = privateKeys.map(_.publicKey)
 
     val previousTx = Seq(
-      Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2wpkh(publicKeys(0))) :: Nil, lockTime = 0),
+      Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2wpkh(publicKeys.head)) :: Nil, lockTime = 0),
       Transaction(version = 2, txIn = Nil, txOut = TxOut(42 millibtc, Script.pay2wpkh(publicKeys(1))) :: Nil, lockTime = 0)
     )
 
@@ -69,22 +69,22 @@ class SighashSpec extends FunSuite {
 
     // add an input
     val tx1 = {
-      val tmp = tx.addInput(TxIn(OutPoint(previousTx(0), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
-      val sig: ByteVector = Transaction.signInput(tmp, 0, Script.pay2pkh(publicKeys(0)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(0).txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys(0))
-      tmp.updateWitness(0, ScriptWitness(sig :: publicKeys(0).value :: Nil))
+      val tmp = tx.addInput(TxIn(OutPoint(previousTx.head, 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
+      val sig: ByteVector = Transaction.signInput(tmp, 0, Script.pay2pkh(publicKeys.head), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(0).txOut.head.amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys.head)
+      tmp.updateWitness(0, ScriptWitness(sig :: publicKeys.head.value :: Nil))
     }
     Transaction.correctlySpends(tx1, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // add another input: the first input's sig si still valid !
     val tx2 = {
       val tmp = tx1.addInput(TxIn(OutPoint(previousTx(1), 0), sequence = 0xFFFFFFFFL, signatureScript = Nil))
-      val sig: ByteVector = Transaction.signInput(tmp, 1, Script.pay2pkh(publicKeys(1)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(1).txOut(0).amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys(1))
+      val sig: ByteVector = Transaction.signInput(tmp, 1, Script.pay2pkh(publicKeys(1)), SIGHASH_ALL | SIGHASH_ANYONECANPAY, previousTx(1).txOut.head.amount, SigVersion.SIGVERSION_WITNESS_V0, privateKeys(1))
       tmp.updateWitness(1, ScriptWitness(sig :: publicKeys(1).value :: Nil))
     }
     Transaction.correctlySpends(tx2, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // but I cannot change the tx output
-    val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut(0).copy(amount = 40 millibtc)))
+    val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut.head.copy(amount = 40 millibtc)))
     intercept[RuntimeException] {
       Transaction.correctlySpends(tx3, previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }

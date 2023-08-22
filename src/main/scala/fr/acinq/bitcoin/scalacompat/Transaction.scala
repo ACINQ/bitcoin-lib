@@ -16,9 +16,9 @@ object OutPoint extends BtcSerializer[OutPoint] {
 
   override def write(input: OutPoint, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.OutPoint.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
 
-  def isCoinbase(input: OutPoint) = scala2kmp(input).isCoinbase
+  def isCoinbase(input: OutPoint): Boolean = scala2kmp(input).isCoinbase
 
-  def isNull(input: OutPoint) = isCoinbase(input)
+  def isNull(input: OutPoint): Boolean = isCoinbase(input)
 }
 
 /**
@@ -58,7 +58,7 @@ object TxIn extends BtcSerializer[TxIn] {
 
   def coinbase(script: Seq[ScriptElt]): TxIn = coinbase(Script.write(script))
 
-  val SEQUENCE_FINAL = fr.acinq.bitcoin.TxIn.SEQUENCE_FINAL
+  val SEQUENCE_FINAL: Long = fr.acinq.bitcoin.TxIn.SEQUENCE_FINAL
 }
 
 /**
@@ -104,7 +104,7 @@ case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerial
 }
 
 object ScriptWitness extends BtcSerializer[ScriptWitness] {
-  val empty = ScriptWitness(Seq.empty[ByteVector])
+  val empty: ScriptWitness = ScriptWitness(Seq.empty[ByteVector])
 
   override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.ScriptWitness.write(scala2kmp(t), OutputStreamWrapper(out),protocolVersion)
 
@@ -118,9 +118,9 @@ object ScriptWitness extends BtcSerializer[ScriptWitness] {
  * @param stack items to be pushed on the stack
  */
 case class ScriptWitness(stack: Seq[ByteVector]) extends BtcSerializable[ScriptWitness] {
-  def isNull = stack.isEmpty
+  def isNull: Boolean = stack.isEmpty
 
-  def isNotNull = !isNull
+  def isNotNull: Boolean = !isNull
 
   override def serializer: BtcSerializer[ScriptWitness] = ScriptWitness
 }
@@ -152,7 +152,7 @@ object Transaction extends BtcSerializer[Transaction] {
 
   def weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
 
-  def isCoinbase(input: Transaction) = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn(0).outPoint)
+  def isCoinbase(input: Transaction): Boolean = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn.head.outPoint)
 
   /**
    * prepare a transaction for signing a specific input

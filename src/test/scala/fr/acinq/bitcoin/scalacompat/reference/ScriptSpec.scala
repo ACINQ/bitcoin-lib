@@ -54,7 +54,7 @@ object ScriptSpec {
 
   import fr.acinq.bitcoin.ScriptFlags._
 
-  val mapFlagNames = Map(
+  val mapFlagNames: Map[String, Int] = Map(
     "NONE" -> SCRIPT_VERIFY_NONE,
     "P2SH" -> SCRIPT_VERIFY_P2SH,
     "STRICTENC" -> SCRIPT_VERIFY_STRICTENC,
@@ -77,14 +77,14 @@ object ScriptSpec {
 
   def parseScriptFlags(strFlags: String): Int = if (strFlags.isEmpty) 0 else strFlags.split(",").map(mapFlagNames(_)).foldLeft(0)(_ | _)
 
-  def creditTx(scriptPubKey: ByteVector, amount: Btc) = Transaction(version = 1,
+  def creditTx(scriptPubKey: ByteVector, amount: Btc): Transaction = Transaction(version = 1,
     txIn = TxIn(OutPoint(ByteVector32.Zeroes, -1), Script.write(OP_0 :: OP_0 :: Nil), 0xffffffff) :: Nil,
     txOut = TxOut(amount, scriptPubKey) :: Nil,
     lockTime = 0)
 
-  def spendingTx(scriptSig: ByteVector, tx: Transaction) = Transaction(version = 1,
+  def spendingTx(scriptSig: ByteVector, tx: Transaction): Transaction = Transaction(version = 1,
     txIn = TxIn(OutPoint(Crypto.hash256(Transaction.write(tx)), 0), scriptSig, 0xffffffff) :: Nil,
-    txOut = TxOut(tx.txOut(0).amount, ByteVector.empty) :: Nil,
+    txOut = TxOut(tx.txOut.head.amount, ByteVector.empty) :: Nil,
     lockTime = 0)
 
   // use 0 btc if no amount is specified
@@ -107,7 +107,7 @@ object ScriptSpec {
   }
 
   def runTest(json: JValue): Int = {
-    implicit val format = DefaultFormats
+    implicit val format: DefaultFormats.type = DefaultFormats
 
     var count = 0
     // use tail to skip the first line of the .json file

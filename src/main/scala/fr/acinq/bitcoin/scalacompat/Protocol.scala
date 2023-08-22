@@ -17,10 +17,10 @@ case class ByteVector32(bytes: ByteVector) {
 }
 
 object ByteVector32 {
-  val Zeroes = ByteVector32(hex"0000000000000000000000000000000000000000000000000000000000000000")
-  val One = ByteVector32(hex"0100000000000000000000000000000000000000000000000000000000000000")
+  val Zeroes: ByteVector32 = ByteVector32(hex"0000000000000000000000000000000000000000000000000000000000000000")
+  val One: ByteVector32 = ByteVector32(hex"0100000000000000000000000000000000000000000000000000000000000000")
 
-  def fromValidHex(str: String) = ByteVector32(ByteVector.fromValidHex(str))
+  def fromValidHex(str: String): ByteVector32 = ByteVector32(ByteVector.fromValidHex(str))
 
   implicit def byteVector32toByteVector(h: ByteVector32): ByteVector = h.bytes
 }
@@ -32,9 +32,9 @@ case class ByteVector64(bytes: ByteVector) {
 }
 
 object ByteVector64 {
-  val Zeroes = ByteVector64(hex"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+  val Zeroes: ByteVector64 = ByteVector64(hex"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
 
-  def fromValidHex(str: String) = ByteVector64(ByteVector.fromValidHex(str))
+  def fromValidHex(str: String): ByteVector64 = ByteVector64(ByteVector.fromValidHex(str))
 
   implicit def byteVector64toByteVector(h: ByteVector64): ByteVector = h.bytes
 }

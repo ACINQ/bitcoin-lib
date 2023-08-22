@@ -2,7 +2,6 @@ package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import fr.acinq.bitcoin.{Base58, Base58Check, ScriptFlags, SigHash, SigVersion}
-import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import org.scalatest.FlatSpec
 import scodec.bits._
 
@@ -35,7 +34,7 @@ class CheckLockTimeVerifySpec extends FlatSpec {
         txOut = TxOut(amount = 100 sat, publicKeyScript = scriptPubKey) :: Nil,
         lockTime = 100L
       )
-      val sig = Transaction.signInput(tmpTx, 0, previousTx.txOut(0).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key)
+      val sig = Transaction.signInput(tmpTx, 0, previousTx.txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key)
       tmpTx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(key.publicKey) :: Nil)
     }
 

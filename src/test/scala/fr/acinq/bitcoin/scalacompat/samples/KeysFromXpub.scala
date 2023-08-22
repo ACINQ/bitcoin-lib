@@ -9,7 +9,7 @@ object KeysFromXpub extends App {
     *
     */
 
-  def deriveAddresses(xpub: String) = {
+  def deriveAddresses(xpub: String): Unit = {
     val (prefix, master) = DeterministicWallet.ExtendedPublicKey.decode(xpub)
     prefix match {
       case DeterministicWallet.ypub =>

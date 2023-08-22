@@ -142,7 +142,7 @@ object OP_PUSHDATA {
   else true
 }
 case class OP_PUSHDATA(data: ByteVector, code: Int) extends ScriptElt {
-  override def toString = data.toString
+  override def toString: String = data.toString
 }
 case class OP_INVALID(code: Int) extends ScriptElt
 // @formatter:off
