@@ -52,6 +52,18 @@ object KotlinUtils {
 
   implicit def scala2kmp(input: PublicKey): bitcoin.PublicKey = new bitcoin.PublicKey(input.value)
 
+  implicit def kmp2scala(input: bitcoin.DeterministicWallet.ExtendedPrivateKey): DeterministicWallet.ExtendedPrivateKey = DeterministicWallet.ExtendedPrivateKey(input)
+
+  implicit def scala2kmp(input: DeterministicWallet.ExtendedPrivateKey): bitcoin.DeterministicWallet.ExtendedPrivateKey = input.priv
+
+  implicit def kmp2scala(input: bitcoin.DeterministicWallet.ExtendedPublicKey): DeterministicWallet.ExtendedPublicKey = DeterministicWallet.ExtendedPublicKey(input)
+
+  implicit def scala2kmp(input: DeterministicWallet.ExtendedPublicKey): bitcoin.DeterministicWallet.ExtendedPublicKey = input.pub
+
+  implicit def kmp2scala(input: bitcoin.KeyPath): DeterministicWallet.KeyPath = DeterministicWallet.KeyPath(input)
+
+  implicit def scala2kmp(input: DeterministicWallet.KeyPath): bitcoin.KeyPath = input.keyPath
+
   implicit def scala2kmp(input: Script.ExecutionData): bitcoin.Script.ExecutionData =
     new bitcoin.Script.ExecutionData(input.annex.map(scala2kmp).orNull, input.tapleafHash.map(scala2kmp).orNull, input.validationWeightLeft.map(i => Integer.valueOf(i)).orNull, input.codeSeparatorPos)
 

@@ -37,8 +37,6 @@ object DeterministicWallet {
      * @return a KeyPath instance
      */
     def apply(path: String): KeyPath = KeyPath(new bitcoin.KeyPath(path))
-
-    def childNumberToString(childNumber: Long) = if (isHardened(childNumber)) (childNumber - hardenedKeyIndex).toString + "'" else childNumber.toString
   }
 
   val hardenedKeyIndex = 0x80000000L
