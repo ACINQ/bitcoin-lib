@@ -162,9 +162,7 @@ object Script {
    */
   def pay2wpkh(pubKey: PublicKey): Seq[ScriptElt] = pay2wpkh(pubKey.hash160)
 
-  def isPay2wpkh(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isPay2wsh(script.map(scala2kmp).asJava)
-
-  def pay2tr(publicKey: XonlyPublicKey): Seq[ScriptElt] = bitcoin.Script.pay2tr(publicKey.pub).asScala.map(kmp2scala).toList
+  def isPay2wpkh(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isPay2wpkh(script.map(scala2kmp).asJava)
 
   /**
    * @param pubKey public key
@@ -172,4 +170,7 @@ object Script {
    * @return script witness for the corresponding pay-to-witness-public-key-hash script
    */
   def witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = bitcoin.Script.witnessPay2wpkh(pubKey, sig)
+
+  def pay2tr(publicKey: XonlyPublicKey): Seq[ScriptElt] = bitcoin.Script.pay2tr(publicKey.pub).asScala.map(kmp2scala).toList
+
 }
