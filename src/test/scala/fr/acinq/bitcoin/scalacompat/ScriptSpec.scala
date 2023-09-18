@@ -8,6 +8,7 @@ import org.scalatest.FlatSpec
 import scodec.bits._
 
 class ScriptSpec extends FlatSpec {
+
   import ScriptSpec._
 
   it should "parse signature scripts" in {
@@ -20,12 +21,14 @@ class ScriptSpec extends FlatSpec {
   it should "parse 'pay to public key' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("76a91433e81a941e64cda12c6a299ed322ddbdd03f8d0e88ac")
     val script = Script.parse(blob)
+    assert(Script.isPay2pkh(script))
     val Some(hash) = publicKeyHash(script)
     assert(Base58Check.encode(Prefix.PubkeyAddressTestnet, hash.toArray) === "mkFQohBpy2HDXrCwyMrYL5RtfrmeiuuPY2")
   }
   it should "parse 'pay to script' scripts" in {
     val blob = BaseEncoding.base16().lowerCase().decode("a914a90003b4ddef4be46fc61e7f2167da9d234944e287")
     val script = Script.parse(blob)
+    assert(Script.isPay2sh(script))
     val OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil = script
     val multisigAddress = Base58Check.encode(Prefix.ScriptAddressTestnet, scriptHash.toArray)
     assert(multisigAddress === "2N8epCi6GwVDNYgJ7YtQ3qQ9vGQzaGu6JY4")
@@ -33,13 +36,16 @@ class ScriptSpec extends FlatSpec {
   it should "detect 'pay to script' scripts" in {
     val script = hex"a91415727299b05b45fdaf9ac9ecf7565cfe27c3e56787"
     assert(Script.isPayToScript(script))
+    assert(Script.isPay2sh(Script.parse(script)))
   }
   it should "detect 'native witness' scripts" in {
     val p2wpkh = Script.pay2wpkh(PublicKey(hex"029da12cdb5b235692b91536afefe5c91c3ab9473d8e43b533836ab456299c8871"))
+    assert(Script.isPay2wpkh(p2wpkh))
     assert(Script.isNativeWitnessScript(p2wpkh))
     assert(Script.isNativeWitnessScript(Script.write(p2wpkh)))
     assert(Script.getWitnessVersion(p2wpkh) === Some(0))
     val p2wsh = Script.pay2wsh(hex"a91415727299b05b45fdaf9ac9ecf7565cfe27c3e56787")
+    assert(Script.isPay2wsh(p2wsh))
     assert(Script.isNativeWitnessScript(p2wsh))
     assert(Script.isNativeWitnessScript(Script.write(p2wsh)))
     assert(Script.getWitnessVersion(p2wsh) === Some(0))
