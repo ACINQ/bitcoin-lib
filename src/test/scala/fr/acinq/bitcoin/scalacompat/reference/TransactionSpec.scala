@@ -1,17 +1,15 @@
 package fr.acinq.bitcoin.scalacompat.reference
 
 import fr.acinq.bitcoin.scalacompat
-import fr.acinq.bitcoin.scalacompat.{Protocol, Script}
-
-import java.io.{InputStream, InputStreamReader}
-import fr.acinq.bitcoin.scalacompat._
 import fr.acinq.bitcoin.scalacompat.reference.ScriptSpec.{parseFromText, parseScriptFlags}
+import fr.acinq.bitcoin.scalacompat._
 import org.json4s.DefaultFormats
 import org.json4s.JsonAST.{JArray, JInt, JString, JValue}
 import org.json4s.jackson.JsonMethods
 import org.scalatest.{FlatSpec, Matchers}
 import scodec.bits.ByteVector
 
+import java.io.{InputStream, InputStreamReader}
 import scala.util.{Failure, Success, Try}
 
 object TransactionSpec {
@@ -26,11 +24,11 @@ object TransactionSpec {
         m.map {
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey))) =>
             val prevoutScript = parseFromText(scriptPubKey)
-            prevoutMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> prevoutScript
+            prevoutMap += OutPoint(TxId(ByteVector32.fromValidHex(hash)), index.toLong) -> prevoutScript
           case JArray(List(JString(hash), JInt(index), JString(scriptPubKey), JInt(amount))) =>
             val prevoutScript = parseFromText(scriptPubKey)
-            prevoutMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> prevoutScript
-            prevamountMap += OutPoint(ByteVector32(ByteVector.fromValidHex(hash).reverse), index.toLong) -> Satoshi(amount.toLong)
+            prevoutMap += OutPoint(TxId(ByteVector32.fromValidHex(hash)), index.toLong) -> prevoutScript
+            prevamountMap += OutPoint(TxId(ByteVector32.fromValidHex(hash)), index.toLong) -> Satoshi(amount.toLong)
           case _ => ()
         }
 
