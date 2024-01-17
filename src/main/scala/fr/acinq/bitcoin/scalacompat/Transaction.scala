@@ -248,15 +248,27 @@ object Transaction extends BtcSerializer[Transaction] {
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
 
   /**
-   * @param tx            transaction to sign
-   * @param inputIndex    index of the transaction input being signed
-   * @param inputs        UTXOs spent by this transaction
-   * @param sighashType   signature hash type
-   * @param sigVersion    signature version
-   * @param executionData execution context of a transaction script
+   * @param tx          transaction to sign
+   * @param inputIndex  index of the transaction input being signed
+   * @param inputs      UTXOs spent by this transaction
+   * @param sighashType signature hash type
+   * @param sigVersion  signature version
+   * @param tapleaf_opt when spending a tapscript, the hash of the corresponding script leaf must be provided
+   * @param annex_opt   (optional) taproot annex
    */
-  def hashForSigningSchnorr(tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, sigVersion: Int, executionData: Script.ExecutionData = Script.ExecutionData.empty): ByteVector32 =
-    bitcoin.Transaction.hashForSigningSchnorr(tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, sigVersion, executionData)
+  def hashForSigningSchnorr(tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, sigVersion: Int, tapleaf_opt: Option[ByteVector32] = None, annex_opt: Option[ByteVector] = None): ByteVector32 = {
+    bitcoin.Transaction.hashForSigningSchnorr(tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, sigVersion, tapleaf_opt.map(scala2kmp).orNull, annex_opt.map(scala2kmp).orNull, null)
+  }
+
+  /** Use this function when spending a taproot key path. */
+  def hashForSigningTaprootKeyPath(tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, annex_opt: Option[ByteVector] = None): ByteVector32 = {
+    bitcoin.Transaction.hashForSigningTaprootKeyPath(tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, annex_opt.map(scala2kmp).orNull)
+  }
+
+  /** Use this function when spending a taproot script path. */
+  def hashForSigningTaprootScriptPath(tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, tapleaf: ByteVector32, annex_opt: Option[ByteVector] = None): ByteVector32 = {
+    bitcoin.Transaction.hashForSigningTaprootScriptPath(tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, scala2kmp(tapleaf), annex_opt.map(scala2kmp).orNull)
+  }
 
   /**
    * sign a tx input
@@ -288,6 +300,36 @@ object Transaction extends BtcSerializer[Transaction] {
    */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
+
+  /**
+   * Sign a taproot tx input, using the internal key path.
+   *
+   * @param privateKey     private key.
+   * @param tx             input transaction.
+   * @param inputIndex     index of the tx input that is being signed.
+   * @param inputs         list of all UTXOs spent by this transaction.
+   * @param sighashType    signature hash type, which will be appended to the signature (if not default).
+   * @param scriptTree_opt tapscript tree of the signed input, if it has script paths.
+   * @return the schnorr signature of this tx for this specific tx input.
+   */
+  def signInputTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, scriptTree_opt: Option[bitcoin.ScriptTree], annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
+    bitcoin.Transaction.signInputTaprootKeyPath(privateKey, tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, scriptTree_opt.orNull, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
+  }
+
+  /**
+   * Sign a taproot tx input, using one of its script paths.
+   *
+   * @param privateKey  private key.
+   * @param tx          input transaction.
+   * @param inputIndex  index of the tx input that is being signed.
+   * @param inputs      list of all UTXOs spent by this transaction.
+   * @param sighashType signature hash type, which will be appended to the signature (if not default).
+   * @param tapleaf     tapscript leaf hash of the script that is being spent.
+   * @return the schnorr signature of this tx for this specific tx input and the given script leaf.
+   */
+  def signInputTaprootScriptPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, tapleaf: ByteVector32, annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
+    bitcoin.Transaction.signInputTaprootScriptPath(privateKey, tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, tapleaf, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
+  }
 
   def correctlySpends(tx: Transaction, previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int): Unit = {
     fr.acinq.bitcoin.Transaction.correctlySpends(tx, previousOutputs.map { case (o, t) => scala2kmp(o) -> scala2kmp(t) }.asJava, scriptFlags)

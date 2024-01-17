@@ -137,6 +137,12 @@ object Crypto {
       (XonlyPublicKey(p.getFirst), p.getSecond)
     }
 
+    /** Tweak this key with the merkle root of the given script tree. */
+    def outputKey(scriptTree: bitcoin.ScriptTree): (XonlyPublicKey, Boolean) = outputKey(new bitcoin.Crypto.TaprootTweak.ScriptTweak(scriptTree))
+
+    /** Tweak this key with the merkle root provided. */
+    def outputKey(merkleRoot: ByteVector32): (XonlyPublicKey, Boolean) = outputKey(new bitcoin.Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+
     /**
      * add a public key to this x-only key
      *
