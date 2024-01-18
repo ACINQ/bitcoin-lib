@@ -248,15 +248,19 @@ object Transaction extends BtcSerializer[Transaction] {
     hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion)
 
   /**
-   * @param tx            transaction to sign
-   * @param inputIndex    index of the transaction input being signed
-   * @param inputs        UTXOs spent by this transaction
-   * @param sighashType   signature hash type
-   * @param sigVersion    signature version
-   * @param executionData execution context of a transaction script
+   *
+   * @param tx               transaction to sign
+   * @param inputIndex       index of the transaction input being signed
+   * @param inputs           UTXOs spent by this transaction
+   * @param sighashType      signature hash type
+   * @param sigVersion       signature version
+   * @param tapleaf          optional tapleaf hash
+   * @param annex            optional taproot annex
+   * @param codeSeparatorPos code separartor position
+   * @return
    */
-  def hashForSigningSchnorr(tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, sigVersion: Int, executionData: Script.ExecutionData = Script.ExecutionData.empty): ByteVector32 =
-    bitcoin.Transaction.hashForSigningSchnorr(tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, sigVersion, executionData)
+  def hashForSigningSchnorr(tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, sigVersion: Int, tapleaf: Option[ByteVector32] = None, annex: Option[ByteVector] = None, codeSeparatorPos: Long = 0xFFFFFFFFL): ByteVector32 =
+    bitcoin.Transaction.hashForSigningSchnorr(tx, inputIndex, inputs.map(scala2kmp).asJava, sighashType, sigVersion, tapleaf.map(scala2kmp).orNull, annex.map(scala2kmp).orNull, codeSeparatorPos)
 
   /**
    * sign a tx input

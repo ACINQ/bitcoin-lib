@@ -4,7 +4,7 @@ import fr.acinq.bitcoin.Crypto.TaprootTweak
 import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey, XonlyPublicKey}
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import fr.acinq.bitcoin.scalacompat.Transaction.hashForSigningSchnorr
-import fr.acinq.bitcoin.{Bech32, ScriptFlags, ScriptLeaf, ScriptTree, SigHash, SigVersion}
+import fr.acinq.bitcoin.{Bech32, ScriptFlags, ScriptTree, SigHash, SigVersion}
 import fr.acinq.secp256k1.Secp256k1
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
@@ -151,8 +151,8 @@ class TaprootSpec extends FunSuite {
     )
 
     // simple script tree with a single element
-    val scriptTree = new ScriptTree.Leaf(new ScriptLeaf(0, Script.write(script), fr.acinq.bitcoin.Script.TAPROOT_LEAF_TAPSCRIPT))
-    val merkleRoot = ScriptTree.hash(scriptTree)
+    val scriptTree = new ScriptTree.Leaf(0, Script.write(script), fr.acinq.bitcoin.Script.TAPROOT_LEAF_TAPSCRIPT)
+    val merkleRoot = scriptTree.hash()
 
     // we choose a pubkey that does not have a corresponding private key: our funding tx can only be spent through the script path, not the key path
     val internalPubkey = XonlyPublicKey(PublicKey.fromBin(ByteVector.fromValidHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")))
@@ -168,7 +168,7 @@ class TaprootSpec extends FunSuite {
       txOut = TxOut(fundingTx.txOut.head.amount - Satoshi(5000), addressToPublicKeyScript(Block.RegtestGenesisBlock.hash, "bcrt1qdtu5cwyngza8hw8s5uk2erlrkh8ceh3msp768v").toOption.get) :: Nil,
       lockTime = 0
     )
-    val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx.txOut.head), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(annex = None, tapleafHash = Some(merkleRoot)))
+    val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx.txOut.head), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Some(merkleRoot))
 
     // compute all 3 signatures
     val sigs = privs.map { p => Crypto.signSchnorr(hash, p, fr.acinq.bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE) }
@@ -204,7 +204,7 @@ class TaprootSpec extends FunSuite {
     )
     val scripts: Seq[Seq[ScriptElt]] = privs.map { p => Seq(OP_PUSHDATA(XonlyPublicKey(p.publicKey())), OP_CHECKSIG) }
 
-    val leaves = scripts.zipWithIndex.map { case (script, idx) => new ScriptTree.Leaf(new ScriptLeaf(idx, Script.write(script), fr.acinq.bitcoin.Script.TAPROOT_LEAF_TAPSCRIPT)) }
+    val leaves = scripts.zipWithIndex.map { case (script, idx) => new ScriptTree.Leaf(idx, Script.write(script), fr.acinq.bitcoin.Script.TAPROOT_LEAF_TAPSCRIPT) }
     //     root
     //    /   \
     //  /  \   #3
@@ -213,7 +213,7 @@ class TaprootSpec extends FunSuite {
       new ScriptTree.Branch(leaves.head, leaves(1)),
       leaves(2)
     )
-    val merkleRoot = ScriptTree.hash(scriptTree)
+    val merkleRoot = scriptTree.hash()
     val blockchain = Block.SignetGenesisBlock.hash
 
     // we use key #1 as our internal key
@@ -266,10 +266,10 @@ class TaprootSpec extends FunSuite {
       // to re-compute the merkle root we need to provide leaves #2 and #3
       val controlBlock = ByteVector.view(Array((fr.acinq.bitcoin.Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte) ++
         internalPubkey.pub.value.toByteArray ++
-        ScriptTree.hash(leaves(1)).toByteArray ++
-        ScriptTree.hash(leaves(2)).toByteArray)
+        leaves(1).hash().toByteArray ++
+        leaves(2).hash().toByteArray)
 
-      val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx.txOut.head), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(None, Some(ScriptTree.hash(leaves.head))))
+      val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx.txOut.head), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Some(leaves.head.hash()))
       val sig = Crypto.signSchnorr(hash, privs.head, fr.acinq.bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE)
       tmp.updateWitness(0, ScriptWitness(Seq(sig, Script.write(scripts.head), controlBlock)))
     }
@@ -294,9 +294,9 @@ class TaprootSpec extends FunSuite {
       // to re-compute the merkle root we need to provide leaves #1 and #3
       val controlBlock = ByteVector.view(Array((fr.acinq.bitcoin.Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte) ++
         internalPubkey.pub.value.toByteArray ++
-        ScriptTree.hash(leaves.head).toByteArray ++
-        ScriptTree.hash(leaves(2)).toByteArray)
-      val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx2.txOut.head), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(None, Some(ScriptTree.hash(leaves(1)))))
+        leaves.head.hash().toByteArray ++
+        leaves(2).hash().toByteArray)
+      val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx2.txOut.head), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Some(leaves(1).hash()))
       val sig = Crypto.signSchnorr(hash, privs(1), fr.acinq.bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE) // signature for script spend of leaf #2
       tmp.updateWitness(0, ScriptWitness(Seq(sig, Script.write(scripts(1)), controlBlock)))
     }
@@ -320,8 +320,8 @@ class TaprootSpec extends FunSuite {
       // to re-compute the merkle root we need to provide branch(#1, #2)
       val controlBlock = ByteVector.view(Array((fr.acinq.bitcoin.Script.TAPROOT_LEAF_TAPSCRIPT + (if (parity) 1 else 0)).toByte) ++
         internalPubkey.pub.value.toByteArray ++
-        ScriptTree.hash(new ScriptTree.Branch(leaves.head, leaves(1))).toByteArray)
-      val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx3.txOut(1)), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Script.ExecutionData(None, Some(ScriptTree.hash(leaves(2)))))
+        new ScriptTree.Branch(leaves.head, leaves(1)).hash().toByteArray)
+      val hash = hashForSigningSchnorr(tmp, 0, Seq(fundingTx3.txOut(1)), SigHash.SIGHASH_DEFAULT, SigVersion.SIGVERSION_TAPSCRIPT, Some(leaves(2).hash()))
       val sig = Crypto.signSchnorr(hash, privs(2), fr.acinq.bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE) // signature for script spend of leaf #3
       tmp.updateWitness(0, ScriptWitness(Seq(sig, Script.write(scripts(2)), controlBlock)))
     }
