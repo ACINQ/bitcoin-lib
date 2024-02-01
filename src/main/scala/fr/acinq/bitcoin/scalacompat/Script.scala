@@ -55,12 +55,6 @@ object Script {
     require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
   }
 
-  case class ExecutionData(annex: Option[ByteVector], tapleafHash: Option[ByteVector32], validationWeightLeft: Option[Int] = None, codeSeparatorPos: Long = 0xFFFFFFFFL)
-
-  object ExecutionData {
-    val empty: ExecutionData = ExecutionData(None, None)
-  }
-
   /**
    * Bitcoin script runner
    *

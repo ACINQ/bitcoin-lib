@@ -80,11 +80,6 @@ object KotlinUtils {
 
   implicit def scala2kmp(input: DeterministicWallet.KeyPath): bitcoin.KeyPath = input.keyPath
 
-  implicit def scala2kmp(input: Script.ExecutionData): bitcoin.Script.ExecutionData =
-    new bitcoin.Script.ExecutionData(input.annex.map(scala2kmp).orNull, input.tapleafHash.map(scala2kmp).orNull, input.validationWeightLeft.map(i => Integer.valueOf(i)).orNull, input.codeSeparatorPos)
-
-  implicit def kmp2scala(input: bitcoin.Script.ExecutionData): Script.ExecutionData = Script.ExecutionData(Option(input.getAnnex), Option(input.getTapleafHash), Option(input.getValidationWeightLeft), input.getCodeSeparatorPos)
-
   case class InputStreamWrapper(is: InputStream) extends bitcoin.io.Input {
     // NB: on the JVM we will use a ByteArrayInputStream, which guarantees that the result will be correct.
     override def getAvailableBytes: Int = is.available()
