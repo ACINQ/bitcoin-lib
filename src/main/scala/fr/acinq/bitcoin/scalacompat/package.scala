@@ -83,16 +83,16 @@ package object scalacompat {
    * @param script    public key script
    * @return the address of this public key script on this chain
    */
-  def computeScriptAddress(chainHash: BlockHash, script: Seq[ScriptElt]): Either[fr.acinq.bitcoin.BitcoinError, String] = addressFromPublicKeyScript(chainHash, script)
+  def computeScriptAddress(chainHash: BlockHash, script: Seq[ScriptElt]): Either[BitcoinError, String] = addressFromPublicKeyScript(chainHash, script)
 
   /**
    * @param chainHash hash of the chain (i.e. hash of the genesis block of the chain we're on)
    * @param script    public key script
    * @return the address of this public key script on this chain
    */
-  def computeScriptAddress(chainHash: BlockHash, script: ByteVector): Either[fr.acinq.bitcoin.BitcoinError, String] = computeScriptAddress(chainHash, Script.parse(script))
+  def computeScriptAddress(chainHash: BlockHash, script: ByteVector): Either[BitcoinError, String] = computeScriptAddress(chainHash, Script.parse(script))
 
-  def addressToPublicKeyScript(chainHash: BlockHash, address: String): Either[fr.acinq.bitcoin.BitcoinError, Seq[ScriptElt]] = fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript(chainHash, address).map(_.asScala.map(kmp2scala).toList)
+  def addressToPublicKeyScript(chainHash: BlockHash, address: String): Either[BitcoinError, Seq[ScriptElt]] = fr.acinq.bitcoin.Bitcoin.addressToPublicKeyScript(chainHash, address).map(_.asScala.map(kmp2scala).toList)
 
-  def addressFromPublicKeyScript(chainHash: BlockHash, script: Seq[ScriptElt]): Either[fr.acinq.bitcoin.BitcoinError, String] = fr.acinq.bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava)
+  def addressFromPublicKeyScript(chainHash: BlockHash, script: Seq[ScriptElt]): Either[BitcoinError, String] = fr.acinq.bitcoin.Bitcoin.addressFromPublicKeyScript(chainHash, script.map(scala2kmp).asJava)
 }
