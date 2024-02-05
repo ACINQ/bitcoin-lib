@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey, XonlyPublicKey}
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
@@ -62,11 +62,15 @@ object KotlinUtils {
 
   implicit def kmp2scala(input: bitcoin.PrivateKey): PrivateKey = PrivateKey(input)
 
-  implicit def scala2kmp(input: PrivateKey): bitcoin.PrivateKey = new bitcoin.PrivateKey(input.value)
+  implicit def scala2kmp(input: PrivateKey): bitcoin.PrivateKey = input.priv
 
   implicit def kmp2scala(input: bitcoin.PublicKey): PublicKey = PublicKey(input)
 
-  implicit def scala2kmp(input: PublicKey): bitcoin.PublicKey = new bitcoin.PublicKey(input.value)
+  implicit def scala2kmp(input: PublicKey): bitcoin.PublicKey = input.pub
+
+  implicit def kmp2scala(input: bitcoin.XonlyPublicKey): XonlyPublicKey = XonlyPublicKey(input)
+
+  implicit def scala2kmp(input: XonlyPublicKey): bitcoin.XonlyPublicKey = input.pub
 
   implicit def kmp2scala(input: bitcoin.DeterministicWallet.ExtendedPrivateKey): DeterministicWallet.ExtendedPrivateKey = DeterministicWallet.ExtendedPrivateKey(input)
 
