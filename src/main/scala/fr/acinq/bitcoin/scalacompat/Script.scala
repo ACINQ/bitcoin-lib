@@ -55,12 +55,6 @@ object Script {
     require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
   }
 
-  case class ExecutionData(annex: Option[ByteVector], tapleafHash: Option[ByteVector32], validationWeightLeft: Option[Int] = None, codeSeparatorPos: Long = 0xFFFFFFFFL)
-
-  object ExecutionData {
-    val empty: ExecutionData = ExecutionData(None, None)
-  }
-
   /**
    * Bitcoin script runner
    *
@@ -171,6 +165,29 @@ object Script {
    */
   def witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = bitcoin.Script.witnessPay2wpkh(pubKey, sig)
 
-  def pay2tr(publicKey: XonlyPublicKey): Seq[ScriptElt] = bitcoin.Script.pay2tr(publicKey.pub).asScala.map(kmp2scala).toList
+  /**
+   * @param outputKey public key exposed by the taproot script (tweaked based on the tapscripts).
+   * @return a pay-to-taproot script.
+   */
+  def pay2tr(outputKey: XonlyPublicKey): Seq[ScriptElt] = bitcoin.Script.pay2tr(outputKey.pub).asScala.map(kmp2scala).toList
+
+  /**
+   * @param internalKey internal public key that will be tweaked with the [scripts] provided.
+   * @param scripts_opt optional spending scripts that can be used instead of key-path spending.
+   */
+  def pay2tr(internalKey: XonlyPublicKey, scripts_opt: Option[bitcoin.ScriptTree]): Seq[ScriptElt] = bitcoin.Script.pay2tr(internalKey.pub, scripts_opt.orNull).asScala.map(kmp2scala).toList
+
+  def isPay2tr(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isPay2tr(script.map(scala2kmp).asJava)
+
+  /** NB: callers must ensure that they use the correct taproot tweak when generating their signature. */
+  def witnessKeyPathPay2tr(sig: ByteVector64, sighash: Int = bitcoin.SigHash.SIGHASH_DEFAULT): ScriptWitness = bitcoin.Script.witnessKeyPathPay2tr(sig, sighash)
+
+  /**
+   * @param internalKey taproot internal public key.
+   * @param script      script that is spent (must exist in the [scriptTree]).
+   * @param witness     witness for the spent [script].
+   * @param scriptTree  tapscript tree.
+   */
+  def witnessScriptPathPay2tr(internalKey: XonlyPublicKey, script: bitcoin.ScriptTree.Leaf, witness: ScriptWitness, scriptTree: bitcoin.ScriptTree): ScriptWitness = bitcoin.Script.witnessScriptPathPay2tr(internalKey.pub, script, witness, scriptTree)
 
 }

@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey, XonlyPublicKey}
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
@@ -62,11 +62,15 @@ object KotlinUtils {
 
   implicit def kmp2scala(input: bitcoin.PrivateKey): PrivateKey = PrivateKey(input)
 
-  implicit def scala2kmp(input: PrivateKey): bitcoin.PrivateKey = new bitcoin.PrivateKey(input.value)
+  implicit def scala2kmp(input: PrivateKey): bitcoin.PrivateKey = input.priv
 
   implicit def kmp2scala(input: bitcoin.PublicKey): PublicKey = PublicKey(input)
 
-  implicit def scala2kmp(input: PublicKey): bitcoin.PublicKey = new bitcoin.PublicKey(input.value)
+  implicit def scala2kmp(input: PublicKey): bitcoin.PublicKey = input.pub
+
+  implicit def kmp2scala(input: bitcoin.XonlyPublicKey): XonlyPublicKey = XonlyPublicKey(input)
+
+  implicit def scala2kmp(input: XonlyPublicKey): bitcoin.XonlyPublicKey = input.pub
 
   implicit def kmp2scala(input: bitcoin.DeterministicWallet.ExtendedPrivateKey): DeterministicWallet.ExtendedPrivateKey = DeterministicWallet.ExtendedPrivateKey(input)
 
@@ -79,11 +83,6 @@ object KotlinUtils {
   implicit def kmp2scala(input: bitcoin.KeyPath): DeterministicWallet.KeyPath = DeterministicWallet.KeyPath(input)
 
   implicit def scala2kmp(input: DeterministicWallet.KeyPath): bitcoin.KeyPath = input.keyPath
-
-  implicit def scala2kmp(input: Script.ExecutionData): bitcoin.Script.ExecutionData =
-    new bitcoin.Script.ExecutionData(input.annex.map(scala2kmp).orNull, input.tapleafHash.map(scala2kmp).orNull, input.validationWeightLeft.map(i => Integer.valueOf(i)).orNull, input.codeSeparatorPos)
-
-  implicit def kmp2scala(input: bitcoin.Script.ExecutionData): Script.ExecutionData = Script.ExecutionData(Option(input.getAnnex), Option(input.getTapleafHash), Option(input.getValidationWeightLeft), input.getCodeSeparatorPos)
 
   case class InputStreamWrapper(is: InputStream) extends bitcoin.io.Input {
     // NB: on the JVM we will use a ByteArrayInputStream, which guarantees that the result will be correct.
