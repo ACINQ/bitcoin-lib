@@ -17,16 +17,16 @@ class DeterministicWalletSpec extends FlatSpec {
 
   "Deterministic Wallet" should "generate and derive keys (test vector #1)" in {
     val m = generate(hex"000102030405060708090a0b0c0d0e0f")
-    assert(encode(m, xprv) === "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi")
+    assert(m.encode(xprv) === "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi")
 
-    val m_pub = publicKey(m)
-    assert(encode(m_pub, xpub) === "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8")
-    assert(fingerprint(m) === 876747070)
+    val m_pub = m.extendedPublicKey
+    assert(m_pub.encode(xpub) === "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8")
+    assert(m.fingerprint === 876747070)
 
-    val m0h = derivePrivateKey(m, hardened(0))
-    assert(encode(m0h, xprv) === "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7")
-    val m0h_pub = publicKey(m0h)
-    assert(encode(m0h_pub, xpub) === "xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw")
+    val m0h = m.derivePrivateKey(hardened(0))
+    assert(m0h.encode(xprv) === "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7")
+    val m0h_pub = m0h.extendedPublicKey
+    assert(m0h_pub.encode(xpub) === "xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw")
 
     val m0h_1 = derivePrivateKey(m0h, 1L)
     assert(encode(m0h_1, xprv) === "xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs")
@@ -57,7 +57,7 @@ class DeterministicWalletSpec extends FlatSpec {
     val m0h_1_2h_2_1000000000_pub = publicKey(m0h_1_2h_2_1000000000)
     assert(encode(m0h_1_2h_2_1000000000_pub, xpub) === "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy")
 
-    assert(encode(derivePrivateKey(m, hardened(0) :: 1L :: hardened(2) :: 2L :: 1000000000L :: Nil), xprv) === "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76")
+    assert(m.derivePrivateKey(hardened(0) :: 1L :: hardened(2) :: 2L :: 1000000000L :: Nil).encode(xprv) === "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76")
   }
 
   it should "generate and derive keys (test vector #2)" in {
@@ -158,15 +158,15 @@ class DeterministicWalletSpec extends FlatSpec {
       val master = DeterministicWallet.generate(ByteVector.view(seed))
       for (_ <- 0 until 50) {
         val index = random.nextLong()
-        val priv = DeterministicWallet.derivePrivateKey(master, index)
+        val priv = master.derivePrivateKey(index)
 
-        val encoded = DeterministicWallet.encode(priv, DeterministicWallet.tprv)
+        val encoded = priv.encode(DeterministicWallet.tprv)
         val (prefix, decoded) = DeterministicWallet.ExtendedPrivateKey.decode(encoded)
         assert(prefix == DeterministicWallet.tprv)
         assert(decoded.chaincode == priv.chaincode && decoded.secretkeybytes == priv.secretkeybytes)
 
-        val pub = DeterministicWallet.publicKey(priv)
-        val encoded1 = DeterministicWallet.encode(pub, DeterministicWallet.tpub)
+        val pub = priv.extendedPublicKey
+        val encoded1 = pub.encode(DeterministicWallet.tpub)
         val (prefix1, decoded1) = DeterministicWallet.ExtendedPublicKey.decode(encoded1)
         assert(prefix1 == DeterministicWallet.tpub)
         assert(decoded1.chaincode == pub.chaincode && decoded1.publicKey == pub.publicKey)

@@ -27,9 +27,14 @@ object Block {
     val hash: BlockHash = fr.acinq.bitcoin.Block.LivenetGenesisBlock.hash
   }
 
-  object TestnetGenesisBlock {
-    val blockId: BlockId = fr.acinq.bitcoin.Block.TestnetGenesisBlock.blockId
-    val hash: BlockHash = fr.acinq.bitcoin.Block.TestnetGenesisBlock.hash
+  object Testnet3GenesisBlock {
+    val blockId: BlockId = fr.acinq.bitcoin.Block.Testnet3GenesisBlock.blockId
+    val hash: BlockHash = fr.acinq.bitcoin.Block.Testnet3GenesisBlock.hash
+  }
+
+  object Testnet4GenesisBlock {
+    val blockId: BlockId = fr.acinq.bitcoin.Block.Testnet4GenesisBlock.blockId
+    val hash: BlockHash = fr.acinq.bitcoin.Block.Testnet4GenesisBlock.hash
   }
 
   object RegtestGenesisBlock {

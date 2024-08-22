@@ -57,10 +57,10 @@ object DeriveWalletKeysSpec {
     for (i <- 0L until 5L) yield {
       val pub = DeterministicWallet.derivePublicKey(master, 0L :: i :: Nil)
       val address = prefix match {
-        case DeterministicWallet.tpub if derivationScheme.contains(BIP44) => computeBIP44Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
-        case DeterministicWallet.tpub if derivationScheme.contains(BIP49) => computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
-        case DeterministicWallet.upub => computeBIP49Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
-        case DeterministicWallet.vpub => computeBIP84Address(pub.publicKey, Block.TestnetGenesisBlock.hash)
+        case DeterministicWallet.tpub if derivationScheme.contains(BIP44) => computeBIP44Address(pub.publicKey, Block.Testnet3GenesisBlock.hash)
+        case DeterministicWallet.tpub if derivationScheme.contains(BIP49) => computeBIP49Address(pub.publicKey, Block.Testnet3GenesisBlock.hash)
+        case DeterministicWallet.upub => computeBIP49Address(pub.publicKey, Block.Testnet3GenesisBlock.hash)
+        case DeterministicWallet.vpub => computeBIP84Address(pub.publicKey, Block.Testnet3GenesisBlock.hash)
         case DeterministicWallet.xpub if derivationScheme.contains(BIP44) => computeBIP44Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
         case DeterministicWallet.xpub if derivationScheme.contains(BIP49) => computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)
         case DeterministicWallet.ypub => computeBIP49Address(pub.publicKey, Block.LivenetGenesisBlock.hash)

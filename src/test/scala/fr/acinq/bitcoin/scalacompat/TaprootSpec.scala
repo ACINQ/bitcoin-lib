@@ -41,7 +41,7 @@ class TaprootSpec extends FunSuite {
     }
 
     // check that tx1's signature is valid
-    val hash = hashForSigningSchnorr(tx1, 0, tx.txOut.head :: Nil, sighashType, SigVersion.SIGVERSION_TAPROOT)
+    val hash = tx1.hashForSigningSchnorr(0, tx.txOut.head :: Nil, sighashType, SigVersion.SIGVERSION_TAPROOT)
     assert(Crypto.verifySignatureSchnorr(hash, sig, outputKey))
 
     // re-create signature
@@ -72,7 +72,7 @@ class TaprootSpec extends FunSuite {
     assert(Script.pay2tr(internalKey, scripts_opt = None) == Script.parse(tx.txOut(1).publicKeyScript))
 
     // we want to spend
-    val Right(outputScript) = addressToPublicKeyScript(Block.TestnetGenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0")
+    val Right(outputScript) = addressToPublicKeyScript(Block.Testnet3GenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0")
     val tx1 = Transaction(
       2,
       TxIn(OutPoint(tx, 1), ByteVector.empty, fr.acinq.bitcoin.TxIn.SEQUENCE_FINAL) :: Nil,
@@ -80,9 +80,9 @@ class TaprootSpec extends FunSuite {
       0
     )
     val sigHashType = 0
-    val sig = Transaction.signInputTaprootKeyPath(privateKey, tx1, 0, tx.txOut(1) :: Nil, sigHashType, scriptTree_opt = None)
+    val sig = tx1.signInputTaprootKeyPath(privateKey, 0, tx.txOut(1) :: Nil, sigHashType, scriptTree_opt = None)
     val tx2 = tx1.updateWitness(0, Script.witnessKeyPathPay2tr(sig))
-    Transaction.correctlySpends(tx2, tx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(tx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("spend pay-to-taproot transactions - 1") {
@@ -92,7 +92,7 @@ class TaprootSpec extends FunSuite {
     val tx2 = Transaction.read(
       "01000000000101d1f1c1f8cdf6759167b90f52c9ad358a369f95284e841d7a2536cef31c0549580100000000fdffffff020000000000000000316a2f49206c696b65205363686e6f7272207369677320616e6420492063616e6e6f74206c69652e204062697462756734329e06010000000000225120a37c3903c8d0db6512e2b40b0dffa05e5a3ab73603ce8c9c4b7771e5412328f90140a60c383f71bac0ec919b1d7dbc3eb72dd56e7aa99583615564f9f99b8ae4e837b758773a5b2e4c51348854c8389f008e05029db7f464a5ff2e01d5e6e626174affd30a00"
     )
-    Transaction.correctlySpends(tx2, tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("spend pay-to-taproot transactions - 2") {
@@ -102,7 +102,7 @@ class TaprootSpec extends FunSuite {
     val tx2 = Transaction.read(
       "020000000001041ee2529c53a3c05c1e35fa853b9209cbc1a17be31aae9f4e7ea42d13f24c65890000000000ffffffff1ee2529c53a3c05c1e35fa853b9209cbc1a17be31aae9f4e7ea42d13f24c65890100000000ffffffff1ee2529c53a3c05c1e35fa853b9209cbc1a17be31aae9f4e7ea42d13f24c65890200000000ffffffff1ee2529c53a3c05c1e35fa853b9209cbc1a17be31aae9f4e7ea42d13f24c65890300000000ffffffff01007ea60000000000225120a457d0c0399b499ed2df571d612ba549ae7f199387edceac175999210f6aa39d0141b23008b3e044d16078fc93ae4f342b6e5ba44241c598503f80269fd66e7ce484e926b2ff58ac5633be79857951b3dc778082fd38a9e06a1139e6eea41a8680c7010141be98ba2a47fce6fbe4f7456e5fe0c2381f38ed3ae3b89d0748fdbfc6936b68019e01ff60343abbea025138e58aed2544dc8d3c0b2ccb35e2073fa2f9feeff5ed010141466d525b97733d4733220694bf747fd6e9d4b0b96ea3b2fb06b7486b4b8e864df0057481a01cf10f7ea06849fb4717d62b902fe5807a1cba03a46bf3a7087e940101418dbfbdd2c164005eceb0de04c317b9cae62b0c97ed33da9dcec6301fa0517939b9024eba99e22098a5b0d86eb7218957883ea9fc13b737e1146ae2b95185fcf90100000000"
     )
-    Transaction.correctlySpends(tx2, tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("spend pay-to-tapscript transactions - 1") {
@@ -112,7 +112,7 @@ class TaprootSpec extends FunSuite {
     val tx2 = Transaction.read(
       "020000000001027bc0bba407bc67178f100e352bf6e047fae4cbf960d783586cb5e430b3b700e70000000000feffffff7bc0bba407bc67178f100e352bf6e047fae4cbf960d783586cb5e430b3b700e70100000000feffffff01b4ba0e0000000000160014173fd310e9db2c7e9550ce0f03f1e6c01d833aa90140134896c42cd95680b048845847c8054756861ffab7d4abab72f6508d67d1ec0c590287ec2161dd7884983286e1cd56ce65c08a24ee0476ede92678a93b1b180c03407b5d614a4610bf9196775791fcc589597ca066dcd10048e004cd4c7341bb4bb90cee4705192f3f7db524e8067a5222c7f09baf29ef6b805b8327ecd1e5ab83ca2220f5b059b9a72298ccbefff59d9b943f7e0fc91d8a3b944a95e7b6390cc99eb5f4ac41c0d9dfdf0fe3c83e9870095d67fff59a8056dad28c6dfb944bb71cf64b90ace9a7776b22a1185fb2dc9524f6b178e2693189bf01655d7f38f043923668dc5af45bffd30a00"
     )
-    Transaction.correctlySpends(tx2, tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("spend pay-to-tapscript transactions - 2") {
@@ -122,7 +122,7 @@ class TaprootSpec extends FunSuite {
     val tx2 = Transaction.read(
       "02000000000101b41b20295ac85fd2ae3e3d02900f1a1e7ddd6139b12e341386189c03d6f5795b0000000000fdffffff0100000000000000003c6a3a546878205361746f7368692120e2889e2f32316d696c20466972737420546170726f6f74206d756c7469736967207370656e64202d426974476f044123b1d4ff27b16af4b0fcb9672df671701a1a7f5a6bb7352b051f461edbc614aa6068b3e5313a174f90f3d95dc4e06f69bebd9cf5a3098fde034b01e69e8e788901400fd4a0d3f36a1f1074cb15838a48f572dc18d412d0f0f0fc1eeda9fa4820c942abb77e4d1a3c2b99ccf4ad29d9189e6e04a017fe611748464449f681bc38cf394420febe583fa77e49089f89b78fa8c116710715d6e40cc5f5a075ef1681550dd3c4ad20d0fa46cb883e940ac3dc5421f05b03859972639f51ed2eccbf3dc5a62e2e1b15ac41c02e44c9e47eaeb4bb313adecd11012dfad435cd72ce71f525329f24d75c5b9432774e148e9209baf3f1656a46986d5f38ddf4e20912c6ac28f48d6bf747469fb100000000"
     )
-    Transaction.correctlySpends(tx2, tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(tx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("spend pay-to-script transactions -- OP_CHECKSIGADD 1") {
@@ -137,7 +137,7 @@ class TaprootSpec extends FunSuite {
     val tx = Transaction.read(
       "010000000001022373cf02ce7df6500ae46a4a0fbbb1b636d2debed8f2df91e2415627397a34090000000000fdffffff88c23d928893cd3509845516cf8411b7cab2738c054cc5ce7e4bde9586997c770000000000fdffffff0200000000000000002b6a29676d20746170726f6f7420f09fa5952068747470733a2f2f626974636f696e6465766b69742e6f72676e9e1100000000001976a91405070d0290da457409a37db2e294c1ffbc52738088ac04410adf90fd381d4a13c3e73740b337b230701189ed94abcb4030781635f035e6d3b50b8506470a68292a2bc74745b7a5732a28254b5f766f09e495929ec308090b01004620c13e6d193f5d04506723bd67abcc5d31b610395c445ac6744cb0a1846b3aabaeac20b0e2e48ad7c3d776cf6f2395c504dc19551268ea7429496726c5d5bf72f9333cba519c21c0000000000000000000000000000000000000000000000000000000000000000104414636070d21adc8280735383102f7a0f5978cea257777a23934dd3b458b79bf388aca218e39e23533a059da173e402c4fc5e3375e1f839efb22e9a5c2a815b07301004620c13e6d193f5d04506723bd67abcc5d31b610395c445ac6744cb0a1846b3aabaeac20b0e2e48ad7c3d776cf6f2395c504dc19551268ea7429496726c5d5bf72f9333cba519c21c0000000000000000000000000000000000000000000000000000000000000000100000000"
     )
-    Transaction.correctlySpends(tx, inputs, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx.correctlySpends(inputs, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("use OP_CHECKSIGADD to implement multisig") {
@@ -156,7 +156,7 @@ class TaprootSpec extends FunSuite {
     )
 
     // simple script tree with a single element
-    val scriptTree = new ScriptTree.Leaf(0, script.map(scala2kmp).asJava)
+    val scriptTree = new ScriptTree.Leaf(script.map(scala2kmp).asJava)
     // we choose a pubkey that does not have a corresponding private key: our funding tx can only be spent through the script path, not the key path
     val internalPubkey = PublicKey.fromBin(ByteVector.fromValidHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")).xOnly
 
@@ -172,25 +172,25 @@ class TaprootSpec extends FunSuite {
     )
 
     // compute all 3 signatures
-    val sigs = privs.map { p => Transaction.signInputTaprootScriptPath(p, tmp, 0, Seq(fundingTx.txOut.head), SigHash.SIGHASH_DEFAULT, scriptTree.hash()) }
+    val sigs = privs.map { p => tmp.signInputTaprootScriptPath(p, 0, Seq(fundingTx.txOut.head), SigHash.SIGHASH_DEFAULT, scriptTree.hash()) }
 
     // one signature is not enough
     val tx = tmp.updateWitness(0, Script.witnessScriptPathPay2tr(internalPubkey, scriptTree, ScriptWitness(Seq(sigs(0), sigs(0), sigs(0))), scriptTree))
     intercept[RuntimeException] {
-      Transaction.correctlySpends(tx, fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+      tx.correctlySpends(fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
 
     // spend with sigs #0 and #1
     val tx1 = tmp.updateWitness(0, Script.witnessScriptPathPay2tr(internalPubkey, scriptTree, ScriptWitness(Seq(ByteVector.empty, sigs(1), sigs(0))), scriptTree))
-    Transaction.correctlySpends(tx1, fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx1.correctlySpends(fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // spend with sigs #0 and #2
     val tx2 = tmp.updateWitness(0, Script.witnessScriptPathPay2tr(internalPubkey, scriptTree, ScriptWitness(Seq(sigs(2), ByteVector.empty, sigs(0))), scriptTree))
-    Transaction.correctlySpends(tx2, fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // spend with sigs #0, #1 and #2
     val tx3 = tmp.updateWitness(0, Script.witnessScriptPathPay2tr(internalPubkey, scriptTree, ScriptWitness(Seq(sigs(2), sigs(1), sigs(0))), scriptTree))
-    Transaction.correctlySpends(tx3, fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx3.correctlySpends(fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("create pay-to-script transactions on signet") {
@@ -201,7 +201,7 @@ class TaprootSpec extends FunSuite {
       PrivateKey(ByteVector32.fromValidHex("0101010101010101010101010101010101010101010101010101010101010103"))
     )
     val scripts: Seq[Seq[ScriptElt]] = privs.map { p => Seq(OP_PUSHDATA(p.xOnlyPublicKey()), OP_CHECKSIG) }
-    val leaves = scripts.zipWithIndex.map { case (script, idx) => new ScriptTree.Leaf(idx, script.map(scala2kmp).asJava) }
+    val leaves = scripts.map { script => new ScriptTree.Leaf(script.map(scala2kmp).asJava) }
     //     root
     //    /   \
     //  /  \   #3
@@ -238,13 +238,13 @@ class TaprootSpec extends FunSuite {
         lockTime = 0
       )
       // We still need to provide the tapscript tree because it is used to tweak the private key.
-      val sig = Transaction.signInputTaprootKeyPath(privs(0), tmp, 0, Seq(fundingTx.txOut(0)), SigHash.SIGHASH_DEFAULT, Some(scriptTree))
+      val sig = tmp.signInputTaprootKeyPath(privs(0), 0, Seq(fundingTx.txOut(0)), SigHash.SIGHASH_DEFAULT, Some(scriptTree))
       tmp.updateWitness(0, Script.witnessKeyPathPay2tr(sig))
     }
 
     // see: https://mempool.space/signet/tx/de3e4dcf07e68c7b237269eee75b926b9d147869f6317031b0550dcbf509ff5b
     assert(tx.toString() == "02000000000101c1952516d2f512e8ec29ffe576fcb13903987434ce22479f2e18b5060f0184c20000000000ffffffff0178cdf50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb064014004174022193d585759ce094bbe47ff23eef0238aaa89a89a0d04c80fa321c9b9056623282c49cfa7388409af5ef9a1ab7e3733b72637edcfb15019018d4d7f5a00000000")
-    Transaction.correctlySpends(tx, fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx.correctlySpends(fundingTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // see https://mempool.space/signet/tx/193962bdc619a1c6f28e3989603a229055b544ee9e12c5ca8cc0a694babd8506
     val fundingTx1 = Transaction.read("020000000001032c94e663cbee0edbdb4375bb2e79be60f8ecfa4e936a14e9a054b1c8923928570000000000feffffff308788df38f369e33bcd70765c171a9796d910b02525a550bfe4d2a2cf8a710c0100000000feffffff94dc10cd523655b0323e90428d720b378b91de312e56908325df6878c530d30d0000000000feffffff0200e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fb8b4f174e020000001600140e361914cb87862fb6ea24193331d6591b59859002463043021f5dcc64a2fef28bdd2b88b5d10851079cc98663a1284d0569bdde5afc558fb202205c2bcdcf1dae62b2c32e8cf6ac6cb2534b70b1889be893da170564a8c4d40f2001210270b71142cd209ddd686ef013adaeb12b641fde95d589a5a607ee0b6c95cc086202473044022034121d55d61376aee90f6b975522b6bad85491448d527b83f6dacbdddcd9548202201a0a9405542ae06239fabdc01069fe2518ee7340ed400d4db2d92604f9d454d601210319b3ad1b37d95ab41034cd810799149501e62ab6d009a6a4eca6034f78ca725b024730440220487663d7740eaa5370673f4807497970feb2d69c83cae281d89fef8aa616259a02200a21dc493e455c2980bc245224eb67aba576f732f77af0fd555a5f44fa205e4d0121023a34e31279a234431b349fd229790038c95c837a8139862df9cbb1226d63c4003eb10100")
@@ -258,14 +258,14 @@ class TaprootSpec extends FunSuite {
         txOut = Seq(TxOut(fundingTx1.txOut.head.amount - Satoshi(5000), sweepPublicKeyScript)),
         lockTime = 0
       )
-      val sig = Transaction.signInputTaprootScriptPath(privs(0), tmp, 0, Seq(fundingTx.txOut(0)), SigHash.SIGHASH_DEFAULT, leaves(0).hash())
+      val sig = tmp.signInputTaprootScriptPath(privs(0), 0, Seq(fundingTx.txOut(0)), SigHash.SIGHASH_DEFAULT, leaves(0).hash())
       val witness = Script.witnessScriptPathPay2tr(internalPubkey, leaves(0), ScriptWitness(Seq(sig)), scriptTree)
       tmp.updateWitness(0, witness)
     }
 
     // see: https://mempool.space/signet/tx/5586515f9ed7fce8b7e8be97a8681c298a94166ff95e15edd94226edec50d9ea
     assert(tx1.toString() == "020000000001010685bdba94a6c08ccac5129eee44b55590223a6089398ef2c6a119c6bd6239190000000000ffffffff0178cdf50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb0640340c6aaa48614bfa03b8cb3c56c84df6214ca223d11b63a7d2dbd67ad4dbb13ccc5ee26890e68b655dfa371fefe8e0117eee854fc3538cbe453ebe6c9ae9d12111022201b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078fac61c01b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f4b756b9676af737379eb8b2767da3e68df7b59757b9f67cb0d21bb5a63ccc1a8a7b49fc07e0495843b92705136c98e1e64d19bf40303f0c2e32d9c58413b770200000000")
-    Transaction.correctlySpends(tx1, fundingTx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx1.correctlySpends(fundingTx1 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // see https://mempool.space/signet/tx/b4dfa342b434709e1b4fd46a2caf7661a195267445ba4402bb2364b174edc5a6
     val fundingTx2 = Transaction.read("02000000000101c1952516d2f512e8ec29ffe576fcb13903987434ce22479f2e18b5060f0184c20100000000feffffff0200e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fb28b1b61100000000160014665ea2d5f8f03b7edc82472baed5ba28dcd22a9f024730440220014381ea4fc0e96733231b84bf9d24ee6d197147c2d2842c896530103c9c23310220384d174f4578767f2117c558671e592ea497f0680cedbacc73dc3f4c316f6b73012102d2212f3a1ef1a797be1fbe8ac784eb81158957339cab89e32faa6f73cc9bf6713fb10100")
@@ -280,14 +280,14 @@ class TaprootSpec extends FunSuite {
         txOut = Seq(TxOut(fundingTx2.txOut.head.amount - Satoshi(5000), sweepPublicKeyScript)),
         lockTime = 0
       )
-      val sig = Transaction.signInputTaprootScriptPath(privs(1), tmp, 0, Seq(fundingTx2.txOut(0)), SigHash.SIGHASH_DEFAULT, leaves(1).hash())
+      val sig = tmp.signInputTaprootScriptPath(privs(1), 0, Seq(fundingTx2.txOut(0)), SigHash.SIGHASH_DEFAULT, leaves(1).hash())
       val witness = Script.witnessScriptPathPay2tr(internalPubkey, leaves(1), ScriptWitness(Seq(sig)), scriptTree)
       tmp.updateWitness(0, witness)
     }
 
     // see: https://mempool.space/signet/tx/5586515f9ed7fce8b7e8be97a8681c298a94166ff95e15edd94226edec50d9ea
     assert(tx2.toString() == "02000000000101a6c5ed74b16423bb0244ba45742695a16176af2c6ad44f1b9e7034b442a3dfb40000000000ffffffff0178cdf50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb06403409ded7b5094a959650a725f4c1d87f5ba17904a14085ad5ec65c4b2ebb817c8e9193a31091ad3c9ac393bc394dd2a85f2456908cc2209760540e5094b32ccec392220c050c3f0b8d45b9e093a91cb96d097b24100e66585d0d8561e01c1231837493fac61c01b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078fb3377ed08656d10020a2669defa10b1493771fbd61be8e3dbe2d8232a6b9805ca7b49fc07e0495843b92705136c98e1e64d19bf40303f0c2e32d9c58413b770200000000")
-    Transaction.correctlySpends(tx2, fundingTx2 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(fundingTx2 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // see https://mempool.space/signet/tx/97196e1dc3ee089955d2a738143a66a34166d0c7f0a85d8ad4ba2c972dc0555c
     val fundingTx3 = Transaction.read("020000000001025bff09f5cb0d55b0317031f66978149d6b925be7ee6972237b8ce607cf4d3ede0000000000feffffffead950eced2642d9ed155ef96f16948a291c68a897bee8b7e8fcd79e5f5186550000000000feffffff0214b9f50500000000160014faf51bb67e3e35a93aa549cf2c8d24763d8162ce00e1f50500000000225120f1d062d20433c023ba934aec75fa78cf8e2f840181b88c301430524aad93d0fb0247304402201989eb9d1f4d976a9f0bf512e7f1fa784c45eee369a6c13511162a463c89935002201a1d41e53c56600137a851d0c26daaffd6aa30197fbf9221daf6cbca458fb40f012102238ee9a8b833398e3421c809e7ac75089e4e738841577273fe87d3cd14a22cf202473044022035e887ced3bb03f54cce39e4cdecf93b787765c51de2545a16c97fec67d3085b02200bd15d5497d1a9be37ad29142673ef2cdc0cee69f6a9cf5643c376a4b4f81489012102238ee9a8b833398e3421c809e7ac75089e4e738841577273fe87d3cd14a22cf290b10100")
@@ -301,14 +301,13 @@ class TaprootSpec extends FunSuite {
         txOut = Seq(TxOut(fundingTx3.txOut.head.amount - Satoshi(5000), addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7").toOption.get)),
         lockTime = 0
       )
-      val sig = Transaction.signInputTaprootScriptPath(privs(2), tmp, 0, Seq(fundingTx3.txOut(1)), SigHash.SIGHASH_DEFAULT, leaves(2).hash())
+      val sig = tmp.signInputTaprootScriptPath(privs(2), 0, Seq(fundingTx3.txOut(1)), SigHash.SIGHASH_DEFAULT, leaves(2).hash())
       val witness = Script.witnessScriptPathPay2tr(internalPubkey, leaves(2), ScriptWitness(Seq(sig)), scriptTree)
       tmp.updateWitness(0, witness)
     }
 
     // see: https://mempool.space/signet/tx/2eb421e044de0535aa3d14a5a4c325ba8b5181440bbd911b5b43718b686b09a8
     assert(tx3.toString() == "020000000001015c55c02d972cbad48a5da8f0c7d06641a3663a1438a7d2559908eec31d6e19970100000000ffffffff018ca5f50500000000160014310b7b9acef217ed007ba904eac9fa45ad5cb0640340c10da2636457db468385345303e984ee949d0815745f5dcba67cde603ef02738b6f26f6c44beef0a93d9fcbb82571d215ca2cf04a1894ce01d2eaf7b6068260a2220a4fbd2c1822592c0ae8afa0e63a0d4c56a571179e93fd61615627f419fd0be9aac41c01b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f35b9c8be6dc0c33d6ce3cc9d3ba04c509b3f5b0139254f67d3184a5a238901f400000000")
-    Transaction.correctlySpends(tx3, fundingTx3 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    tx3.correctlySpends(fundingTx3 :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
-
 }

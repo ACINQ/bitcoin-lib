@@ -54,6 +54,20 @@ object DeterministicWallet {
 
     def publicKey: PublicKey = privateKey.publicKey
 
+    def extendedPublicKey: ExtendedPublicKey = ExtendedPublicKey(priv.getExtendedPublicKey)
+
+    def derivePrivateKey(index: Long): ExtendedPrivateKey = ExtendedPrivateKey(priv.derivePrivateKey(index))
+
+    def derivePrivateKey(path: Seq[Long]): ExtendedPrivateKey = ExtendedPrivateKey(priv.derivePrivateKey(path.map(x => Long.box(x)).toList.asJava))
+
+    def derivePrivateKey(path: KeyPath): ExtendedPrivateKey = ExtendedPrivateKey(priv.derivePrivateKey(path))
+
+    def derivePrivateKey(path: String): ExtendedPrivateKey = ExtendedPrivateKey(priv.derivePrivateKey(path))
+
+    def encode(prefix: Int): String = priv.encode(prefix)
+
+    def fingerprint: Long = priv.fingerprint()
+
     override def toString: String = priv.toString
   }
 
@@ -68,7 +82,7 @@ object DeterministicWallet {
     }
   }
 
-  def encode(input: ExtendedPrivateKey, prefix: Int): String = bitcoin.DeterministicWallet.encode(input.priv, prefix)
+  def encode(input: ExtendedPrivateKey, prefix: Int): String = input.encode(prefix)
 
   case class ExtendedPublicKey(pub: bitcoin.DeterministicWallet.ExtendedPublicKey) {
     val publickeybytes: ByteVector = pub.publickeybytes
@@ -78,6 +92,18 @@ object DeterministicWallet {
     val parent: Long = pub.parent
 
     def publicKey: PublicKey = pub.getPublicKey
+
+    def derivePublicKey(index: Long): ExtendedPublicKey = ExtendedPublicKey(pub.derivePublicKey(index))
+
+    def derivePublicKey(path: Seq[Long]): ExtendedPublicKey = ExtendedPublicKey(pub.derivePublicKey(path.map(x => Long.box(x)).toList.asJava))
+
+    def derivePublicKey(path: KeyPath): ExtendedPublicKey = ExtendedPublicKey(pub.derivePublicKey(path))
+
+    def derivePublicKey(path: String): ExtendedPublicKey = ExtendedPublicKey(pub.derivePublicKey(path))
+
+    def encode(prefix: Int): String = pub.encode(prefix)
+
+    def fingerprint: Long = pub.fingerprint()
 
     override def toString: String = pub.toString
   }

@@ -58,11 +58,11 @@ class TransactionSpec extends FunSuite with Matchers {
     )
 
     // step #2: sign the tx
-    val sig = Transaction.signInput(tx1, 0, previousTx.txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = tx1.signInput(0, previousTx.txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val tx2 = tx1.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(publicKey) :: Nil)
 
     // redeem the tx
-    Transaction.correctlySpends(tx2, Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
+    tx2.correctlySpends(Seq(previousTx), ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
 
   test("create and verify sign pay2pk transactions with multiple inputs and outputs") {
@@ -96,8 +96,8 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L
     )
 
-    val sig1 = Transaction.signInput(tx, 0, previousTx(0).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys.head)
-    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
+    val sig1 = tx.signInput(0, previousTx(0).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys.head)
+    val sig2 = tx.signInput(1, previousTx(1).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
     val tx1 = tx
       .updateSigScript(0, OP_PUSHDATA(sig1) :: OP_PUSHDATA(keys.head.publicKey.value) :: Nil)
       .updateSigScript(1, OP_PUSHDATA(sig2) :: OP_PUSHDATA(keys(1).publicKey.toUncompressedBin) :: Nil)
@@ -105,7 +105,7 @@ class TransactionSpec extends FunSuite with Matchers {
     assert(tx1.toString == "01000000026c8a0bb4fef409509800066578a718e9a771082d94e96e0885a4b6a15b720c02000000006b483045022100e5510a2f15f03788ee2aeb2115edc96089596e3a0f0c1b1abfbbf069f4beedb802203faf6ec92a5a4ed2ce5fd42621be99746b57eca0eb46d322dc076080338b6c5a0121030533e1d2e9b7576fef26de1f34d67887158b7af1b040850aab6024b07925d70affffffffaf01f14881716b8acb062c33e7a66fc71e77bb2e4359b1f91b959aeb4f8837f1000000008b483045022100d3e5756f36e39a801c71c406124b3e0a66f0893a7fea46c69939b84715137c40022070a0e96e37c0a8e8c920e84fc63ed1914b4cef114a027f2d027d0a4a04b0b52d0141040081a4cce4c497d51d2f9be2d2109c00cbdef252185ca23074889604ace3504d73fd5f5aaac6423b04e776e467a948e1e79cb8793ded5f4b59c730c4460a0f86ffffffff02c0c62d00000000001976a914558c6b340f5abd22bf97b15cbc1483f8f1b54f5f88aca0f01900000000001976a914a1f93b5b00f9f5e8ade5549b58ed06cdc5c8203e88ac00000000")
 
     // now check that we can redeem this tx
-    Transaction.correctlySpends(tx1, previousTx, ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
+    tx1.correctlySpends(previousTx, ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
     // the id of this tx on testnet is 882e971dbdb7b762cd07e5db016d3c81267ec5233186a31e6f40457a0a56a311
   }
 
@@ -143,9 +143,9 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L)
 
     // and sign it
-    val sig = Transaction.signInput(tx, 0, previousTx.txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
+    val sig = tx.signInput(0, previousTx.txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, privateKey)
     val signedTx = tx.updateSigScript(0, OP_PUSHDATA(sig) :: OP_PUSHDATA(privateKey.publicKey.toUncompressedBin) :: Nil)
-    Transaction.correctlySpends(signedTx, previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    signedTx.correctlySpends(previousTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // how to spend our tx ? let's try to sent its output to our public key
     val spendingTx = Transaction(version = 1L,
@@ -156,13 +156,13 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L)
 
     // we need at least 2 signatures
-    val sig1 = Transaction.signInput(spendingTx, 0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
-    val sig2 = Transaction.signInput(spendingTx, 0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
+    val sig1 = spendingTx.signInput(0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key1)
+    val sig2 = spendingTx.signInput(0, redeemScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, key2)
 
     // update our tx with the correct sig script
     val sigScript = OP_0 :: OP_PUSHDATA(sig1) :: OP_PUSHDATA(sig2) :: OP_PUSHDATA(redeemScript) :: Nil
     val signedSpendingTx = spendingTx.updateSigScript(0, sigScript)
-    Transaction.correctlySpends(signedSpendingTx, signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    signedSpendingTx.correctlySpends(signedTx :: Nil, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
   }
 
   test("sign a 3-to-2 transaction with helper method") {
@@ -204,9 +204,9 @@ class TransactionSpec extends FunSuite with Matchers {
       lockTime = 0L
     )
 
-    val sig1 = Transaction.signInput(tx, 0, previousTx.head.txOut(1).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys.head)
-    val sig2 = Transaction.signInput(tx, 1, previousTx(1).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
-    val sig3 = Transaction.signInput(tx, 2, previousTx(2).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(2))
+    val sig1 = tx.signInput(0, previousTx.head.txOut(1).publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys.head)
+    val sig2 = tx.signInput(1, previousTx(1).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(1))
+    val sig3 = tx.signInput(2, previousTx(2).txOut.head.publicKeyScript, SigHash.SIGHASH_ALL, 0 sat, SigVersion.SIGVERSION_BASE, keys(2))
 
     val signedTx = tx
       .updateSigScript(0, OP_PUSHDATA(sig1) :: OP_PUSHDATA(keys.head.publicKey.value) :: Nil)
@@ -219,7 +219,7 @@ class TransactionSpec extends FunSuite with Matchers {
     // the id of this tx on testnet is e8570dd062de8e354b18f6308ff739a51f25db75563c4ee2bc5849281263528f
 
     // redeem tx
-    Transaction.correctlySpends(signedTx, previousTx, ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
+    signedTx.correctlySpends(previousTx, ScriptFlags.MANDATORY_SCRIPT_VERIFY_FLAGS)
   }
 
   test("compute tx size and weight") {
