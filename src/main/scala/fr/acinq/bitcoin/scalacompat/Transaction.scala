@@ -205,7 +205,7 @@ object Transaction extends BtcSerializer[Transaction] {
    * @return a hash which can be used to sign the referenced tx input
    */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): ByteVector32 = {
-    tx.hashForSigning(inputIndex, previousOutputScript, sighashType)
+    ByteVector32(ByteVector.view(fr.acinq.bitcoin.Transaction.hashForSigning(tx, inputIndex, previousOutputScript.toArray, sighashType)))
   }
 
   /**
@@ -218,7 +218,7 @@ object Transaction extends BtcSerializer[Transaction] {
    * @return a hash which can be used to sign the referenced tx input
    */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int): ByteVector32 =
-    tx.hashForSigning(inputIndex, Script.write(previousOutputScript), sighashType)
+    hashForSigning(tx, inputIndex, Script.write(previousOutputScript), sighashType)
 
   /**
    * hash a tx for signing
@@ -433,30 +433,6 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    */
   def prepareForSigning(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): Transaction = {
     scala2kmp(this).prepareForSigning(inputIndex, previousOutputScript.toArray, sighashType)
-  }
-
-  /**
-   * hash a tx for signing (pre-segwit)
-   *
-   * @param inputIndex           index of the tx input that is being processed
-   * @param previousOutputScript public key script of the output claimed by this tx input
-   * @param sighashType          signature hash type
-   * @return a hash which can be used to sign the referenced tx input
-   */
-  def hashForSigning(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): ByteVector32 = {
-    ByteVector32(ByteVector.view(scala2kmp(this).hashForSigning(inputIndex, previousOutputScript.toArray, sighashType)))
-  }
-
-  /**
-   * hash a tx for signing (pre-segwit)
-   *
-   * @param inputIndex           index of the tx input that is being processed
-   * @param previousOutputScript public key script of the output claimed by this tx input
-   * @param sighashType          signature hash type
-   * @return a hash which can be used to sign the referenced tx input
-   */
-  def hashForSigning(inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int): ByteVector32 = {
-    ByteVector32(ByteVector.view(scala2kmp(this).hashForSigning(inputIndex, Script.write(previousOutputScript).toArray, sighashType)))
   }
 
   /**
