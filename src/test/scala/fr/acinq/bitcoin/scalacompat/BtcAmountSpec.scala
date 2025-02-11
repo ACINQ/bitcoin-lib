@@ -2,6 +2,8 @@ package fr.acinq.bitcoin.scalacompat
 
 import org.scalatest.FunSuite
 
+import java.util.Locale
+
 class BtcAmountSpec extends FunSuite {
 
   test("btc/millibtc/satoshi conversions") {
@@ -92,6 +94,25 @@ class BtcAmountSpec extends FunSuite {
     assert((1.1 btc).min(900 millibtc) === Btc(0.9))
     assert((1.1 btc).max(90000000 sat) === Btc(1.1))
     assert((1.1 btc).min(90000000 sat) === Btc(0.9))
+  }
+
+  test("toString formatting") {
+    assert((0.00000000 btc).toString == "0 BTC")
+    assert((10.00000000 btc).toString == "10 BTC")
+    assert((1.23456789 btc).toString == "1.23456789 BTC")
+    assert((-1.23456789 btc).toString == "-1.23456789 BTC")
+    assert((1.2345 btc).toString == "1.2345 BTC")
+    assert((-1.2345 btc).toString == "-1.2345 BTC")
+
+    assert((0 btc).toMilliBtc.toString == "0 mBTC")
+    assert((10.00000000 btc).toMilliBtc.toString == "10000 mBTC")
+    assert((1.23456789 btc).toMilliBtc.toString == "1234.56789 mBTC")
+    assert((-1.23456789 btc).toMilliBtc.toString == "-1234.56789 mBTC")
+    assert((1.2345 btc).toMilliBtc.toString == "1234.5 mBTC")
+    assert((-1.2345 btc).toMilliBtc.toString == "-1234.5 mBTC")
+    assert((1.234 btc).toMilliBtc.toString == "1234 mBTC")
+    assert((-1.234 btc).toMilliBtc.toString == "-1234 mBTC")
+
   }
 
 }

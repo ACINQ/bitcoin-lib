@@ -1,5 +1,10 @@
 package fr.acinq.bitcoin.scalacompat
 
+import fr.acinq.bitcoin.scalacompat.BtcAmount.{btcFormat, milliBtcFormat}
+
+import java.text.{DecimalFormat, DecimalFormatSymbols}
+import java.util.Locale
+
 sealed trait BtcAmount
 
 case class Satoshi(private val underlying: Long) extends BtcAmount with Ordered[Satoshi] {
@@ -52,7 +57,7 @@ case class MilliBtc(private val underlying: BigDecimal) extends BtcAmount with O
   def toBigDecimal: BigDecimal = underlying
   def toDouble: Double = underlying.toDouble
   def toLong: Long = underlying.toLong
-  override def toString = f"$underlying%1.5f mBTC"
+  override def toString = s"${milliBtcFormat.format(underlying)} mBTC"
   // @formatter:on
 }
 
@@ -82,7 +87,7 @@ case class Btc(private val underlying: BigDecimal) extends BtcAmount with Ordere
   def toBigDecimal: BigDecimal = underlying
   def toDouble: Double = underlying.toDouble
   def toLong: Long = underlying.toLong
-  override def toString = f"$underlying%1.8f BTC"
+  override def toString = s"${btcFormat.format(underlying)} BTC"
   // @formatter:on
 }
 
@@ -90,4 +95,6 @@ object BtcAmount {
   val Coin = 100000000L
   val Cent = 1000000L
   val MaxMoney: Double = 21e6 * Coin
+  val milliBtcFormat = new DecimalFormat("#.#####", new DecimalFormatSymbols(Locale.US))
+  val btcFormat = new DecimalFormat("#.########", new DecimalFormatSymbols(Locale.US))
 }
