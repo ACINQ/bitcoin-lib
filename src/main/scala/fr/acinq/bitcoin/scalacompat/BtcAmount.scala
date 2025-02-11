@@ -52,7 +52,7 @@ case class MilliBtc(private val underlying: BigDecimal) extends BtcAmount with O
   def toBigDecimal: BigDecimal = underlying
   def toDouble: Double = underlying.toDouble
   def toLong: Long = underlying.toLong
-  override def toString = s"$underlying mBTC"
+  override def toString = f"$underlying%1.5f mBTC"
   // @formatter:on
 }
 
@@ -82,7 +82,7 @@ case class Btc(private val underlying: BigDecimal) extends BtcAmount with Ordere
   def toBigDecimal: BigDecimal = underlying
   def toDouble: Double = underlying.toDouble
   def toLong: Long = underlying.toLong
-  override def toString = s"$underlying BTC"
+  override def toString = f"$underlying%1.8f BTC"
   // @formatter:on
 }
 
