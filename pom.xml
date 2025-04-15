@@ -177,12 +177,12 @@
         <dependency>
             <groupId>fr.acinq.bitcoin</groupId>
             <artifactId>bitcoin-kmp-jvm</artifactId>
-            <version>0.22.1</version>
+            <version>0.22.2</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
             <artifactId>secp256k1-kmp-jni-jvm</artifactId>
-            <version>0.17.1</version>
+            <version>0.17.3</version>
         </dependency>
         <dependency>
             <groupId>org.scodec</groupId>
