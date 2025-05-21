@@ -45,6 +45,24 @@ object Musig2 {
   }
 
   /**
+   * Verify a partial musig2 signature.
+   *
+   * @param partialSig     partial musig2 signature.
+   * @param nonce          public nonce matching the secret nonce used to generate the signature.
+   * @param publicKey      public key for the private key used to generate the signature.
+   * @param tx             transaction spending the target taproot input.
+   * @param inputIndex     index of the taproot input to spend.
+   * @param inputs         all inputs of the spending transaction.
+   * @param publicKeys     public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+   * @param publicNonces   public nonces of all participants of the musig2 session.
+   * @param scriptTree_opt tapscript tree of the taproot input, if it has script paths.
+   * @return true if the partial signature is valid.
+   */
+  def verifyTaprootSignature(partialSig: ByteVector32, nonce: IndividualNonce, publicKey: PublicKey, tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], publicKeys: Seq[PublicKey], publicNonces: Seq[IndividualNonce], scriptTree_opt: Option[ScriptTree]): Boolean = {
+    fr.acinq.bitcoin.crypto.musig2.Musig2.verify(partialSig, nonce, publicKey, tx, inputIndex, inputs.map(scala2kmp).asJava, publicKeys.map(scala2kmp).asJava, publicNonces.asJava, scriptTree_opt.orNull)
+  }
+
+  /**
    * Aggregate partial musig2 signatures into a valid schnorr signature for the given taproot input key path.
    *
    * @param partialSigs    partial musig2 signatures of all participants of the musig2 session.

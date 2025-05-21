@@ -32,7 +32,9 @@ class Musig2Spec extends FunSuite {
     // Once they have each other's public nonce, they can produce partial signatures.
     val publicNonces = Seq(alicePublicNonce, bobPublicNonce)
     val Right(aliceSig) = Musig2.signTaprootInput(alicePrivKey, spendingTx, 0, tx.txOut, Seq(alicePubKey, bobPubKey), aliceSecretNonce, publicNonces, scriptTree_opt = None)
+    assert(Musig2.verifyTaprootSignature(aliceSig, alicePublicNonce, alicePubKey, spendingTx, 0, tx.txOut, Seq(alicePubKey, bobPubKey), publicNonces, scriptTree_opt = None))
     val Right(bobSig) = Musig2.signTaprootInput(bobPrivKey, spendingTx, 0, tx.txOut, Seq(alicePubKey, bobPubKey), bobSecretNonce, publicNonces, scriptTree_opt = None)
+    assert(Musig2.verifyTaprootSignature(bobSig, bobPublicNonce, bobPubKey, spendingTx, 0, tx.txOut, Seq(alicePubKey, bobPubKey), publicNonces, scriptTree_opt = None))
 
     // Once they have each other's partial signature, they can aggregate them into a valid signature.
     val Right(aggregateSig) = Musig2.aggregateTaprootSignatures(Seq(aliceSig, bobSig), spendingTx, 0, tx.txOut, Seq(alicePubKey, bobPubKey), publicNonces, scriptTree_opt = None)
@@ -83,7 +85,9 @@ class Musig2Spec extends FunSuite {
       // Once they have each other's public nonce, they can produce partial signatures.
       val publicNonces = Seq(userPublicNonce, serverPublicNonce)
       val Right(userSig) = Musig2.signTaprootInput(userPrivateKey, tx, 0, swapInTx.txOut, Seq(userPublicKey, serverPublicKey), userSecretNonce, publicNonces, Some(scriptTree))
+      assert(Musig2.verifyTaprootSignature(userSig, userPublicNonce, userPublicKey, tx, 0, swapInTx.txOut, Seq(userPublicKey, serverPublicKey), publicNonces, Some(scriptTree)))
       val Right(serverSig) = Musig2.signTaprootInput(serverPrivateKey, tx, 0, swapInTx.txOut, Seq(userPublicKey, serverPublicKey), serverSecretNonce, publicNonces, Some(scriptTree))
+      assert(Musig2.verifyTaprootSignature(serverSig, serverPublicNonce, serverPublicKey, tx, 0, swapInTx.txOut, Seq(userPublicKey, serverPublicKey), publicNonces, Some(scriptTree)))
 
       // Once they have each other's partial signature, they can aggregate them into a valid signature.
       val Right(sig) = Musig2.aggregateTaprootSignatures(Seq(userSig, serverSig), tx, 0, swapInTx.txOut, Seq(userPublicKey, serverPublicKey), publicNonces, Some(scriptTree))
