@@ -20,11 +20,29 @@ object Musig2 {
 
   /**
    * @param sessionId  a random, unique session ID.
-   * @param privateKey signer's private key.
+   * @param signingKey either the signer's private key or public key
    * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
+   * @param message_opt (optional) message that will be signed, if already known.
+   * @param extraInput_opt (optional) additional random data.
    */
-  def generateNonce(sessionId: ByteVector32, privateKey: PrivateKey, publicKeys: Seq[PublicKey]): (SecretNonce, IndividualNonce) = {
-    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonce(sessionId, privateKey, publicKeys.map(scala2kmp).asJava)
+  def generateNonce(sessionId: ByteVector32, signingKey: Either[PrivateKey, PublicKey], publicKeys: Seq[PublicKey], message_opt: Option[ByteVector32], extraInput_opt: Option[ByteVector32]): (SecretNonce, IndividualNonce) = {
+    val (privateKey, publicKey) = signingKey match {
+      case Left(priv) => (scala2kmp(priv), priv.publicKey)
+      case Right(pub) => (null, pub)
+    }
+    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonce(sessionId, privateKey, publicKey, publicKeys.map(scala2kmp).asJava, message_opt.map(scala2kmp).orNull, extraInput_opt.map(scala2kmp).orNull)
+    (nonce.getFirst, nonce.getSecond)
+  }
+
+  /**
+   * @param nonRepeatingCounter non-repeating counter that must never be reused with the same private key.
+   * @param privateKey          signer's private key.
+   * @param publicKeys          public keys of all participants: callers must verify that all public keys are valid.
+   * @param message_opt         (optional) message that will be signed, if already known.
+   * @param extraInput_opt      (optional) additional random data.
+   */
+  def generateNonceWithCounter(nonRepeatingCounter: Long, privateKey: PrivateKey, publicKeys: Seq[PublicKey], message_opt: Option[ByteVector32], extraInput_opt: Option[ByteVector32]): (SecretNonce, IndividualNonce) = {
+    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonceWithCounter(nonRepeatingCounter, privateKey, publicKeys.map(scala2kmp).asJava, message_opt.map(scala2kmp).orNull, extraInput_opt.map(scala2kmp).orNull)
     (nonce.getFirst, nonce.getSecond)
   }
 
