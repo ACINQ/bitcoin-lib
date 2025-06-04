@@ -27,8 +27,8 @@ class Musig2Spec extends FunSuite {
 
     // The first step of a musig2 signing session is to exchange nonces.
     // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
-    val (aliceSecretNonce, alicePublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Some(alicePrivKey), alicePrivKey.publicKey, Seq(alicePubKey, bobPubKey), None, None)
-    val (bobSecretNonce, bobPublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Some(bobPrivKey), bobPrivKey.publicKey, Seq(alicePubKey, bobPubKey), None, None)
+    val (aliceSecretNonce, alicePublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Left(alicePrivKey), Seq(alicePubKey, bobPubKey), None, None)
+    val (bobSecretNonce, bobPublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Right(bobPrivKey.publicKey), Seq(alicePubKey, bobPubKey), None, None)
 
     // Once they have each other's public nonce, they can produce partial signatures.
     val publicNonces = Seq(alicePublicNonce, bobPublicNonce)
@@ -80,8 +80,8 @@ class Musig2Spec extends FunSuite {
       )
       // The first step of a musig2 signing session is to exchange nonces.
       // If participants are disconnected before the end of the signing session, they must start again with fresh nonces.
-      val (userSecretNonce, userPublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Some(userPrivateKey), userPrivateKey.publicKey, Seq(userPublicKey, serverPublicKey), None, None)
-      val (serverSecretNonce, serverPublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Some(serverPrivateKey), serverPrivateKey.publicKey, Seq(userPublicKey, serverPublicKey), None, None)
+      val (userSecretNonce, userPublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Left(userPrivateKey), Seq(userPublicKey, serverPublicKey), None, None)
+      val (serverSecretNonce, serverPublicNonce) = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Right(serverPrivateKey.publicKey), Seq(userPublicKey, serverPublicKey), None, None)
 
       // Once they have each other's public nonce, they can produce partial signatures.
       val publicNonces = Seq(userPublicNonce, serverPublicNonce)
