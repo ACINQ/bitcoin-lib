@@ -20,11 +20,26 @@ object Musig2 {
 
   /**
    * @param sessionId  a random, unique session ID.
-   * @param privateKey signer's private key.
+   * @param privateKey signer's private key
+   * @param publicKey  signer's public key
    * @param publicKeys public keys of all participants: callers must verify that all public keys are valid.
+   * @param message    (optional) message that will be signed, if already known.
+   * @param extraInput (optional) additional random data.
    */
-  def generateNonce(sessionId: ByteVector32, privateKey: PrivateKey, publicKeys: Seq[PublicKey]): (SecretNonce, IndividualNonce) = {
-    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonce(sessionId, privateKey, publicKeys.map(scala2kmp).asJava)
+  def generateNonce(sessionId: ByteVector32, privateKey: Option[PrivateKey], publicKey: PublicKey, publicKeys: Seq[PublicKey], message: Option[ByteVector32], extraInput: Option[ByteVector32]): (SecretNonce, IndividualNonce) = {
+    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonce(sessionId, privateKey.map(scala2kmp).orNull, publicKey, publicKeys.map(scala2kmp).asJava, message.map(scala2kmp).orNull, extraInput.map(scala2kmp).orNull)
+    (nonce.getFirst, nonce.getSecond)
+  }
+
+  /**
+   * @param nonRepeatingCounter non-repeating counter that must never be reused with the same private key.
+   * @param privateKey          signer's private key.
+   * @param publicKeys          public keys of all participants: callers must verify that all public keys are valid.
+   * @param message             (optional) message that will be signed, if already known.
+   * @param extraInput          (optional) additional random data.
+   */
+  def generateNonceWithCounter(nonRepeatingCounter: Long, privateKey: PrivateKey, publicKeys: Seq[PublicKey], message: Option[ByteVector32], extraInput: Option[ByteVector32]): (SecretNonce, IndividualNonce) = {
+    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonceWithCounter(nonRepeatingCounter, privateKey, publicKeys.map(scala2kmp).asJava, message.map(scala2kmp).orNull, extraInput.map(scala2kmp).orNull)
     (nonce.getFirst, nonce.getSecond)
   }
 
