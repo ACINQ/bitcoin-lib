@@ -101,6 +101,11 @@ object KotlinUtils {
 
   implicit def eitherkmp2either[L, R](input: fr.acinq.bitcoin.utils.Either[L, R]): Either[L, R] = if (input.isLeft) Left(input.getLeft) else Right(input.getRight)
 
+  implicit def either2keitherkmp[L, R](input: Either[L, R]): fr.acinq.bitcoin.utils.Either[L, R] = input match {
+    case Left(l) => new fr.acinq.bitcoin.utils.Either.Left[L](l).asInstanceOf[fr.acinq.bitcoin.utils.Either[L, R]]
+    case Right(r) => new fr.acinq.bitcoin.utils.Either.Right[R](r).asInstanceOf[fr.acinq.bitcoin.utils.Either[L, R]]
+  }
+
   implicit def scala2kmp(input: ScriptElt): bitcoin.ScriptElt = input match {
     case OP_PUSHDATA(data, _) => new bitcoin.OP_PUSHDATA(data)
     case _ => scriptEltMapScala2Kmp(input)

@@ -26,11 +26,7 @@ object Musig2 {
    * @param extraInput_opt (optional) additional random data.
    */
   def generateNonce(sessionId: ByteVector32, signingKey: Either[PrivateKey, PublicKey], publicKeys: Seq[PublicKey], message_opt: Option[ByteVector32], extraInput_opt: Option[ByteVector32]): (SecretNonce, IndividualNonce) = {
-    val (privateKey, publicKey) = signingKey match {
-      case Left(priv) => (scala2kmp(priv), priv.publicKey)
-      case Right(pub) => (null, pub)
-    }
-    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonce(sessionId, privateKey, publicKey, publicKeys.map(scala2kmp).asJava, message_opt.map(scala2kmp).orNull, extraInput_opt.map(scala2kmp).orNull)
+    val nonce = fr.acinq.bitcoin.crypto.musig2.Musig2.generateNonce(sessionId, either2keitherkmp(signingKey.map(scala2kmp).left.map(scala2kmp)), publicKeys.map(scala2kmp).asJava, message_opt.map(scala2kmp).orNull, extraInput_opt.map(scala2kmp).orNull)
     (nonce.getFirst, nonce.getSecond)
   }
 
