@@ -1,15 +1,11 @@
 package fr.acinq.bitcoin.scalacompat
 
-import fr.acinq.bitcoin.Crypto.TaprootTweak
-import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey, TaprootTweak}
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
-import fr.acinq.bitcoin.scalacompat.Transaction.hashForSigningSchnorr
-import fr.acinq.bitcoin.{Bech32, ScriptFlags, ScriptTree, SigHash, SigVersion}
+import fr.acinq.bitcoin.{Bech32, ScriptFlags, SigHash, SigVersion}
 import fr.acinq.secp256k1.Secp256k1
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
-
-import scala.jdk.CollectionConverters.SeqHasAsJava
 
 class TaprootSpec extends FunSuite {
 
@@ -19,7 +15,7 @@ class TaprootSpec extends FunSuite {
     val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/1")
     val internalKey = key.publicKey.xOnly
     val script = Script.pay2tr(internalKey, scripts_opt = None)
-    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak.INSTANCE)
+    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak)
     assert("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c" == Bech32.encodeWitnessAddress("tb", 1, outputKey.pub.value.toByteArray))
     assert(script == Script.pay2tr(outputKey))
 
@@ -45,23 +41,23 @@ class TaprootSpec extends FunSuite {
     assert(Crypto.verifySignatureSchnorr(hash, sig, outputKey))
 
     // re-create signature
-    val ourSig = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak.INSTANCE)
+    val ourSig = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak)
     assert(Crypto.verifySignatureSchnorr(hash, ourSig, outputKey))
     assert(Secp256k1.get().verifySchnorr(ourSig.toArray, hash.toArray, outputKey.pub.value.toByteArray))
 
     // setting auxiliary random data to all-zero yields the same result as not setting any auxiliary random data
-    val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak.INSTANCE, Some(ByteVector32.Zeroes))
+    val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak, Some(ByteVector32.Zeroes))
     assert(ourSig == ourSig1)
 
     // setting auxiliary random data to a non-zero value yields a different result
-    val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak.INSTANCE, Some(ByteVector32.One))
+    val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak, Some(ByteVector32.One))
     assert(ourSig != ourSig2)
   }
 
   test("send to and spend from taproot addresses") {
     val privateKey = PrivateKey(ByteVector32.fromValidHex("0101010101010101010101010101010101010101010101010101010101010101"))
     val internalKey = privateKey.publicKey.xOnly
-    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak.INSTANCE)
+    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak)
     val address = Bech32.encodeWitnessAddress("tb", 1, outputKey.pub.value.toByteArray)
     assert("tb1p33wm0auhr9kkahzd6l0kqj85af4cswn276hsxg6zpz85xe2r0y8snwrkwy" == address)
 
@@ -156,7 +152,7 @@ class TaprootSpec extends FunSuite {
     )
 
     // simple script tree with a single element
-    val scriptTree = new ScriptTree.Leaf(script.map(scala2kmp).asJava)
+    val scriptTree = ScriptTree.Leaf(script)
     // we choose a pubkey that does not have a corresponding private key: our funding tx can only be spent through the script path, not the key path
     val internalPubkey = PublicKey.fromBin(ByteVector.fromValidHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")).xOnly
 
@@ -201,13 +197,13 @@ class TaprootSpec extends FunSuite {
       PrivateKey(ByteVector32.fromValidHex("0101010101010101010101010101010101010101010101010101010101010103"))
     )
     val scripts: Seq[Seq[ScriptElt]] = privs.map { p => Seq(OP_PUSHDATA(p.xOnlyPublicKey()), OP_CHECKSIG) }
-    val leaves = scripts.map { script => new ScriptTree.Leaf(script.map(scala2kmp).asJava) }
+    val leaves = scripts.map(ScriptTree.Leaf(_))
     //     root
     //    /   \
     //  /  \   #3
     // #1  #2
-    val scriptTree = new ScriptTree.Branch(
-      new ScriptTree.Branch(leaves(0), leaves(1)),
+    val scriptTree = ScriptTree.Branch(
+      ScriptTree.Branch(leaves(0), leaves(1)),
       leaves(2)
     )
     val blockchain = Block.SignetGenesisBlock.hash

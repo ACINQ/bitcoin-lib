@@ -175,7 +175,7 @@ object Script {
    * @param internalKey internal public key that will be tweaked with the [scripts] provided.
    * @param scripts_opt optional spending scripts that can be used instead of key-path spending.
    */
-  def pay2tr(internalKey: XonlyPublicKey, scripts_opt: Option[bitcoin.ScriptTree]): Seq[ScriptElt] = bitcoin.Script.pay2tr(internalKey.pub, scripts_opt.orNull).asScala.map(kmp2scala).toList
+  def pay2tr(internalKey: XonlyPublicKey, scripts_opt: Option[ScriptTree]): Seq[ScriptElt] = bitcoin.Script.pay2tr(internalKey.pub, scripts_opt.map(scala2kmp).orNull).asScala.map(kmp2scala).toList
 
   def isPay2tr(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isPay2tr(script.map(scala2kmp).asJava)
 
@@ -188,6 +188,6 @@ object Script {
    * @param witness     witness for the spent [script].
    * @param scriptTree  tapscript tree.
    */
-  def witnessScriptPathPay2tr(internalKey: XonlyPublicKey, script: bitcoin.ScriptTree.Leaf, witness: ScriptWitness, scriptTree: bitcoin.ScriptTree): ScriptWitness = bitcoin.Script.witnessScriptPathPay2tr(internalKey.pub, script, witness, scriptTree)
+  def witnessScriptPathPay2tr(internalKey: XonlyPublicKey, script: ScriptTree.Leaf, witness: ScriptWitness, scriptTree: ScriptTree): ScriptWitness = bitcoin.Script.witnessScriptPathPay2tr(internalKey.pub, scala2kmp(script), witness, scala2kmp(scriptTree))
 
 }

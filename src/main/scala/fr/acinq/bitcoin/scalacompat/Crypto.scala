@@ -5,6 +5,27 @@ import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import scodec.bits.ByteVector
 
 object Crypto {
+
+  // @formatter:off
+  /** Specify how private keys are tweaked when creating Schnorr signatures. */
+  sealed trait SchnorrTweak
+  object SchnorrTweak {
+    /** The private key is directly used, without any tweaks. */
+    case object NoTweak extends SchnorrTweak
+  }
+
+  sealed trait TaprootTweak extends SchnorrTweak
+  object TaprootTweak {
+    /** The private key is tweaked with H_TapTweak(public key) (this is used for key path spending when there is no script tree). */
+    case object NoScriptTweak extends TaprootTweak
+    /** The private key is tweaked with H_TapTweak(public key || merkle_root) (this is used for key path spending when a script tree exists). */
+    case class ScriptTweak(merkleRoot: ByteVector32) extends TaprootTweak
+    object ScriptTweak {
+      def apply(scriptTree: ScriptTree): ScriptTweak = ScriptTweak(scriptTree.hash())
+    }
+  }
+  // @formatter:on
+
   /**
    * A bitcoin private key.
    * A private key is valid if it is not 0 and less than the secp256k1 curve order when interpreted as an integer (most significant byte first).
@@ -124,7 +145,7 @@ object Crypto {
   case class XonlyPublicKey(pub: bitcoin.XonlyPublicKey) {
     val publicKey: PublicKey = PublicKey(pub.getPublicKey)
 
-    def tweak(tapTweak: bitcoin.Crypto.TaprootTweak): ByteVector32 = pub.tweak(tapTweak)
+    def tweak(tapTweak: TaprootTweak): ByteVector32 = pub.tweak(scala2kmp(tapTweak))
 
     /**
      * "tweaks" this key with an optional merkle root
@@ -132,16 +153,16 @@ object Crypto {
      * @param tapTweak taproot tweak
      * @return an (x-only pubkey, parity) pair
      */
-    def outputKey(tapTweak: bitcoin.Crypto.TaprootTweak): (XonlyPublicKey, Boolean) = {
-      val p = pub.outputKey(tapTweak)
+    def outputKey(tapTweak: TaprootTweak): (XonlyPublicKey, Boolean) = {
+      val p = pub.outputKey(scala2kmp(tapTweak))
       (XonlyPublicKey(p.getFirst), p.getSecond)
     }
 
     /** Tweak this key with the merkle root of the given script tree. */
-    def outputKey(scriptTree: bitcoin.ScriptTree): (XonlyPublicKey, Boolean) = outputKey(new bitcoin.Crypto.TaprootTweak.ScriptTweak(scriptTree))
+    def outputKey(scriptTree: ScriptTree): (XonlyPublicKey, Boolean) = outputKey(TaprootTweak.ScriptTweak(scriptTree))
 
     /** Tweak this key with the merkle root provided. */
-    def outputKey(merkleRoot: ByteVector32): (XonlyPublicKey, Boolean) = outputKey(new bitcoin.Crypto.TaprootTweak.ScriptTweak(merkleRoot))
+    def outputKey(merkleRoot: ByteVector32): (XonlyPublicKey, Boolean) = outputKey(TaprootTweak.ScriptTweak(merkleRoot))
 
     /**
      * add a public key to this x-only key
@@ -274,8 +295,8 @@ object Crypto {
    *                   the key (there is an extra "1" appended to the key)
    * @return a signature in compact format (64 bytes)
    */
-  def signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: bitcoin.Crypto.SchnorrTweak = bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
-    bitcoin.Crypto.signSchnorr(data, privateKey, schnorrTweak, auxrand32.map(scala2kmp).orNull)
+  def signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: SchnorrTweak = SchnorrTweak.NoTweak, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
+    bitcoin.Crypto.signSchnorr(data, privateKey, scala2kmp(schnorrTweak), auxrand32.map(scala2kmp).orNull)
   }
 
   /**
