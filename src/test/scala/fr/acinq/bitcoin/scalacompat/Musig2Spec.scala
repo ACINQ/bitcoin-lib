@@ -1,11 +1,10 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
-import fr.acinq.bitcoin.{ScriptFlags, ScriptTree, SigHash}
+import fr.acinq.bitcoin.{ScriptFlags, SigHash}
 import org.scalatest.FunSuite
 import scodec.bits.{ByteVector, HexStringSyntax}
 
-import scala.jdk.CollectionConverters.SeqHasAsJava
 import scala.util.Random
 
 class Musig2Spec extends FunSuite {
@@ -55,7 +54,7 @@ class Musig2Spec extends FunSuite {
     // The redeem script is just the refund script. it is generated from this policy: and_v(v:pk(user),older(refundDelay)).
     // It does not depend upon the user's or server's key, just the user's refund key and the refund delay.
     val redeemScript = Seq(OP_PUSHDATA(userRefundPrivateKey.xOnlyPublicKey()), OP_CHECKSIGVERIFY, OP_PUSHDATA(Script.encodeNumber(refundDelay)), OP_CHECKSEQUENCEVERIFY)
-    val scriptTree = new ScriptTree.Leaf(redeemScript.map(KotlinUtils.scala2kmp).asJava)
+    val scriptTree = ScriptTree.Leaf(redeemScript)
 
     // The internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key.
     val aggregatedKey = Musig2.aggregateKeys(Seq(userPublicKey, serverPublicKey))
@@ -103,7 +102,7 @@ class Musig2Spec extends FunSuite {
         txOut = Seq(TxOut(10_000 sat, Script.pay2wpkh(userPublicKey))),
         lockTime = 0
       )
-      val sig = Transaction.signInputTaprootScriptPath(userRefundPrivateKey, tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, KotlinUtils.kmp2scala(scriptTree.hash()))
+      val sig = Transaction.signInputTaprootScriptPath(userRefundPrivateKey, tx, 0, swapInTx.txOut, SigHash.SIGHASH_DEFAULT, scriptTree.hash())
       val witness = Script.witnessScriptPathPay2tr(aggregatedKey, scriptTree, ScriptWitness(Seq(sig)), scriptTree)
       val signedTx = tx.updateWitness(0, witness)
       Transaction.correctlySpends(signedTx, Seq(swapInTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
