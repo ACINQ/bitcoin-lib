@@ -1,7 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey, XonlyPublicKey}
+import fr.acinq.bitcoin.scalacompat.Crypto._
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
@@ -62,6 +62,28 @@ object KotlinUtils {
   implicit def scala2kmp(input: ScriptTree): bitcoin.ScriptTree = input match {
     case leaf: ScriptTree.Leaf => scala2kmp(leaf)
     case branch: ScriptTree.Branch => scala2kmp(branch)
+  }
+
+  implicit def kmp2scala(input: bitcoin.Crypto.TaprootTweak): TaprootTweak = input match {
+    case bitcoin.Crypto.TaprootTweak.NoScriptTweak.INSTANCE => TaprootTweak.NoScriptTweak
+    case tweak: bitcoin.Crypto.TaprootTweak.ScriptTweak => TaprootTweak.ScriptTweak(kmp2scala(tweak.getMerkleRoot))
+    case _ => ??? // this cannot happen, but the compiler cannot know that there aren't other cases
+  }
+
+  implicit def scala2kmp(input: TaprootTweak): bitcoin.Crypto.TaprootTweak = input match {
+    case TaprootTweak.NoScriptTweak => bitcoin.Crypto.TaprootTweak.NoScriptTweak.INSTANCE
+    case tweak: TaprootTweak.ScriptTweak => new bitcoin.Crypto.TaprootTweak.ScriptTweak(scala2kmp(tweak.merkleRoot))
+  }
+
+  implicit def kmp2scala(input: bitcoin.Crypto.SchnorrTweak): SchnorrTweak = input match {
+    case bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE => SchnorrTweak.NoTweak
+    case tweak: bitcoin.Crypto.TaprootTweak => kmp2scala(tweak)
+    case _ => ??? // this cannot happen, but the compiler cannot know that there aren't other cases
+  }
+
+  implicit def scala2kmp(input: SchnorrTweak): bitcoin.Crypto.SchnorrTweak = input match {
+    case SchnorrTweak.NoTweak => bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE
+    case tweak: TaprootTweak => scala2kmp(tweak)
   }
 
   implicit def kmp2scala(input: bitcoin.TxIn): TxIn = TxIn(input.outPoint, input.signatureScript, input.sequence, input.witness)
