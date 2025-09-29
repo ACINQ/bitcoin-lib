@@ -52,12 +52,10 @@ Our goal is not to re-implement a full Bitcoin node but to build a library that 
   <dependency>
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.13</artifactId>
-    <version>0.27</version>
+    <version>0.43.2</version>
   </dependency>
 </dependencies>
 ```
-
-The latest snapshot (development) version is 0.28-SNAPSHOT, the latest released version is 0.27.
 
 ## libsecp256k1 support
 
