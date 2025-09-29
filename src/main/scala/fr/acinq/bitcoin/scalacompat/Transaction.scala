@@ -100,8 +100,8 @@ object TxIn extends BtcSerializer[TxIn] {
  */
 case class TxIn(outPoint: OutPoint, signatureScript: ByteVector, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) extends BtcSerializable[TxIn] {
   def isFinal: Boolean = sequence == bitcoin.TxIn.SEQUENCE_FINAL
-
   def hasWitness: Boolean = witness.isNotNull
+  def weight(): Int = scala2kmp(this).weight()
 
   override def serializer: BtcSerializer[TxIn] = TxIn
 }
@@ -128,6 +128,8 @@ object TxOut extends BtcSerializer[TxOut] {
  * @param publicKeyScript public key script which sets the conditions for spending this output
  */
 case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerializable[TxOut] {
+  def weight(): Int = scala2kmp(this).weight()
+
   override def serializer: BtcSerializer[TxOut] = TxOut
 }
 
