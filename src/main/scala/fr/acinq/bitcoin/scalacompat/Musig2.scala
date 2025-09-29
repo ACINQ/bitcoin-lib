@@ -25,7 +25,7 @@ object Musig2 {
   }
 
   /** A locally-generated nonce, for which both the secret and public parts are known. */
-  case class LocalNonce(secret: SecretNonce, public: IndividualNonce)
+  case class LocalNonce(secretNonce: SecretNonce, publicNonce: IndividualNonce)
 
   /**
    * Aggregate the public keys of a musig2 session into a single public key.
