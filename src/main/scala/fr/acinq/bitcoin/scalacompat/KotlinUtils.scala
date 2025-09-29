@@ -1,13 +1,14 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin
-import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey, XonlyPublicKey}
+import fr.acinq.bitcoin.scalacompat.Crypto._
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
 import scala.jdk.CollectionConverters.{ListHasAsScala, SeqHasAsJava}
 
 object KotlinUtils {
+
   implicit def kmp2scala(input: bitcoin.ByteVector32): ByteVector32 = ByteVector32(ByteVector(input.toByteArray))
 
   implicit def scala2kmp(input: ByteVector32): bitcoin.ByteVector32 = new bitcoin.ByteVector32(input.toArray)
@@ -43,6 +44,47 @@ object KotlinUtils {
   implicit def kmp2scala(input: bitcoin.ScriptWitness): ScriptWitness = ScriptWitness(input.stack.asScala.toList.map(kmp2scala))
 
   implicit def scala2kmp(input: ScriptWitness): bitcoin.ScriptWitness = new bitcoin.ScriptWitness(input.stack.map(scala2kmp).asJava)
+
+  implicit def kmp2scala(input: bitcoin.ScriptTree.Leaf): ScriptTree.Leaf = ScriptTree.Leaf(kmp2scala(input.getScript), input.getLeafVersion)
+
+  implicit def scala2kmp(input: ScriptTree.Leaf): bitcoin.ScriptTree.Leaf = new bitcoin.ScriptTree.Leaf(scala2kmp(input.script), input.leafVersion)
+
+  implicit def kmp2scala(input: bitcoin.ScriptTree.Branch): ScriptTree.Branch = ScriptTree.Branch(kmp2scala(input.getLeft), kmp2scala(input.getRight))
+
+  implicit def scala2kmp(input: ScriptTree.Branch): bitcoin.ScriptTree.Branch = new bitcoin.ScriptTree.Branch(scala2kmp(input.left), scala2kmp(input.right))
+
+  implicit def kmp2scala(input: bitcoin.ScriptTree): ScriptTree = input match {
+    case branch: bitcoin.ScriptTree.Branch => kmp2scala(branch)
+    case leaf: bitcoin.ScriptTree.Leaf => kmp2scala(leaf)
+    case _ => ??? // this cannot happen, but the compiler cannot know that there aren't other cases
+  }
+
+  implicit def scala2kmp(input: ScriptTree): bitcoin.ScriptTree = input match {
+    case leaf: ScriptTree.Leaf => scala2kmp(leaf)
+    case branch: ScriptTree.Branch => scala2kmp(branch)
+  }
+
+  implicit def kmp2scala(input: bitcoin.Crypto.TaprootTweak): TaprootTweak = input match {
+    case bitcoin.Crypto.TaprootTweak.NoScriptTweak.INSTANCE => TaprootTweak.NoScriptTweak
+    case tweak: bitcoin.Crypto.TaprootTweak.ScriptTweak => TaprootTweak.ScriptTweak(kmp2scala(tweak.getMerkleRoot))
+    case _ => ??? // this cannot happen, but the compiler cannot know that there aren't other cases
+  }
+
+  implicit def scala2kmp(input: TaprootTweak): bitcoin.Crypto.TaprootTweak = input match {
+    case TaprootTweak.NoScriptTweak => bitcoin.Crypto.TaprootTweak.NoScriptTweak.INSTANCE
+    case tweak: TaprootTweak.ScriptTweak => new bitcoin.Crypto.TaprootTweak.ScriptTweak(scala2kmp(tweak.merkleRoot))
+  }
+
+  implicit def kmp2scala(input: bitcoin.Crypto.SchnorrTweak): SchnorrTweak = input match {
+    case bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE => SchnorrTweak.NoTweak
+    case tweak: bitcoin.Crypto.TaprootTweak => kmp2scala(tweak)
+    case _ => ??? // this cannot happen, but the compiler cannot know that there aren't other cases
+  }
+
+  implicit def scala2kmp(input: SchnorrTweak): bitcoin.Crypto.SchnorrTweak = input match {
+    case SchnorrTweak.NoTweak => bitcoin.Crypto.SchnorrTweak.NoTweak.INSTANCE
+    case tweak: TaprootTweak => scala2kmp(tweak)
+  }
 
   implicit def kmp2scala(input: bitcoin.TxIn): TxIn = TxIn(input.outPoint, input.signatureScript, input.sequence, input.witness)
 
@@ -229,5 +271,6 @@ object KotlinUtils {
     OP_INVALIDOPCODE -> bitcoin.OP_INVALIDOPCODE.INSTANCE)
 
   private val scriptEltMapKmp2Scala2Map: Map[bitcoin.ScriptElt, ScriptElt] = scriptEltMapScala2Kmp.map { case (k, v) => v -> k }
+
 }
 

@@ -100,8 +100,8 @@ object TxIn extends BtcSerializer[TxIn] {
  */
 case class TxIn(outPoint: OutPoint, signatureScript: ByteVector, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) extends BtcSerializable[TxIn] {
   def isFinal: Boolean = sequence == bitcoin.TxIn.SEQUENCE_FINAL
-
   def hasWitness: Boolean = witness.isNotNull
+  def weight(): Int = scala2kmp(this).weight()
 
   override def serializer: BtcSerializer[TxIn] = TxIn
 }
@@ -128,6 +128,8 @@ object TxOut extends BtcSerializer[TxOut] {
  * @param publicKeyScript public key script which sets the conditions for spending this output
  */
 case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerializable[TxOut] {
+  def weight(): Int = scala2kmp(this).weight()
+
   override def serializer: BtcSerializer[TxOut] = TxOut
 }
 
@@ -312,7 +314,7 @@ object Transaction extends BtcSerializer[Transaction] {
    * @param scriptTree_opt tapscript tree of the signed input, if it has script paths.
    * @return the schnorr signature of this tx for this specific tx input.
    */
-  def signInputTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, scriptTree_opt: Option[bitcoin.ScriptTree], annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
+  def signInputTaprootKeyPath(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, scriptTree_opt: Option[ScriptTree], annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
     tx.signInputTaprootKeyPath(privateKey, inputIndex, inputs, sighashType, scriptTree_opt, annex_opt, auxrand32)
   }
 
@@ -521,8 +523,8 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @param scriptTree_opt tapscript tree of the signed input, if it has script paths.
    * @return the schnorr signature of this tx for this specific tx input.
    */
-  def signInputTaprootKeyPath(privateKey: PrivateKey, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, scriptTree_opt: Option[bitcoin.ScriptTree], annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
-    scala2kmp(this).signInputTaprootKeyPath(privateKey, inputIndex, inputs.map(scala2kmp).asJava, sighashType, scriptTree_opt.orNull, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
+  def signInputTaprootKeyPath(privateKey: PrivateKey, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, scriptTree_opt: Option[ScriptTree], annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
+    scala2kmp(this).signInputTaprootKeyPath(privateKey, inputIndex, inputs.map(scala2kmp).asJava, sighashType, scriptTree_opt.map(scala2kmp).orNull, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
   }
 
   /**
