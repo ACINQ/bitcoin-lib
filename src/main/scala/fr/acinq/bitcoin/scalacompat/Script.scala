@@ -190,4 +190,10 @@ object Script {
    */
   def witnessScriptPathPay2tr(internalKey: XonlyPublicKey, script: ScriptTree.Leaf, witness: ScriptWitness, scriptTree: ScriptTree): ScriptWitness = bitcoin.Script.witnessScriptPathPay2tr(internalKey.pub, scala2kmp(script), witness, scala2kmp(scriptTree))
 
+  /** Standard P2A (pay-to-anchor) output. */
+  val pay2anchor: Seq[ScriptElt] = bitcoin.Script.getPay2anchor.asScala.map(kmp2scala).toList
+
+  /** An empty witness script must be used to spend [[pay2anchor]] outputs. */
+  val witnessPay2anchor: ScriptWitness = bitcoin.Script.getWitnessPay2anchor
+
 }
