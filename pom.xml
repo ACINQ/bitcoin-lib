@@ -3,7 +3,7 @@
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.13</artifactId>
     <packaging>jar</packaging>
-    <version>0.45.2-SNAPSHOT</version>
+    <version>0.46-SNAPSHOT</version>
     <description>Simple Scala Bitcoin library</description>
     <url>https://github.com/ACINQ/bitcoin-lib</url>
     <name>bitcoin-lib</name>
@@ -153,12 +153,12 @@
         <dependency>
             <groupId>fr.acinq.bitcoin</groupId>
             <artifactId>bitcoin-kmp-jvm</artifactId>
-            <version>0.28.1</version>
+            <version>0.29.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
             <artifactId>secp256k1-kmp-jni-jvm</artifactId>
-            <version>0.21.0</version>
+            <version>0.22.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.scodec</groupId>

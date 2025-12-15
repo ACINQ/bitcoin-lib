@@ -166,12 +166,6 @@ object Script {
   def witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = bitcoin.Script.witnessPay2wpkh(pubKey, sig)
 
   /**
-   * @param outputKey public key exposed by the taproot script (tweaked based on the tapscripts).
-   * @return a pay-to-taproot script.
-   */
-  def pay2tr(outputKey: XonlyPublicKey): Seq[ScriptElt] = bitcoin.Script.pay2tr(outputKey.pub).asScala.map(kmp2scala).toList
-
-  /**
    * @param internalKey internal public key that will be tweaked with the [scripts] provided.
    * @param scripts_opt optional spending scripts that can be used instead of key-path spending.
    */

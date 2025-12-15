@@ -15,9 +15,9 @@ class TaprootSpec extends FunSuite {
     val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/1")
     val internalKey = key.publicKey.xOnly
     val script = Script.pay2tr(internalKey, scripts_opt = None)
-    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak)
+    val (outputKey, _) = internalKey.outputKey(TaprootTweak.KeyPathTweak)
     assert("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c" == Bech32.encodeWitnessAddress("tb", 1, outputKey.pub.value.toByteArray))
-    assert(script == Script.pay2tr(outputKey))
+    assert(addressFromPublicKeyScript(Block.Testnet3GenesisBlock.hash, script).contains("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c"))
 
     // tx sends to tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c
     val tx = Transaction.read(
@@ -41,23 +41,23 @@ class TaprootSpec extends FunSuite {
     assert(Crypto.verifySignatureSchnorr(hash, sig, outputKey))
 
     // re-create signature
-    val ourSig = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak)
+    val ourSig = Crypto.signSchnorr(hash, key.privateKey, Some(TaprootTweak.KeyPathTweak))
     assert(Crypto.verifySignatureSchnorr(hash, ourSig, outputKey))
     assert(Secp256k1.get().verifySchnorr(ourSig.toArray, hash.toArray, outputKey.pub.value.toByteArray))
 
     // setting auxiliary random data to all-zero yields the same result as not setting any auxiliary random data
-    val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak, Some(ByteVector32.Zeroes))
+    val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, Some(TaprootTweak.KeyPathTweak), Some(ByteVector32.Zeroes))
     assert(ourSig == ourSig1)
 
     // setting auxiliary random data to a non-zero value yields a different result
-    val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak, Some(ByteVector32.One))
+    val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, Some(TaprootTweak.KeyPathTweak), Some(ByteVector32.One))
     assert(ourSig != ourSig2)
   }
 
   test("send to and spend from taproot addresses") {
     val privateKey = PrivateKey(ByteVector32.fromValidHex("0101010101010101010101010101010101010101010101010101010101010101"))
     val internalKey = privateKey.publicKey.xOnly
-    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak)
+    val (outputKey, _) = internalKey.outputKey(TaprootTweak.KeyPathTweak)
     val address = Bech32.encodeWitnessAddress("tb", 1, outputKey.pub.value.toByteArray)
     assert("tb1p33wm0auhr9kkahzd6l0kqj85af4cswn276hsxg6zpz85xe2r0y8snwrkwy" == address)
 
