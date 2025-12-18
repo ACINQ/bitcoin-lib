@@ -1,6 +1,7 @@
 package fr.acinq.bitcoin.scalacompat
 
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
+import fr.acinq.bitcoin.scalacompat.Crypto.TaprootTweak.KeyPathTweak
 import fr.acinq.bitcoin.{ScriptFlags, SigHash}
 import org.scalatest.FunSuite
 import scodec.bits.{ByteVector, HexStringSyntax}
@@ -19,7 +20,7 @@ class Musig2Spec extends FunSuite {
     val internalPubKey = Musig2.aggregateKeys(Seq(alicePubKey, bobPubKey))
 
     // This tx sends to a taproot script that doesn't contain any script path.
-    val tx = Transaction(2, Nil, Seq(TxOut(10_000 sat, Script.pay2tr(internalPubKey, scripts_opt = None))), 0)
+    val tx = Transaction(2, Nil, Seq(TxOut(10_000 sat, Script.pay2tr(internalPubKey, KeyPathTweak))), 0)
     // This tx spends the previous tx with Alice and Bob's signatures.
     val spendingTx = Transaction(2, Seq(TxIn(OutPoint(tx, 0), ByteVector.empty, 0)), Seq(TxOut(10_000 sat, Script.pay2wpkh(alicePubKey))), 0)
 
@@ -59,7 +60,7 @@ class Musig2Spec extends FunSuite {
     // The internal pubkey is the musig2 aggregation of the user's and server's public keys: it does not depend upon the user's refund's key.
     val aggregatedKey = Musig2.aggregateKeys(Seq(userPublicKey, serverPublicKey))
     // It is tweaked with the script's merkle root to get the pubkey that will be exposed.
-    val pubkeyScript = Script.pay2tr(aggregatedKey, Some(scriptTree))
+    val pubkeyScript = Script.pay2tr(aggregatedKey, scriptTree)
 
     val swapInTx = Transaction(
       version = 2,

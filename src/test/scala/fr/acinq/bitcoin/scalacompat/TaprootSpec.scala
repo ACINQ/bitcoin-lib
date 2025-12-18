@@ -1,5 +1,6 @@
 package fr.acinq.bitcoin.scalacompat
 
+import fr.acinq.bitcoin.scalacompat.Crypto.TaprootTweak.KeyPathTweak
 import fr.acinq.bitcoin.scalacompat.Crypto.{PrivateKey, PublicKey, TaprootTweak}
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import fr.acinq.bitcoin.{Bech32, ScriptFlags, SigHash, SigVersion}
@@ -14,10 +15,10 @@ class TaprootSpec extends FunSuite {
     val (_, master) = DeterministicWallet.ExtendedPrivateKey.decode("tprv8ZgxMBicQKsPeQQADibg4WF7mEasy3piWZUHyThAzJCPNgMHDVYhTCVfev3jFbDhcYm4GimeFMbbi9z1d9rfY1aL5wfJ9mNebQ4thJ62EJb")
     val key = DeterministicWallet.derivePrivateKey(master, "86'/1'/0'/0/1")
     val internalKey = key.publicKey.xOnly
-    val script = Script.pay2tr(internalKey, scripts_opt = None)
-    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak)
+    val script = Script.pay2tr(internalKey, KeyPathTweak)
+    val (outputKey, _) = internalKey.outputKey(TaprootTweak.KeyPathTweak)
     assert("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c" == Bech32.encodeWitnessAddress("tb", 1, outputKey.pub.value.toByteArray))
-    assert(script == Script.pay2tr(outputKey))
+    assert(addressFromPublicKeyScript(Block.Testnet3GenesisBlock.hash, script).contains("tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c"))
 
     // tx sends to tb1phlhs7afhqzkgv0n537xs939s687826vn8l24ldkrckvwsnlj3d7qj6u57c
     val tx = Transaction.read(
@@ -41,23 +42,23 @@ class TaprootSpec extends FunSuite {
     assert(Crypto.verifySignatureSchnorr(hash, sig, outputKey))
 
     // re-create signature
-    val ourSig = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak)
+    val ourSig = Crypto.signSchnorr(hash, key.privateKey, Some(TaprootTweak.KeyPathTweak))
     assert(Crypto.verifySignatureSchnorr(hash, ourSig, outputKey))
     assert(Secp256k1.get().verifySchnorr(ourSig.toArray, hash.toArray, outputKey.pub.value.toByteArray))
 
     // setting auxiliary random data to all-zero yields the same result as not setting any auxiliary random data
-    val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak, Some(ByteVector32.Zeroes))
+    val ourSig1 = Crypto.signSchnorr(hash, key.privateKey, Some(TaprootTweak.KeyPathTweak), Some(ByteVector32.Zeroes))
     assert(ourSig == ourSig1)
 
     // setting auxiliary random data to a non-zero value yields a different result
-    val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, TaprootTweak.NoScriptTweak, Some(ByteVector32.One))
+    val ourSig2 = Crypto.signSchnorr(hash, key.privateKey, Some(TaprootTweak.KeyPathTweak), Some(ByteVector32.One))
     assert(ourSig != ourSig2)
   }
 
   test("send to and spend from taproot addresses") {
     val privateKey = PrivateKey(ByteVector32.fromValidHex("0101010101010101010101010101010101010101010101010101010101010101"))
     val internalKey = privateKey.publicKey.xOnly
-    val (outputKey, _) = internalKey.outputKey(TaprootTweak.NoScriptTweak)
+    val (outputKey, _) = internalKey.outputKey(TaprootTweak.KeyPathTweak)
     val address = Bech32.encodeWitnessAddress("tb", 1, outputKey.pub.value.toByteArray)
     assert("tb1p33wm0auhr9kkahzd6l0kqj85af4cswn276hsxg6zpz85xe2r0y8snwrkwy" == address)
 
@@ -65,7 +66,7 @@ class TaprootSpec extends FunSuite {
     val tx = Transaction.read(
       "02000000000101bf77ef36f2c0f32e0822cef0514948254997495a34bfba7dd4a73aabfcbb87900000000000fdffffff02c2c2000000000000160014b5c3dbfeb8e7d0c809c3ba3f815fd430777ef4be50c30000000000002251208c5db7f797196d6edc4dd7df6048f4ea6b883a6af6af032342088f436543790f0140583f758bea307216e03c1f54c3c6088e8923c8e1c89d96679fb00de9e808a79d0fba1cc3f9521cb686e8f43fb37cc6429f2e1480c70cc25ecb4ac0dde8921a01f1f70000"
     )
-    assert(Script.pay2tr(internalKey, scripts_opt = None) == Script.parse(tx.txOut(1).publicKeyScript))
+    assert(Script.pay2tr(internalKey, KeyPathTweak) == Script.parse(tx.txOut(1).publicKeyScript))
 
     // we want to spend
     val Right(outputScript) = addressToPublicKeyScript(Block.Testnet3GenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0")
@@ -157,7 +158,7 @@ class TaprootSpec extends FunSuite {
     val internalPubkey = PublicKey.fromBin(ByteVector.fromValidHex("0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")).xOnly
 
     // funding tx sends to our tapscript
-    val fundingTx = Transaction(version = 2, txIn = Nil, txOut = Seq(TxOut(Satoshi(1000000), Script.pay2tr(internalPubkey, Some(scriptTree)))), lockTime = 0)
+    val fundingTx = Transaction(version = 2, txIn = Nil, txOut = Seq(TxOut(Satoshi(1000000), Script.pay2tr(internalPubkey, scriptTree))), lockTime = 0)
 
     // create an unsigned transaction
     val tmp = Transaction(
@@ -213,7 +214,7 @@ class TaprootSpec extends FunSuite {
     val (tweakedKey, _) = internalPubkey.outputKey(scriptTree)
 
     // this is the tapscript we send funds to
-    val script = Script.pay2tr(internalPubkey, Some(scriptTree))
+    val script = Script.pay2tr(internalPubkey, scriptTree)
     val bip350Address = Bech32.encodeWitnessAddress(Bech32.hrp(blockchain), 1.toByte, tweakedKey.pub.value.toByteArray)
     assert(bip350Address == "tb1p78gx95syx0qz8w5nftk8t7nce78zlpqpsxugcvq5xpfy4tvn6rasd7wk0y")
     val Right(sweepPublicKeyScript) = addressToPublicKeyScript(blockchain, "tb1qxy9hhxkw7gt76qrm4yzw4j06gkk4evryh8ayp7")

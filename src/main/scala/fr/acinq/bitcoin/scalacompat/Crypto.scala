@@ -7,21 +7,14 @@ import scodec.bits.ByteVector
 object Crypto {
 
   // @formatter:off
-  /** Specify how private keys are tweaked when creating Schnorr signatures. */
-  sealed trait SchnorrTweak
-  object SchnorrTweak {
-    /** The private key is directly used, without any tweaks. */
-    case object NoTweak extends SchnorrTweak
-  }
-
-  sealed trait TaprootTweak extends SchnorrTweak
+  sealed trait TaprootTweak
   object TaprootTweak {
     /** The private key is tweaked with H_TapTweak(public key) (this is used for key path spending when there is no script tree). */
-    case object NoScriptTweak extends TaprootTweak
+    case object KeyPathTweak extends TaprootTweak
     /** The private key is tweaked with H_TapTweak(public key || merkle_root) (this is used for key path spending when a script tree exists). */
-    case class ScriptTweak(merkleRoot: ByteVector32) extends TaprootTweak
-    object ScriptTweak {
-      def apply(scriptTree: ScriptTree): ScriptTweak = ScriptTweak(scriptTree.hash())
+    case class ScriptPathTweak(merkleRoot: ByteVector32) extends TaprootTweak
+    object ScriptPathTweak {
+      def apply(scriptTree: ScriptTree): ScriptPathTweak = ScriptPathTweak(scriptTree.hash())
     }
   }
   // @formatter:on
@@ -159,10 +152,10 @@ object Crypto {
     }
 
     /** Tweak this key with the merkle root of the given script tree. */
-    def outputKey(scriptTree: ScriptTree): (XonlyPublicKey, Boolean) = outputKey(TaprootTweak.ScriptTweak(scriptTree))
+    def outputKey(scriptTree: ScriptTree): (XonlyPublicKey, Boolean) = outputKey(TaprootTweak.ScriptPathTweak(scriptTree))
 
     /** Tweak this key with the merkle root provided. */
-    def outputKey(merkleRoot: ByteVector32): (XonlyPublicKey, Boolean) = outputKey(TaprootTweak.ScriptTweak(merkleRoot))
+    def outputKey(merkleRoot: ByteVector32): (XonlyPublicKey, Boolean) = outputKey(TaprootTweak.ScriptPathTweak(merkleRoot))
 
     /**
      * add a public key to this x-only key
@@ -295,8 +288,8 @@ object Crypto {
    *                   the key (there is an extra "1" appended to the key)
    * @return a signature in compact format (64 bytes)
    */
-  def signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak: SchnorrTweak = SchnorrTweak.NoTweak, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
-    bitcoin.Crypto.signSchnorr(data, privateKey, scala2kmp(schnorrTweak), auxrand32.map(scala2kmp).orNull)
+  def signSchnorr(data: ByteVector32, privateKey: PrivateKey, schnorrTweak_opt: Option[TaprootTweak] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
+    bitcoin.Crypto.signSchnorr(data, privateKey, schnorrTweak_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
   }
 
   /**

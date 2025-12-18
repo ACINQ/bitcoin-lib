@@ -166,16 +166,22 @@ object Script {
   def witnessPay2wpkh(pubKey: PublicKey, sig: ByteVector): ScriptWitness = bitcoin.Script.witnessPay2wpkh(pubKey, sig)
 
   /**
-   * @param outputKey public key exposed by the taproot script (tweaked based on the tapscripts).
-   * @return a pay-to-taproot script.
+   * @param internalKey internal public key that will be tweaked with the [scripts] provided.
+   * @param scriptsRoot spending scripts that can be used instead of key-path spending.
    */
-  def pay2tr(outputKey: XonlyPublicKey): Seq[ScriptElt] = bitcoin.Script.pay2tr(outputKey.pub).asScala.map(kmp2scala).toList
+  def pay2tr(internalKey: XonlyPublicKey, scriptsRoot: ByteVector32): Seq[ScriptElt] = bitcoin.Script.pay2tr(internalKey.pub, scriptsRoot).asScala.map(kmp2scala).toList
 
   /**
    * @param internalKey internal public key that will be tweaked with the [scripts] provided.
-   * @param scripts_opt optional spending scripts that can be used instead of key-path spending.
+   * @param scripts spending scripts that can be used instead of key-path spending.
    */
-  def pay2tr(internalKey: XonlyPublicKey, scripts_opt: Option[ScriptTree]): Seq[ScriptElt] = bitcoin.Script.pay2tr(internalKey.pub, scripts_opt.map(scala2kmp).orNull).asScala.map(kmp2scala).toList
+  def pay2tr(internalKey: XonlyPublicKey, scripts: ScriptTree): Seq[ScriptElt] = pay2tr(internalKey, scripts.hash())
+
+  /**
+   * @param internalKey internal public key that will be tweaked with the provided [taprootTweak].
+   * @param taprootTweak tweak to apply to [internalKey].
+   */
+  def pay2tr(internalKey: XonlyPublicKey, taprootTweak: Crypto.TaprootTweak): Seq[ScriptElt] = bitcoin.Script.pay2tr(internalKey.pub, taprootTweak).asScala.map(kmp2scala).toList
 
   def isPay2tr(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isPay2tr(script.map(scala2kmp).asJava)
 
