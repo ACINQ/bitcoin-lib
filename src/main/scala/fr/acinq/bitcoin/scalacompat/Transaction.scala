@@ -304,6 +304,13 @@ object Transaction extends BtcSerializer[Transaction] {
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
 
   /**
+   * @param sig ECDSA signature in compact format
+   * @param sighashType signature hash type, which will be appended to the signature
+   * @return an ECDSA signature in the format used in transaction witnesses: DER encoded followed by a sighash byte
+   */
+  def encodeWitnessEcdsaSig(sig: ByteVector64, sighashType: Int): ByteVector = ByteVector.view(fr.acinq.bitcoin.Transaction.encodeWitnessEcdsaSig(sig, sighashType))
+
+  /**
    * Sign a taproot tx input, using the internal key path.
    *
    * @param privateKey     private key.
