@@ -5,7 +5,7 @@ import fr.acinq.secp256k1.Secp256k1
 import org.scalatest.FunSuite
 import scodec.bits.ByteVector
 
-import scala.util.{Random, Try}
+import scala.util.Random
 
 /**
   * run this test with -Djava.library.path=$PATH_LIBSECP256K1_DIR where $PATH_LIBSECP256K1_DIR is a directory that
@@ -33,7 +33,7 @@ class Secp256k1Spec extends FunSuite {
       Random.nextBytes(priv)
       Random.nextBytes(data)
       val sig1: ByteVector = Crypto.sign(ByteVector.view(data), PrivateKey(ByteVector.view(priv)))
-      val sig2: ByteVector = ByteVector.view(nativeSecp256k1.get.sign(data, priv))
+      val sig2: ByteVector = ByteVector.view(nativeSecp256k1.get.sign(data, priv, null))
       assert(sig1 == sig2)
     }
   }

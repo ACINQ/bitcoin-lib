@@ -282,7 +282,7 @@ object Transaction extends BtcSerializer[Transaction] {
    * @param amount               amount of the output claimed by this tx input
    * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
    * @param privateKey           private key
-   * @return the encoded signature of this tx for this specific tx input
+   * @return the encoded signature (DER + sighash byte) of this tx for this specific tx input
    */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector = {
     tx.signInput(inputIndex, previousOutputScript, sighashType, amount, signatureVersion, privateKey)
@@ -298,10 +298,17 @@ object Transaction extends BtcSerializer[Transaction] {
    * @param amount               amount of the output claimed by this tx input
    * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
    * @param privateKey           private key
-   * @return the encoded signature of this tx for this specific tx input
+   * @return the encoded signature (DER + sighash byte) of this tx for this specific tx input
    */
   def signInput(tx: Transaction, inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector =
     signInput(tx, inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
+
+  /**
+   * @param sig ECDSA signature in compact format
+   * @param sighashType signature hash type, which will be appended to the signature
+   * @return an ECDSA signature in the format used in transaction witnesses: DER encoded followed by a sighash byte
+   */
+  def encodeWitnessEcdsaSig(sig: ByteVector64, sighashType: Int): ByteVector = ByteVector.view(fr.acinq.bitcoin.Transaction.encodeWitnessEcdsaSig(sig, sighashType))
 
   /**
    * Sign a taproot tx input, using the internal key path.
@@ -483,6 +490,36 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   def hashForSigningTaprootScriptPath(inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, tapleaf: ByteVector32, annex_opt: Option[ByteVector] = None): ByteVector32 = {
     scala2kmp(this).hashForSigningTaprootScriptPath(inputIndex, inputs.map(scala2kmp).asJava, sighashType, scala2kmp(tapleaf), annex_opt.map(scala2kmp).orNull)
   }
+
+  /**
+   * sign a tx input
+   *
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type, which will be appended to the signature
+   * @param amount               amount of the output claimed by this tx input
+   * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+   * @param privateKey           private key
+   * @return the encoded signature of this tx for this specific tx input in compact 64 bytes format
+   */
+  def signInputCompact(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector64 = {
+    scala2kmp(this).signInputCompact(inputIndex, scala2kmp(previousOutputScript), sighashType, amount, signatureVersion, privateKey.priv)
+  }
+
+  /**
+   * sign a tx input
+   *
+   * @param inputIndex           index of the tx input that is being processed
+   * @param previousOutputScript public key script of the output claimed by this tx input
+   * @param sighashType          signature hash type, which will be appended to the signature
+   * @param amount               amount of the output claimed by this tx input
+   * @param signatureVersion     signature version (1: segwit, 0: pre-segwit)
+   * @param privateKey           private key
+   * @return the encoded signature of this tx for this specific tx input in compact 64 bytes format
+   */
+  def signInputCompact(inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector64 =
+    signInputCompact(inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
+
 
   /**
    * sign a tx input

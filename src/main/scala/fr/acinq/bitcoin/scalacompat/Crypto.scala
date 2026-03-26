@@ -240,10 +240,6 @@ object Crypto {
 
   def isDefinedHashTypeSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDefinedHashTypeSignature(sig.toArray)
 
-  def compact2der(signature: ByteVector64): ByteVector = bitcoin.Crypto.compact2der(signature)
-
-  def der2compact(signature: ByteVector): ByteVector64 = bitcoin.Crypto.der2compact(signature.toArray)
-
   /**
    * @param data      data
    * @param signature signature

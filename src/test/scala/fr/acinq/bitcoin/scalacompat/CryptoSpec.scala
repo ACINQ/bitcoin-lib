@@ -3,6 +3,7 @@ package fr.acinq.bitcoin.scalacompat
 import fr.acinq.bitcoin.Base58.Prefix
 import fr.acinq.bitcoin.scalacompat.Crypto._
 import fr.acinq.bitcoin.{Base58, Base58Check}
+import fr.acinq.secp256k1.Secp256k1
 import org.scalatest.FlatSpec
 import scodec.bits._
 
@@ -157,7 +158,7 @@ class CryptoSpec extends FlatSpec {
 
     dataset.map {
       case (k, m, s) =>
-        val sig: ByteVector = Crypto.compact2der(Crypto.sign(Crypto.sha256(ByteVector.view(m.getBytes("UTF-8"))), PrivateKey(k)))
+        val sig: ByteVector = ByteVector.view(Secp256k1.get().compact2der(Crypto.sign(Crypto.sha256(ByteVector.view(m.getBytes("UTF-8"))), PrivateKey(k)).toArray))
         assert(sig == s)
     }
   }
