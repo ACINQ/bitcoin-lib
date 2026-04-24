@@ -26,6 +26,7 @@ class TaprootSpec extends FunSuite {
     )
     assert(Script.isPay2tr(Script.parse(tx.txOut.head.publicKeyScript)))
     assert(script == Script.parse(tx.txOut.head.publicKeyScript))
+    assert(Script.pay2trOutputKey(script).contains(outputKey))
 
     // tx1 spends tx using key path spending i.e its witness just includes a single signature that is valid for outputKey
     val tx1 = Transaction.read(
@@ -67,6 +68,7 @@ class TaprootSpec extends FunSuite {
       "02000000000101bf77ef36f2c0f32e0822cef0514948254997495a34bfba7dd4a73aabfcbb87900000000000fdffffff02c2c2000000000000160014b5c3dbfeb8e7d0c809c3ba3f815fd430777ef4be50c30000000000002251208c5db7f797196d6edc4dd7df6048f4ea6b883a6af6af032342088f436543790f0140583f758bea307216e03c1f54c3c6088e8923c8e1c89d96679fb00de9e808a79d0fba1cc3f9521cb686e8f43fb37cc6429f2e1480c70cc25ecb4ac0dde8921a01f1f70000"
     )
     assert(Script.pay2tr(internalKey, KeyPathTweak) == Script.parse(tx.txOut(1).publicKeyScript))
+    assert(Script.pay2trOutputKey(tx.txOut(1).publicKeyScript).contains(outputKey))
 
     // we want to spend
     val Right(outputScript) = addressToPublicKeyScript(Block.Testnet3GenesisBlock.hash, "tb1pn3g330w4n5eut7d4vxq0pp303267qc6vg8d2e0ctjuqre06gs3yqnc5yx0")
