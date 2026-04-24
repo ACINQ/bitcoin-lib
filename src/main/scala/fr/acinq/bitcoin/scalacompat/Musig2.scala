@@ -63,6 +63,47 @@ object Musig2 {
   }
 
   /**
+   * Create a partial musig2 signature for the given arbitrary message.
+   *
+   * @param privateKey   private key of the signing participant.
+   * @param secretNonce  secret nonce of the signing participant.
+   * @param msg          message that should be signed.
+   * @param publicKeys   public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+   * @param publicNonces public nonces of all participants of the musig2 session.
+   * @return a partial signature, or an error if the nonce has already been used or session creation/signing fails.
+   */
+  def sign(privateKey: PrivateKey, secretNonce: SecretNonce, msg: ByteVector32, publicKeys: Seq[PublicKey], publicNonces: Seq[IndividualNonce]): Either[Throwable, ByteVector32] = {
+    musig2.Musig2.sign(privateKey, secretNonce.inner, msg, publicKeys.map(scala2kmp).asJava, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArray)).asJava).map(kmp2scala)
+  }
+
+  /**
+   * Verify a partial musig2 signature of an arbitrary message.
+   *
+   * @param partialSig   partial musig2 signature.
+   * @param nonce        public nonce matching the secret nonce used to generate the signature.
+   * @param publicKey    public key for the private key used to generate the signature.
+   * @param msg          message signed.
+   * @param publicKeys   public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+   * @param publicNonces public nonces of all participants of the musig2 session.
+   * @return true if the partial signature is valid.
+   */
+  def verify(partialSig: ByteVector32, nonce: IndividualNonce, publicKey: PublicKey, msg: ByteVector32, publicKeys: Seq[PublicKey], publicNonces: Seq[IndividualNonce]): Boolean = {
+    musig2.Musig2.verify(partialSig, new musig2.IndividualNonce(nonce.data.toArray), publicKey, msg, publicKeys.map(scala2kmp).asJava, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArray)).asJava)
+  }
+
+  /**
+   * Aggregate partial musig2 signatures into a valid schnorr signature for the given arbitrary message.
+   *
+   * @param partialSigs  partial musig2 signatures of all participants of the musig2 session.
+   * @param msg          message signed.
+   * @param publicKeys   public keys of all participants of the musig2 session: callers must verify that all public keys are valid.
+   * @param publicNonces public nonces of all participants of the musig2 session.
+   */
+  def aggregatePartialSignatures(partialSigs: Seq[ByteVector32], msg: ByteVector32, publicKeys: Seq[PublicKey], publicNonces: Seq[IndividualNonce]): Either[Throwable, ByteVector64] = {
+    musig2.Musig2.aggregatePartialSignatures(partialSigs.map(scala2kmp).asJava, msg, publicKeys.map(scala2kmp).asJava, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArray)).asJava).map(kmp2scala)
+  }
+
+  /**
    * Create a partial musig2 signature for the given taproot input key path.
    *
    * @param privateKey     private key of the signing participant.

@@ -122,4 +122,32 @@ class Musig2Spec extends FunSuite {
     assert(nonce.secretNonce.consume(a => Crypto.sha256(ByteVector.view(a))).isRight)
     assert(nonce.secretNonce.consume(a => Crypto.sha256(ByteVector.view(a))).isLeft)
   }
+
+  test("sign arbitrary messages with musig2") {
+    val priv1 = PrivateKey(ByteVector(Random.nextBytes(32)))
+    val priv2 = PrivateKey(ByteVector(Random.nextBytes(32)))
+    val priv3 = PrivateKey(ByteVector(Random.nextBytes(32)))
+    val msg = ByteVector32(ByteVector(Random.nextBytes(32)))
+    val publicKeys = Seq(priv1.publicKey, priv2.publicKey, priv3.publicKey)
+    val nonce1 = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Left(priv1), publicKeys, None, None)
+    val nonce2 = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Left(priv2), publicKeys, None, None)
+    val nonce3 = Musig2.generateNonce(ByteVector32(ByteVector(Random.nextBytes(32))), Left(priv3), publicKeys, None, None)
+    val publicNonces = Seq(nonce1, nonce2, nonce3).map(_.publicNonce)
+    val Some(sig1) = Musig2.sign(priv1, nonce1.secretNonce, msg, publicKeys, publicNonces).toOption
+    assert(Musig2.verify(sig1, nonce1.publicNonce, priv1.publicKey, msg, publicKeys, publicNonces))
+    val Some(sig2) = Musig2.sign(priv2, nonce2.secretNonce, msg, publicKeys, publicNonces).toOption
+    assert(Musig2.verify(sig2, nonce2.publicNonce, priv2.publicKey, msg, publicKeys, publicNonces))
+    val Some(sig3) = Musig2.sign(priv3, nonce3.secretNonce, msg, publicKeys, publicNonces).toOption
+    assert(Musig2.verify(sig3, nonce3.publicNonce, priv3.publicKey, msg, publicKeys, publicNonces))
+    assert(!Musig2.verify(sig3, nonce2.publicNonce, priv3.publicKey, msg, publicKeys, publicNonces))
+    // We can partially aggregate signatures, but it doesn't create a valid schnorr signature for the aggregated public key.
+    val Some(incompleteSig) = Musig2.aggregatePartialSignatures(Seq(sig1, sig2), msg, publicKeys, publicNonces).toOption
+    assert(!Crypto.verifySignatureSchnorr(msg, incompleteSig, Musig2.aggregateKeys(publicKeys)))
+    // Including redundant partial signatures doesn't yield a valid signature.
+    val Some(redundantSig) = Musig2.aggregatePartialSignatures(Seq(sig1, sig2, sig1), msg, publicKeys, publicNonces).toOption
+    assert(!Crypto.verifySignatureSchnorr(msg, redundantSig, Musig2.aggregateKeys(publicKeys)))
+    val Some(sig) = Musig2.aggregatePartialSignatures(Seq(sig1, sig2, sig3), msg, publicKeys, publicNonces).toOption
+    assert(Crypto.verifySignatureSchnorr(msg, sig, Musig2.aggregateKeys(publicKeys)))
+  }
+
 }
