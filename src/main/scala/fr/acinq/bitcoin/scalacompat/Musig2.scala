@@ -14,7 +14,9 @@ object Musig2 {
    * Musig2 secret nonce, that should be treated as a private opaque blob.
    * This nonce must never be persisted or reused across signing sessions.
    */
-  case class SecretNonce(inner: musig2.SecretNonce)
+  case class SecretNonce(inner: musig2.SecretNonce) {
+    def consume[T](f: Array[Byte] => T): Either[Throwable, T] = inner.consume$bitcoin_kmp((bytes: Array[Byte]) => f(bytes))
+  }
 
   /**
    * Musig2 public nonce, that must be shared with other participants in the signing session.

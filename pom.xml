@@ -146,7 +146,7 @@
         <dependency>
             <groupId>fr.acinq.bitcoin</groupId>
             <artifactId>bitcoin-kmp-jvm</artifactId>
-            <version>0.30.0</version>
+            <version>0.31.0</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
@@ -209,20 +209,6 @@
                             <publishingServerId>central</publishingServerId>
                             <centralSnapshotsUrl>https://central.sonatype.com/repository/maven-snapshots</centralSnapshotsUrl>
                         </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.6</version>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>

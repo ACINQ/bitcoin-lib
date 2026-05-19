@@ -119,10 +119,10 @@ object DeterministicWallet {
     }
   }
 
-  def encode(input: ExtendedPublicKey, prefix: Int): String = bitcoin.DeterministicWallet.encode(input.pub, prefix)
+  def encode(input: ExtendedPublicKey, prefix: Int): String = input.pub.encode(prefix)
 
   def write(input: ExtendedPublicKey, output: OutputStream): Unit = {
-    fr.acinq.bitcoin.DeterministicWallet.write(input.pub, OutputStreamWrapper(output))
+    input.pub.write(OutputStreamWrapper(output))
   }
 
   /**
@@ -137,21 +137,21 @@ object DeterministicWallet {
    * @param input extended private key
    * @return the public key for this private key
    */
-  def publicKey(input: ExtendedPrivateKey): ExtendedPublicKey = ExtendedPublicKey(bitcoin.DeterministicWallet.publicKey(input.priv))
+  def publicKey(input: ExtendedPrivateKey): ExtendedPublicKey =  ExtendedPublicKey(input.priv.extendedPublicKey)
 
   /**
    *
    * @param input extended public key
    * @return the fingerprint for this public key
    */
-  def fingerprint(input: ExtendedPublicKey): Long = bitcoin.DeterministicWallet.fingerprint(input.pub)
+  def fingerprint(input: ExtendedPublicKey): Long = input.pub.fingerprint()
 
   /**
    *
    * @param input extended private key
    * @return the fingerprint for this private key (which is based on the corresponding public key)
    */
-  def fingerprint(input: ExtendedPrivateKey): Long = bitcoin.DeterministicWallet.fingerprint(input.priv)
+  def fingerprint(input: ExtendedPrivateKey): Long = input.priv.fingerprint()
 
   /**
    *
@@ -159,7 +159,7 @@ object DeterministicWallet {
    * @param index  index of the child key
    * @return the derived private key at the specified index
    */
-  def derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = ExtendedPrivateKey(bitcoin.DeterministicWallet.derivePrivateKey(parent.priv, index))
+  def derivePrivateKey(parent: ExtendedPrivateKey, index: Long): ExtendedPrivateKey = ExtendedPrivateKey(parent.priv.derivePrivateKey(index))
 
   /**
    *
@@ -167,7 +167,7 @@ object DeterministicWallet {
    * @param index  index of the child key
    * @return the derived public key at the specified index
    */
-  def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = ExtendedPublicKey(bitcoin.DeterministicWallet.derivePublicKey(parent.pub, index))
+  def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = ExtendedPublicKey(parent.pub.derivePublicKey(index))
 
   def derivePrivateKey(parent: ExtendedPrivateKey, chain: Seq[Long]): ExtendedPrivateKey = chain.foldLeft(parent)(derivePrivateKey)
 
