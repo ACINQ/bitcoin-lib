@@ -167,15 +167,15 @@ object DeterministicWallet {
    * @param index  index of the child key
    * @return the derived public key at the specified index
    */
-  def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = ExtendedPublicKey(parent.pub.derivePublicKey(index))
+  def derivePublicKey(parent: ExtendedPublicKey, index: Long): ExtendedPublicKey = parent.derivePublicKey(index)
 
-  def derivePrivateKey(parent: ExtendedPrivateKey, chain: Seq[Long]): ExtendedPrivateKey = chain.foldLeft(parent)(derivePrivateKey)
+  def derivePrivateKey(parent: ExtendedPrivateKey, chain: Seq[Long]): ExtendedPrivateKey = parent.derivePrivateKey(chain)
 
   def derivePrivateKey(parent: ExtendedPrivateKey, keyPath: KeyPath): ExtendedPrivateKey = derivePrivateKey(parent, keyPath.path)
 
   def derivePrivateKey(parent: ExtendedPrivateKey, path: String): ExtendedPrivateKey = derivePrivateKey(parent, KeyPath(path))
 
-  def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = chain.foldLeft(parent)(derivePublicKey)
+  def derivePublicKey(parent: ExtendedPublicKey, chain: Seq[Long]): ExtendedPublicKey = parent.derivePublicKey(chain)
 
   def derivePublicKey(parent: ExtendedPublicKey, keyPath: KeyPath): ExtendedPublicKey = derivePublicKey(parent, keyPath.path)
 

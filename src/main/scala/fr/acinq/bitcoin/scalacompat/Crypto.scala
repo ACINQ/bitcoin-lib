@@ -40,13 +40,13 @@ object Crypto {
 
     def *(that: PrivateKey): PrivateKey = multiply(that)
 
-    def isZero: Boolean = priv.value == bitcoin.ByteVector32.Zeroes
+    def isZero: Boolean = priv.value.equals(fr.acinq.bitcoin.ByteVector32.Zeroes)
 
     def isValid: Boolean = priv.isValid
 
     def publicKey: PublicKey = PublicKey(priv.publicKey())
 
-    def xOnlyPublicKey(): XonlyPublicKey = XonlyPublicKey(publicKey)
+    def xOnlyPublicKey(): XonlyPublicKey = XonlyPublicKey(priv.xOnlyPublicKey())
 
     /**
      * @param prefix Private key prefix
@@ -60,7 +60,7 @@ object Crypto {
   }
 
   object PrivateKey {
-    def apply(data: ByteVector): PrivateKey = PrivateKey(new bitcoin.PrivateKey(data.toArray))
+    def apply(data: ByteVector): PrivateKey = PrivateKey(new bitcoin.PrivateKey(data.toArrayUnsafe))
 
     /**
      * @param data serialized private key in bitcoin format
@@ -127,7 +127,7 @@ object Crypto {
     def fromBin(input: ByteVector, checkValid: Boolean = true): PublicKey = {
       require(isPubKeyValidLax(input))
       require(!checkValid || Crypto.isPubKeyValidStrict(input), "public key is invalid")
-      PublicKey(new bitcoin.PublicKey(bitcoin.PublicKey.compress(input.toArray)))
+      PublicKey(new bitcoin.PublicKey(bitcoin.PublicKey.compress(input.toArrayUnsafe)))
     }
   }
 
@@ -184,7 +184,7 @@ object Crypto {
    */
   def ecdh(priv: PrivateKey, pub: PublicKey): ByteVector32 = ByteVector32(ByteVector.view(bitcoin.Crypto.ecdh(priv.priv, pub.pub)))
 
-  def hmac512(key: ByteVector, data: ByteVector): ByteVector = ByteVector.view(bitcoin.Crypto.hmac512(key.toArray, data.toArray))
+  def hmac512(key: ByteVector, data: ByteVector): ByteVector = ByteVector.view(bitcoin.Crypto.hmac512(key.toArrayUnsafe, data.toArrayUnsafe))
 
   def sha256(x: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(bitcoin.Crypto.sha256(x)))
 
@@ -197,7 +197,7 @@ object Crypto {
    * @param input array of byte
    * @return the 160 bits BTC hash of input
    */
-  def hash160(input: ByteVector): ByteVector = ByteVector.view(bitcoin.Crypto.hash160(input.toArray))
+  def hash160(input: ByteVector): ByteVector = ByteVector.view(bitcoin.Crypto.hash160(input.toArrayUnsafe))
 
   /**
    * 256 bits bitcoin hash
@@ -206,15 +206,15 @@ object Crypto {
    * @param input array of byte
    * @return the 256 bits BTC hash of input
    */
-  def hash256(input: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(bitcoin.Crypto.hash256(input.toArray)))
+  def hash256(input: ByteVector): ByteVector32 = ByteVector32(ByteVector.view(bitcoin.Crypto.hash256(input.toArrayUnsafe)))
 
-  def isDERSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDERSignature(sig.toArray)
+  def isDERSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDERSignature(sig.toArrayUnsafe)
 
-  def isLowDERSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isLowDERSignature(sig.toArray)
+  def isLowDERSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isLowDERSignature(sig.toArrayUnsafe)
 
-  def checkSignatureEncoding(sig: ByteVector, flags: Int): Boolean = bitcoin.Crypto.checkSignatureEncoding(sig.toArray, flags)
+  def checkSignatureEncoding(sig: ByteVector, flags: Int): Boolean = bitcoin.Crypto.checkSignatureEncoding(sig.toArrayUnsafe, flags)
 
-  def checkPubKeyEncoding(key: ByteVector, flags: Int, sigVersion: Int): Boolean = bitcoin.Crypto.checkPubKeyEncoding(key.toArray, flags, sigVersion)
+  def checkPubKeyEncoding(key: ByteVector, flags: Int, sigVersion: Int): Boolean = bitcoin.Crypto.checkPubKeyEncoding(key.toArrayUnsafe, flags, sigVersion)
 
   /**
    * @param key serialized public key
@@ -232,13 +232,13 @@ object Crypto {
    * @return true if the key is valid. This check is much more expensive than its lax version since here we check that
    *         the public key is a valid point on the secp256k1 curve
    */
-  def isPubKeyValidStrict(key: ByteVector): Boolean = isPubKeyValidLax(key) && bitcoin.Crypto.isPubKeyValid(key.toArray)
+  def isPubKeyValidStrict(key: ByteVector): Boolean = isPubKeyValidLax(key) && bitcoin.Crypto.isPubKeyValid(key.toArrayUnsafe)
 
-  def isPubKeyCompressedOrUncompressed(key: ByteVector): Boolean = bitcoin.Crypto.isPubKeyCompressedOrUncompressed(key.toArray)
+  def isPubKeyCompressedOrUncompressed(key: ByteVector): Boolean = bitcoin.Crypto.isPubKeyCompressedOrUncompressed(key.toArrayUnsafe)
 
-  def isPubKeyCompressed(key: ByteVector): Boolean = bitcoin.Crypto.isPubKeyCompressed(key.toArray)
+  def isPubKeyCompressed(key: ByteVector): Boolean = bitcoin.Crypto.isPubKeyCompressed(key.toArrayUnsafe)
 
-  def isDefinedHashTypeSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDefinedHashTypeSignature(sig.toArray)
+  def isDefinedHashTypeSignature(sig: ByteVector): Boolean = bitcoin.Crypto.isDefinedHashTypeSignature(sig.toArrayUnsafe)
 
   /**
    * @param data      data
@@ -246,7 +246,7 @@ object Crypto {
    * @param publicKey public key
    * @return true is signature is valid for this data with this public key
    */
-  def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = bitcoin.Crypto.verifySignature(data.toArray, signature, publicKey.pub)
+  def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = bitcoin.Crypto.verifySignature(data.toArrayUnsafe, signature, publicKey.pub)
 
   /**
    * @param data      data
@@ -274,7 +274,7 @@ object Crypto {
    */
   def sign(data: Array[Byte], privateKey: PrivateKey): ByteVector64 = bitcoin.Crypto.sign(data, privateKey.priv)
 
-  def sign(data: ByteVector, privateKey: PrivateKey): ByteVector64 = sign(data.toArray, privateKey)
+  def sign(data: ByteVector, privateKey: PrivateKey): ByteVector64 = sign(data.toArrayUnsafe, privateKey)
 
   /**
    * Compute the Schnorr signature of data with private key
@@ -296,10 +296,10 @@ object Crypto {
    * @param message   message that was signed
    * @return a recovered public key
    */
-  def recoverPublicKey(signature: ByteVector64, message: ByteVector, recoveryId: Int): PublicKey = PublicKey(bitcoin.Crypto.recoverPublicKey(signature, message.toArray, recoveryId))
+  def recoverPublicKey(signature: ByteVector64, message: ByteVector, recoveryId: Int): PublicKey = PublicKey(bitcoin.Crypto.recoverPublicKey(signature, message.toArrayUnsafe, recoveryId))
 
   def recoverPublicKey(signature: ByteVector64, message: ByteVector): (PublicKey, PublicKey) = {
-    val p = bitcoin.Crypto.recoverPublicKey(signature, message.toArray)
+    val p = bitcoin.Crypto.recoverPublicKey(signature, message.toArrayUnsafe)
     (PublicKey(p.getFirst), PublicKey(p.getSecond))
   }
 

@@ -9,23 +9,7 @@ import scala.annotation.tailrec
  * see https://github.com/bitcoin/bips/blob/master/bip-0069.mediawiki
  */
 object LexicographicalOrdering {
-  @tailrec
-  def isLessThan(a: Seq[Byte], b: Seq[Byte]): Boolean = {
-    if (a.isEmpty && b.isEmpty) false
-    else if (a.isEmpty) true
-    else if (b.isEmpty) false
-    else if (a.head == b.head) isLessThan(a.tail, b.tail)
-    else (a.head & 0xff) < (b.head & 0xff)
-  }
-
-  @tailrec
-  def isLessThan(a: ByteVector, b: ByteVector): Boolean = {
-    if (a.isEmpty && b.isEmpty) false
-    else if (a.isEmpty) true
-    else if (b.isEmpty) false
-    else if (a.head == b.head) isLessThan(a.tail, b.tail)
-    else (a.head & 0xff) < (b.head & 0xff)
-  }
+  def isLessThan(a: ByteVector, b: ByteVector): Boolean = fr.acinq.bitcoin.LexicographicalOrdering.isLessThan(a.toArrayUnsafe, b.toArrayUnsafe)
 
   def isLessThan(a: OutPoint, b: OutPoint): Boolean = {
     if (a.txid == b.txid) a.index < b.index
@@ -43,5 +27,5 @@ object LexicographicalOrdering {
    * @param tx input transaction
    * @return the input tx with inputs and outputs sorted in lexicographical order
    */
-  def sort(tx: Transaction): Transaction = tx.copy(txIn = tx.txIn.sortWith(isLessThan), txOut = tx.txOut.sortWith(isLessThan))
+  def sort(tx: Transaction): Transaction = Transaction(fr.acinq.bitcoin.LexicographicalOrdering.sort(tx.inner))
 }

@@ -61,7 +61,7 @@ object Protocol {
     buffer.getShort & 0xFFFF
   }
 
-  def writeUInt16(input: Int, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt16(input, order).toArray)
+  def writeUInt16(input: Int, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt16(input, order).toArrayUnsafe)
 
   def writeUInt16(input: Int, order: ByteOrder): ByteVector = {
     val bin = new Array[Byte](2)
@@ -85,7 +85,7 @@ object Protocol {
     input.toLong(signed = false, ByteOrdering.fromJava(order))
   }
 
-  def writeUInt32(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt32(input, order).toArray)
+  def writeUInt32(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt32(input, order).toArrayUnsafe)
 
   def writeUInt32(input: Long, order: ByteOrder): ByteVector = {
     val bin = new Array[Byte](4)
@@ -107,7 +107,7 @@ object Protocol {
     buffer.getLong()
   }
 
-  def writeUInt64(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt64(input, order).toArray)
+  def writeUInt64(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt64(input, order).toArrayUnsafe)
 
   def writeUInt64(input: Long, order: ByteOrder): ByteVector = {
     val bin = new Array[Byte](8)
@@ -156,11 +156,11 @@ object Protocol {
 
   def writeBytes(input: Array[Byte], out: OutputStream): Unit = out.write(input)
 
-  def writeBytes(input: ByteVector, out: OutputStream): Unit = out.write(input.toArray)
+  def writeBytes(input: ByteVector, out: OutputStream): Unit = out.write(input.toArrayUnsafe)
 
   def varstring(input: InputStream): String = {
     val length = varint(input)
-    new String(bytes(input, length).toArray, "UTF-8")
+    new String(bytes(input, length).toArrayUnsafe, "UTF-8")
   }
 
   def writeVarstring(input: String, out: OutputStream): Unit = {
@@ -234,7 +234,7 @@ trait BtcSerializer[T] {
    * @param in message binary data in hex format
    * @return a deserialized message of type T
    */
-  def read(in: String, protocolVersion: Long): T = read(ByteVector.fromValidHex(in).toArray, protocolVersion)
+  def read(in: String, protocolVersion: Long): T = read(ByteVector.fromValidHex(in).toArrayUnsafe, protocolVersion)
 
   def read(in: String): T = read(in, PROTOCOL_VERSION)
 

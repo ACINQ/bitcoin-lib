@@ -45,7 +45,7 @@ class SighashSpec extends FunSuite {
     tx2.correctlySpends(previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // but I cannot change the tx output
-    val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut.head.copy(amount = 40 millibtc)))
+    val tx3 = Transaction(tx2.version, tx2.txIn, tx2.txOut.updated(0, tx2.txOut.head.copy(amount = 40 millibtc)), tx2.lockTime)
     intercept[RuntimeException] {
       tx3.correctlySpends(previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }
@@ -84,7 +84,7 @@ class SighashSpec extends FunSuite {
     tx2.correctlySpends(previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
 
     // but I cannot change the tx output
-    val tx3 = tx2.copy(txOut = tx2.txOut.updated(0, tx2.txOut.head.copy(amount = 40 millibtc)))
+    val tx3 = Transaction(tx2.version, tx2.txIn, tx2.txOut.updated(0, tx2.txOut.head.copy(amount = 40 millibtc)), tx2.lockTime)
     intercept[RuntimeException] {
       tx3.correctlySpends(previousTx, ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     }

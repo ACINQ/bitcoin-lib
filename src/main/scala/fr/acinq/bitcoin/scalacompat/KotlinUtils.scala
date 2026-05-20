@@ -9,17 +9,17 @@ import scala.jdk.CollectionConverters.{ListHasAsScala, SeqHasAsJava}
 
 object KotlinUtils {
 
-  implicit def kmp2scala(input: bitcoin.ByteVector32): ByteVector32 = ByteVector32(ByteVector(input.toByteArray))
+  implicit def kmp2scala(input: bitcoin.ByteVector32): ByteVector32 = ByteVector32(ByteVector.view(input.toByteArray))
 
-  implicit def scala2kmp(input: ByteVector32): bitcoin.ByteVector32 = new bitcoin.ByteVector32(input.toArray)
+  implicit def scala2kmp(input: ByteVector32): bitcoin.ByteVector32 = new bitcoin.ByteVector32(input.toArrayUnsafe)
 
-  implicit def kmp2scala(input: bitcoin.ByteVector64): ByteVector64 = ByteVector64(ByteVector(input.toByteArray))
+  implicit def kmp2scala(input: bitcoin.ByteVector64): ByteVector64 = ByteVector64(ByteVector.view(input.toByteArray))
 
-  implicit def scala2kmp(input: ByteVector64): bitcoin.ByteVector64 = new bitcoin.ByteVector64(input.toArray)
+  implicit def scala2kmp(input: ByteVector64): bitcoin.ByteVector64 = new bitcoin.ByteVector64(input.toArrayUnsafe)
 
-  implicit def kmp2scala(input: bitcoin.ByteVector): ByteVector = ByteVector(input.toByteArray)
+  implicit def kmp2scala(input: bitcoin.ByteVector): ByteVector = ByteVector.view(input.toByteArray)
 
-  implicit def scala2kmp(input: ByteVector): bitcoin.ByteVector = new bitcoin.ByteVector(input.toArray)
+  implicit def scala2kmp(input: ByteVector): bitcoin.ByteVector = new bitcoin.ByteVector(input.toArrayUnsafe)
 
   implicit def kmp2scala(input: bitcoin.TxId): TxId = TxId(input.value)
 
@@ -84,11 +84,11 @@ object KotlinUtils {
 
   implicit def kmp2scala(input: bitcoin.TxOut): TxOut = TxOut(input.amount, input.publicKeyScript)
 
-  implicit def scala2kmp(input: TxOut): bitcoin.TxOut = new bitcoin.TxOut(input.amount, input.publicKeyScript)
+  implicit def scala2kmp(input: TxOut): bitcoin.TxOut = input.kmp
 
-  implicit def kmp2scala(input: bitcoin.Transaction): Transaction = Transaction(input.version, input.txIn.asScala.toList.map(kmp2scala), input.txOut.asScala.toList.map(kmp2scala), input.lockTime)
+  implicit def kmp2scala(input: bitcoin.Transaction): Transaction = Transaction(input)
 
-  implicit def scala2kmp(input: Transaction): bitcoin.Transaction = new bitcoin.Transaction(input.version, input.txIn.map(scala2kmp).asJava, input.txOut.map(scala2kmp).asJava, input.lockTime)
+  implicit def scala2kmp(input: Transaction): bitcoin.Transaction = input.inner
 
   implicit def kmp2scala(input: bitcoin.PrivateKey): PrivateKey = PrivateKey(input)
 

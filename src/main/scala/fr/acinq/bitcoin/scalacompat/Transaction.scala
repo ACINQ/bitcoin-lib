@@ -1,13 +1,13 @@
 package fr.acinq.bitcoin.scalacompat
 
-import fr.acinq.bitcoin
+import fr.acinq.{bitcoin => bitcoinkmp}
 import fr.acinq.bitcoin.scalacompat.Crypto.PrivateKey
 import fr.acinq.bitcoin.scalacompat.KotlinUtils._
 import fr.acinq.bitcoin.scalacompat.Protocol._
 import scodec.bits.ByteVector
 
 import java.io.{InputStream, OutputStream}
-import scala.jdk.CollectionConverters.{MapHasAsJava, SeqHasAsJava}
+import scala.jdk.CollectionConverters.{ListHasAsScala, MapHasAsJava, SeqHasAsJava}
 
 /**
  * This is the double hash of a transaction serialized without witness data.
@@ -42,9 +42,9 @@ object OutPoint extends BtcSerializer[OutPoint] {
 
   def apply(txid: TxId, index: Long): OutPoint = OutPoint(TxHash(txid), index)
 
-  override def read(input: InputStream, protocolVersion: Long): OutPoint = kmp2scala(fr.acinq.bitcoin.OutPoint.read(InputStreamWrapper(input), protocolVersion))
+  override def read(input: InputStream, protocolVersion: Long): OutPoint = kmp2scala(bitcoinkmp.OutPoint.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: OutPoint, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.OutPoint.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
+  override def write(input: OutPoint, out: OutputStream, protocolVersion: Long): Unit = bitcoinkmp.OutPoint.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
 
   def isCoinbase(input: OutPoint): Boolean = scala2kmp(input).isCoinbase
 
@@ -71,12 +71,12 @@ case class OutPoint(hash: TxHash, index: Long) extends BtcSerializable[OutPoint]
 object TxIn extends BtcSerializer[TxIn] {
   def apply(outPoint: OutPoint, signatureScript: Seq[ScriptElt], sequence: Long): TxIn = new TxIn(outPoint, Script.write(signatureScript), sequence)
 
-  override def read(input: InputStream, protocolVersion: Long): TxIn = kmp2scala(fr.acinq.bitcoin.TxIn.read(InputStreamWrapper(input), protocolVersion))
+  override def read(input: InputStream, protocolVersion: Long): TxIn = kmp2scala(bitcoinkmp.TxIn.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxIn.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
+  override def write(input: TxIn, out: OutputStream, protocolVersion: Long): Unit = bitcoinkmp.TxIn.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
 
   override def validate(input: TxIn): Unit = {
-    require(input.signatureScript.length <= bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE, s"signature script is ${input.signatureScript.length} bytes, limit is ${bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE} bytes")
+    require(input.signatureScript.length <= bitcoinkmp.Script.MAX_SCRIPT_ELEMENT_SIZE, s"signature script is ${input.signatureScript.length} bytes, limit is ${bitcoinkmp.Script.MAX_SCRIPT_ELEMENT_SIZE} bytes")
   }
 
   def coinbase(script: ByteVector): TxIn = {
@@ -86,7 +86,7 @@ object TxIn extends BtcSerializer[TxIn] {
 
   def coinbase(script: Seq[ScriptElt]): TxIn = coinbase(Script.write(script))
 
-  val SEQUENCE_FINAL: Long = fr.acinq.bitcoin.TxIn.SEQUENCE_FINAL
+  val SEQUENCE_FINAL: Long = bitcoinkmp.TxIn.SEQUENCE_FINAL
 }
 
 /**
@@ -99,7 +99,7 @@ object TxIn extends BtcSerializer[TxIn] {
  * @param witness         Transaction witness (i.e. what is in sig script for standard transactions).
  */
 case class TxIn(outPoint: OutPoint, signatureScript: ByteVector, sequence: Long, witness: ScriptWitness = ScriptWitness.empty) extends BtcSerializable[TxIn] {
-  def isFinal: Boolean = sequence == bitcoin.TxIn.SEQUENCE_FINAL
+  def isFinal: Boolean = sequence == bitcoinkmp.TxIn.SEQUENCE_FINAL
   def hasWitness: Boolean = witness.isNotNull
   def weight(): Int = scala2kmp(this).weight()
 
@@ -109,15 +109,15 @@ case class TxIn(outPoint: OutPoint, signatureScript: ByteVector, sequence: Long,
 object TxOut extends BtcSerializer[TxOut] {
   def apply(amount: Satoshi, publicKeyScript: Seq[ScriptElt]): TxOut = new TxOut(amount, Script.write(publicKeyScript))
 
-  override def read(input: InputStream, protocolVersion: Long): TxOut = kmp2scala(fr.acinq.bitcoin.TxOut.read(InputStreamWrapper(input), protocolVersion))
+  override def read(input: InputStream, protocolVersion: Long): TxOut = kmp2scala(bitcoinkmp.TxOut.read(InputStreamWrapper(input), protocolVersion))
 
-  override def write(input: TxOut, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.TxOut.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
+  override def write(input: TxOut, out: OutputStream, protocolVersion: Long): Unit = bitcoinkmp.TxOut.write(scala2kmp(input), OutputStreamWrapper(out), protocolVersion)
 
   override def validate(input: TxOut): Unit = {
     import input._
     require(amount.toLong >= 0, s"invalid txout amount: $amount")
     require(amount.toLong <= BtcAmount.MaxMoney, s"invalid txout amount: $amount")
-    require(publicKeyScript.length < bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE, s"public key script is ${publicKeyScript.length} bytes, limit is ${bitcoin.Script.MAX_SCRIPT_ELEMENT_SIZE} bytes")
+    require(publicKeyScript.length < bitcoinkmp.Script.MAX_SCRIPT_ELEMENT_SIZE, s"public key script is ${publicKeyScript.length} bytes, limit is ${bitcoinkmp.Script.MAX_SCRIPT_ELEMENT_SIZE} bytes")
   }
 }
 
@@ -128,7 +128,10 @@ object TxOut extends BtcSerializer[TxOut] {
  * @param publicKeyScript public key script which sets the conditions for spending this output
  */
 case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerializable[TxOut] {
-  def weight(): Int = scala2kmp(this).weight()
+  // TxOut will almost always need to be converted to its bitcoin-kmp counterpart so we precompute this conversion here
+  val kmp: bitcoinkmp.TxOut = new bitcoinkmp.TxOut(amount, publicKeyScript.toArrayUnsafe)
+
+  def weight(): Int = kmp.weight()
 
   override def serializer: BtcSerializer[TxOut] = TxOut
 }
@@ -136,9 +139,9 @@ case class TxOut(amount: Satoshi, publicKeyScript: ByteVector) extends BtcSerial
 object ScriptWitness extends BtcSerializer[ScriptWitness] {
   val empty: ScriptWitness = ScriptWitness(Seq.empty[ByteVector])
 
-  override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit = fr.acinq.bitcoin.ScriptWitness.write(scala2kmp(t), OutputStreamWrapper(out), protocolVersion)
+  override def write(t: ScriptWitness, out: OutputStream, protocolVersion: Long): Unit = bitcoinkmp.ScriptWitness.write(scala2kmp(t), OutputStreamWrapper(out), protocolVersion)
 
-  override def read(in: InputStream, protocolVersion: Long): ScriptWitness = kmp2scala(fr.acinq.bitcoin.ScriptWitness.read(InputStreamWrapper(in), protocolVersion))
+  override def read(in: InputStream, protocolVersion: Long): ScriptWitness = kmp2scala(bitcoinkmp.ScriptWitness.read(InputStreamWrapper(in), protocolVersion))
 }
 
 /**
@@ -158,31 +161,43 @@ case class ScriptWitness(stack: Seq[ByteVector]) extends BtcSerializable[ScriptW
 object Transaction extends BtcSerializer[Transaction] {
   /**
    *
+   * @param version  Transaction data format version
+   * @param txIn     Transaction inputs
+   * @param txOut    Transaction outputs
+   * @param lockTime The block number or timestamp at which this transaction is locked
+   * @return a new transaction
+   */
+  def apply(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long): Transaction = Transaction(
+    new bitcoinkmp.Transaction(version, txIn.map(scala2kmp).asJava, txOut.map(scala2kmp).asJava, lockTime)
+  )
+
+  /**
+   *
    * @param version protocol version (and NOT transaction version !)
    * @return true if protocol version specifies that witness data is to be serialized
    */
-  def serializeTxWitness(version: Long): Boolean = (version & bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS) == 0
+  def serializeTxWitness(version: Long): Boolean = bitcoinkmp.Transaction.serializeTxWitness(version)
 
   override def read(input: InputStream, protocolVersion: Long): Transaction = {
-    val tx = fr.acinq.bitcoin.Transaction.read(InputStreamWrapper(input), protocolVersion)
-    tx
+    val tx = bitcoinkmp.Transaction.read(InputStreamWrapper(input), protocolVersion)
+    Transaction(tx)
   }
 
   override def write(tx: Transaction, out: OutputStream, protocolVersion: Long): Unit = {
-    fr.acinq.bitcoin.Transaction.write(tx, OutputStreamWrapper(out), protocolVersion)
+    bitcoinkmp.Transaction.write(tx.inner, OutputStreamWrapper(out), protocolVersion)
   }
 
   override def validate(input: Transaction): Unit = {
-    fr.acinq.bitcoin.Transaction.validate(input)
+    bitcoinkmp.Transaction.validate(input.inner)
   }
 
-  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = fr.acinq.bitcoin.Transaction.baseSize(scala2kmp(tx), protocolVersion)
+  def baseSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.inner.baseSize(protocolVersion)
 
-  def totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = fr.acinq.bitcoin.Transaction.totalSize(scala2kmp(tx), protocolVersion)
+  def totalSize(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.inner.baseSize(protocolVersion)
 
-  def weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = totalSize(tx, protocolVersion) + 3 * baseSize(tx, protocolVersion)
+  def weight(tx: Transaction, protocolVersion: Long = PROTOCOL_VERSION): Int = tx.inner.weight(protocolVersion)
 
-  def isCoinbase(input: Transaction): Boolean = input.txIn.size == 1 && OutPoint.isCoinbase(input.txIn.head.outPoint)
+  def isCoinbase(input: Transaction): Boolean = input.inner.isCoinbase
 
   /**
    * prepare a transaction for signing a specific input
@@ -207,7 +222,7 @@ object Transaction extends BtcSerializer[Transaction] {
    * @return a hash which can be used to sign the referenced tx input
    */
   def hashForSigning(tx: Transaction, inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): ByteVector32 = {
-    ByteVector32(ByteVector.view(fr.acinq.bitcoin.Transaction.hashForSigning(tx, inputIndex, previousOutputScript.toArray, sighashType)))
+    ByteVector32(ByteVector.view(bitcoinkmp.Transaction.hashForSigning(tx, inputIndex, previousOutputScript.toArrayUnsafe, sighashType)))
   }
 
   /**
@@ -308,7 +323,7 @@ object Transaction extends BtcSerializer[Transaction] {
    * @param sighashType signature hash type, which will be appended to the signature
    * @return an ECDSA signature in the format used in transaction witnesses: DER encoded followed by a sighash byte
    */
-  def encodeWitnessEcdsaSig(sig: ByteVector64, sighashType: Int): ByteVector = ByteVector.view(fr.acinq.bitcoin.Transaction.encodeWitnessEcdsaSig(sig, sighashType))
+  def encodeWitnessEcdsaSig(sig: ByteVector64, sighashType: Int): ByteVector = ByteVector.view(bitcoinkmp.Transaction.encodeWitnessEcdsaSig(sig, sighashType))
 
   /**
    * Sign a taproot tx input, using the internal key path.
@@ -350,26 +365,42 @@ object Transaction extends BtcSerializer[Transaction] {
 }
 
 /**
- * Transaction
+ * Instead of using a pure Scala case class, we simply wrap an instance of bitcoin-kmp transaction.
+ * This is done because kmp<->scala conversion is expensive and to benefit from optmisations (such as
+ * pre-computed hashes used to sign transactions, see https://github.com/ACINQ/bitcoin-kmp/pull/184)
  *
- * @param version  Transaction data format version
- * @param txIn     Transaction inputs
- * @param txOut    Transaction outputs
- * @param lockTime The block number or timestamp at which this transaction is locked
+ * But this also means that we cannot use `.copy()` to update inputs or outputs for example, and must provide
+ * helper methods instead.
+ *
  */
-case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTime: Long) extends BtcSerializable[Transaction] {
+case class Transaction(inner: bitcoinkmp.Transaction) extends BtcSerializable[Transaction] {
+  val version: Long = inner.version
+  val lockTime: Long = inner.lockTime
 
   // standard transaction hash, used to identify transactions (in transactions outputs for example)
-  lazy val hash: TxHash = TxHash(Crypto.hash256(Transaction.write(this, bitcoin.Transaction.SERIALIZE_TRANSACTION_NO_WITNESS)))
-  lazy val txid: TxId = TxId(hash)
+  lazy val hash: TxHash = kmp2scala(inner.hash)
+  lazy val txid: TxId = kmp2scala(inner.txid)
+
   // witness transaction hash that includes witness data. used to compute the witness commitment included in the coinbase
   // transaction of segwit blocks
-  lazy val whash: ByteVector32 = Crypto.hash256(Transaction.write(this))
+  lazy val whash: ByteVector32 = Crypto.hash256(bin)
   lazy val wtxid: ByteVector32 = whash.reverse
   lazy val bin: ByteVector = Transaction.write(this)
 
   // this is much easier to use than Scala's default toString
   override def toString: String = bin.toHex
+
+  lazy val txOut: Seq[TxOut] = inner.txOut.asScala.map(kmp2scala).toSeq
+
+  lazy val txIn: Seq[TxIn] = inner.txIn.asScala.map(kmp2scala).toSeq
+
+  def updateInputs(txIn: Seq[TxIn]) : Transaction = Transaction(inner.updateInputs(txIn.map(scala2kmp).asJava))
+
+  def updateOutputs(txOut: Seq[TxOut]) : Transaction = Transaction(inner.updateOutputs(txOut.map(scala2kmp).asJava))
+
+  def updateInputsAndOutputs(txIn: Seq[TxIn], txOut: Seq[TxOut]) : Transaction = Transaction(inner.copy(inner.version, txIn.map(scala2kmp).asJava, txOut.map(scala2kmp).asJava, inner.lockTime))
+
+  def updateLockTime(lockTime: Long): Transaction = Transaction(inner.copy(inner.version, inner.txIn, inner.txOut, lockTime))
 
   /**
    *
@@ -377,60 +408,49 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @param blockTime   current block time
    * @return true if the transaction is final
    */
-  def isFinal(blockHeight: Long, blockTime: Long): Boolean = lockTime match {
-    case 0 => true
-    case value if value < bitcoin.Transaction.LOCKTIME_THRESHOLD && value < blockHeight => true
-    case value if value >= bitcoin.Transaction.LOCKTIME_THRESHOLD && value < blockTime => true
-    case _ if txIn.exists(!_.isFinal) => false
-    case _ => true
-  }
+  def isFinal(blockHeight: Long, blockTime: Long): Boolean = inner.isFinal(blockHeight, blockTime)
 
   /**
    *
    * @param i         index of the tx input to update
    * @param sigScript new signature script
-   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replaced by sigScript
    */
-  def updateSigScript(i: Int, sigScript: ByteVector): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(signatureScript = sigScript)))
+  def updateSigScript(i: Int, sigScript: ByteVector): Transaction = Transaction(inner.updateSigScript(i, sigScript.toArrayUnsafe))
 
   /**
    *
    * @param i         index of the tx input to update
    * @param sigScript new signature script
-   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replace by sigscript
+   * @return a new transaction that is of copy of this one but where the signature script of the ith input has been replaced by sigScript
    */
-  def updateSigScript(i: Int, sigScript: Seq[ScriptElt]): Transaction = updateSigScript(i, Script.write(sigScript))
+  def updateSigScript(i: Int, sigScript: Seq[ScriptElt]): Transaction = Transaction(inner.updateSigScript(i, sigScript.map(scala2kmp).asJava))
 
-  def updateWitness(i: Int, witness: ScriptWitness): Transaction = this.copy(txIn = txIn.updated(i, txIn(i).copy(witness = witness)))
+  def updateWitness(i: Int, witness: ScriptWitness): Transaction = Transaction(inner.updateWitness(i, scala2kmp(witness)))
 
-  def updateWitnesses(witnesses: Seq[ScriptWitness]): Transaction = {
-    require(witnesses.length == txIn.length)
-    witnesses.zipWithIndex.foldLeft(this) {
-      case (tx, (witness, index)) => tx.updateWitness(index, witness)
-    }
-  }
+  def updateWitnesses(witnesses: Seq[ScriptWitness]): Transaction = Transaction(inner.updateWitnesses(witnesses.map(scala2kmp).asJava))
 
-  def hasWitness: Boolean = txIn.exists(_.hasWitness)
+  def hasWitness: Boolean = inner.getHasWitness
 
   /**
    *
    * @param input input to add the tx
    * @return a new transaction which includes the newly added input
    */
-  def addInput(input: TxIn): Transaction = this.copy(txIn = this.txIn :+ input)
+  def addInput(input: TxIn): Transaction = this.copy(inner = inner.addInput(scala2kmp(input)))
 
   /**
    *
    * @param output output to add to the tx
    * @return a new transaction which includes the newly added output
    */
-  def addOutput(output: TxOut): Transaction = this.copy(txOut = this.txOut :+ output)
+  def addOutput(output: TxOut): Transaction = this.copy(inner = inner.addOutput(scala2kmp(output)))
 
-  def baseSize(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.baseSize(this, protocolVersion)
+  def baseSize(protocolVersion: Long = PROTOCOL_VERSION): Int = inner.baseSize(protocolVersion)
 
-  def totalSize(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.totalSize(this, protocolVersion)
+  def totalSize(protocolVersion: Long = PROTOCOL_VERSION): Int = inner.totalSize(protocolVersion)
 
-  def weight(protocolVersion: Long = PROTOCOL_VERSION): Int = Transaction.weight(this, protocolVersion)
+  def weight(protocolVersion: Long = PROTOCOL_VERSION): Int = inner.weight(protocolVersion)
 
   /**
    * prepare a transaction for signing a specific input
@@ -441,7 +461,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @return a new transaction with proper inputs and outputs according to SIGHASH_TYPE rules
    */
   def prepareForSigning(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int): Transaction = {
-    scala2kmp(this).prepareForSigning(inputIndex, previousOutputScript.toArray, sighashType)
+    Transaction(inner.prepareForSigning(inputIndex, previousOutputScript.toArrayUnsafe, sighashType))
   }
 
   /**
@@ -454,7 +474,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @return a hash which can be used to sign the referenced tx input
    */
   def hashForSigning(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int): ByteVector32 = {
-    ByteVector32(ByteVector.view(scala2kmp(this).hashForSigning(inputIndex, previousOutputScript.toArray, sighashType, amount, signatureVersion)))
+    ByteVector32(ByteVector.view(inner.hashForSigning(inputIndex, previousOutputScript.toArrayUnsafe, sighashType, amount, signatureVersion)))
   }
 
   /**
@@ -478,17 +498,17 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @param annex_opt   (optional) taproot annex
    */
   def hashForSigningSchnorr(inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, sigVersion: Int, tapleaf_opt: Option[ByteVector32] = None, annex_opt: Option[ByteVector] = None): ByteVector32 = {
-    scala2kmp(this).hashForSigningSchnorr(inputIndex, inputs.map(scala2kmp).asJava, sighashType, sigVersion, tapleaf_opt.map(scala2kmp).orNull, annex_opt.map(scala2kmp).orNull, null)
+    inner.hashForSigningSchnorr(inputIndex, inputs.map(scala2kmp).asJava, sighashType, sigVersion, tapleaf_opt.map(scala2kmp).orNull, annex_opt.map(scala2kmp).orNull, null)
   }
 
   /** Use this function when spending a taproot key path. */
   def hashForSigningTaprootKeyPath(inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, annex_opt: Option[ByteVector] = None): ByteVector32 = {
-    scala2kmp(this).hashForSigningTaprootKeyPath(inputIndex, inputs.map(scala2kmp).asJava, sighashType, annex_opt.map(scala2kmp).orNull)
+    inner.hashForSigningTaprootKeyPath(inputIndex, inputs.map(scala2kmp).asJava, sighashType, annex_opt.map(scala2kmp).orNull)
   }
 
   /** Use this function when spending a taproot script path. */
   def hashForSigningTaprootScriptPath(inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, tapleaf: ByteVector32, annex_opt: Option[ByteVector] = None): ByteVector32 = {
-    scala2kmp(this).hashForSigningTaprootScriptPath(inputIndex, inputs.map(scala2kmp).asJava, sighashType, scala2kmp(tapleaf), annex_opt.map(scala2kmp).orNull)
+    inner.hashForSigningTaprootScriptPath(inputIndex, inputs.map(scala2kmp).asJava, sighashType, scala2kmp(tapleaf), annex_opt.map(scala2kmp).orNull)
   }
 
   /**
@@ -503,7 +523,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @return the encoded signature of this tx for this specific tx input in compact 64 bytes format
    */
   def signInputCompact(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector64 = {
-    scala2kmp(this).signInputCompact(inputIndex, scala2kmp(previousOutputScript), sighashType, amount, signatureVersion, privateKey.priv)
+    inner.signInputCompact(inputIndex, scala2kmp(previousOutputScript), sighashType, amount, signatureVersion, privateKey.priv)
   }
 
   /**
@@ -518,7 +538,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @return the encoded signature of this tx for this specific tx input in compact 64 bytes format
    */
   def signInputCompact(inputIndex: Int, previousOutputScript: Seq[ScriptElt], sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector64 =
-    signInputCompact(inputIndex, Script.write(previousOutputScript), sighashType, amount, signatureVersion, privateKey)
+    inner.signInputCompact(inputIndex, previousOutputScript.map(scala2kmp).asJava, sighashType, amount, signatureVersion, privateKey.priv)
 
 
   /**
@@ -533,13 +553,13 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @return the encoded signature of this tx for this specific tx input
    */
   def signInput(inputIndex: Int, previousOutputScript: ByteVector, sighashType: Int, amount: Satoshi, signatureVersion: Int, privateKey: PrivateKey): ByteVector = {
-    ByteVector.view(scala2kmp(this).signInput(inputIndex, scala2kmp(previousOutputScript), sighashType, amount, signatureVersion, privateKey.priv))
+    ByteVector.view(inner.signInput(inputIndex, scala2kmp(previousOutputScript), sighashType, amount, signatureVersion, privateKey.priv))
   }
 
   /**
    * sign a tx input
    *
-   * @param inputIndex           index of the tx input that is being processed
+   * @param inputIndex           index of the input that is being processed
    * @param previousOutputScript public key script of the output claimed by this tx input
    * @param sighashType          signature hash type, which will be appended to the signature
    * @param amount               amount of the output claimed by this tx input
@@ -561,7 +581,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @return the schnorr signature of this tx for this specific tx input.
    */
   def signInputTaprootKeyPath(privateKey: PrivateKey, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, scriptTree_opt: Option[ScriptTree], annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
-    scala2kmp(this).signInputTaprootKeyPath(privateKey, inputIndex, inputs.map(scala2kmp).asJava, sighashType, scriptTree_opt.map(scala2kmp).orNull, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
+    inner.signInputTaprootKeyPath(privateKey, inputIndex, inputs.map(scala2kmp).asJava, sighashType, scriptTree_opt.map(scala2kmp).orNull, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
   }
 
   /**
@@ -575,15 +595,15 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
    * @return the schnorr signature of this tx for this specific tx input and the given script leaf.
    */
   def signInputTaprootScriptPath(privateKey: PrivateKey, inputIndex: Int, inputs: Seq[TxOut], sighashType: Int, tapleaf: ByteVector32, annex_opt: Option[ByteVector] = None, auxrand32: Option[ByteVector32] = None): ByteVector64 = {
-    scala2kmp(this).signInputTaprootScriptPath(privateKey, inputIndex, inputs.map(scala2kmp).asJava, sighashType, tapleaf, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
+    inner.signInputTaprootScriptPath(privateKey, inputIndex, inputs.map(scala2kmp).asJava, sighashType, tapleaf, annex_opt.map(scala2kmp).orNull, auxrand32.map(scala2kmp).orNull)
   }
 
   def correctlySpends(previousOutputs: Map[OutPoint, TxOut], scriptFlags: Int): Unit = {
-    scala2kmp(this).correctlySpends(previousOutputs.map { case (o, t) => scala2kmp(o) -> scala2kmp(t) }.asJava, scriptFlags)
+    inner.correctlySpends(previousOutputs.map { case (o, t) => scala2kmp(o) -> scala2kmp(t) }.asJava, scriptFlags)
   }
 
   def correctlySpends(inputs: Seq[Transaction], scriptFlags: Int): Unit = {
-    scala2kmp(this).correctlySpends(inputs.map(scala2kmp).asJava, scriptFlags)
+    inner.correctlySpends(inputs.map(scala2kmp).asJava, scriptFlags)
   }
 
   override def serializer: BtcSerializer[Transaction] = Transaction
