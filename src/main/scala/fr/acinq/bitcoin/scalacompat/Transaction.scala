@@ -366,7 +366,7 @@ object Transaction extends BtcSerializer[Transaction] {
 
 /**
  * Instead of using a pure Scala case class, we simply wrap an instance of bitcoin-kmp transaction.
- * This is done because kmp<->scala conversion is expensive and to benefit from optmisations (such as
+ * This is done because kmp<->scala conversion is expensive and to benefit from optimisations (such as
  * pre-computed hashes used to sign transactions, see https://github.com/ACINQ/bitcoin-kmp/pull/184)
  *
  * But this also means that we cannot use `.copy()` to update inputs or outputs for example, and must provide
