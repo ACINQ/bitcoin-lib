@@ -27,5 +27,5 @@ object LexicographicalOrdering {
    * @param tx input transaction
    * @return the input tx with inputs and outputs sorted in lexicographical order
    */
-  def sort(tx: Transaction): Transaction = Transaction(fr.acinq.bitcoin.LexicographicalOrdering.sort(tx.inner))
+  def sort(tx: Transaction): Transaction = tx.copy(txIn = tx.txIn.sortWith(isLessThan), txOut = tx.txOut.sortWith(isLessThan))
 }

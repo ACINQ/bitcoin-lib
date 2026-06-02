@@ -52,7 +52,7 @@ object Script {
    * @param inputIndex 0-based index of the tx input that is being processed
    */
   case class Context(tx: Transaction, inputIndex: Int, amount: Satoshi, prevouts: List[TxOut] = Nil) {
-    require(inputIndex >= 0 && inputIndex < tx.inner.txIn.size(), "invalid input index")
+    require(inputIndex >= 0 && inputIndex < tx.txIn.length, "invalid input index")
   }
 
   /**

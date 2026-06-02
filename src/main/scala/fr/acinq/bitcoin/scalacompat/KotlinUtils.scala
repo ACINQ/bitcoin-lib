@@ -84,11 +84,11 @@ object KotlinUtils {
 
   implicit def kmp2scala(input: bitcoin.TxOut): TxOut = TxOut(input.amount, input.publicKeyScript)
 
-  implicit def scala2kmp(input: TxOut): bitcoin.TxOut = input.kmp
+  implicit def scala2kmp(input: TxOut): bitcoin.TxOut = new bitcoin.TxOut(input.amount, input.publicKeyScript)
 
-  implicit def kmp2scala(input: bitcoin.Transaction): Transaction = Transaction(input)
+  implicit def kmp2scala(input: bitcoin.Transaction): Transaction = Transaction(input.version, input.txIn.asScala.toList.map(kmp2scala), input.txOut.asScala.toList.map(kmp2scala), input.lockTime)
 
-  implicit def scala2kmp(input: Transaction): bitcoin.Transaction = input.inner
+  implicit def scala2kmp(input: Transaction): bitcoin.Transaction = input.kmp
 
   implicit def kmp2scala(input: bitcoin.PrivateKey): PrivateKey = PrivateKey(input)
 
