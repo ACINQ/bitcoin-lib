@@ -14,7 +14,9 @@ object Musig2 {
    * Musig2 secret nonce, that should be treated as a private opaque blob.
    * This nonce must never be persisted or reused across signing sessions.
    */
-  case class SecretNonce(inner: musig2.SecretNonce)
+  case class SecretNonce(inner: musig2.SecretNonce) {
+    def consume[T](f: Array[Byte] => T): Either[Throwable, T] = inner.consume$bitcoin_kmp((bytes: Array[Byte]) => f(bytes))
+  }
 
   /**
    * Musig2 public nonce, that must be shared with other participants in the signing session.
@@ -73,7 +75,7 @@ object Musig2 {
    * @param scriptTree_opt tapscript tree of the taproot input, if it has script paths.
    */
   def signTaprootInput(privateKey: PrivateKey, tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], publicKeys: Seq[PublicKey], secretNonce: SecretNonce, publicNonces: Seq[IndividualNonce], scriptTree_opt: Option[ScriptTree]): Either[Throwable, ByteVector32] = {
-    musig2.Musig2.signTaprootInput(privateKey, tx, inputIndex, inputs.map(scala2kmp).asJava, publicKeys.map(scala2kmp).asJava, secretNonce.inner, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArray)).asJava, scriptTree_opt.map(scala2kmp).orNull).map(kmp2scala)
+    musig2.Musig2.signTaprootInput(privateKey, tx, inputIndex, inputs.map(scala2kmp).asJava, publicKeys.map(scala2kmp).asJava, secretNonce.inner, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArrayUnsafe)).asJava, scriptTree_opt.map(scala2kmp).orNull).map(kmp2scala)
   }
 
   /**
@@ -91,7 +93,7 @@ object Musig2 {
    * @return true if the partial signature is valid.
    */
   def verifyTaprootSignature(partialSig: ByteVector32, nonce: IndividualNonce, publicKey: PublicKey, tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], publicKeys: Seq[PublicKey], publicNonces: Seq[IndividualNonce], scriptTree_opt: Option[ScriptTree]): Boolean = {
-    musig2.Musig2.verify(partialSig, new musig2.IndividualNonce(nonce.data.toArray), publicKey, tx, inputIndex, inputs.map(scala2kmp).asJava, publicKeys.map(scala2kmp).asJava, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArray)).asJava, scriptTree_opt.map(scala2kmp).orNull)
+    musig2.Musig2.verify(partialSig, new musig2.IndividualNonce(nonce.data.toArrayUnsafe), publicKey, tx, inputIndex, inputs.map(scala2kmp).asJava, publicKeys.map(scala2kmp).asJava, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArrayUnsafe)).asJava, scriptTree_opt.map(scala2kmp).orNull)
   }
 
   /**
@@ -106,7 +108,7 @@ object Musig2 {
    * @param scriptTree_opt tapscript tree of the taproot input, if it has script paths.
    */
   def aggregateTaprootSignatures(partialSigs: Seq[ByteVector32], tx: Transaction, inputIndex: Int, inputs: Seq[TxOut], publicKeys: Seq[PublicKey], publicNonces: Seq[IndividualNonce], scriptTree_opt: Option[ScriptTree]): Either[Throwable, ByteVector64] = {
-    musig2.Musig2.aggregateTaprootSignatures(partialSigs.map(scala2kmp).asJava, tx, inputIndex, inputs.map(scala2kmp).asJava, publicKeys.map(scala2kmp).asJava, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArray)).asJava, scriptTree_opt.map(scala2kmp).orNull).map(kmp2scala)
+    musig2.Musig2.aggregateTaprootSignatures(partialSigs.map(scala2kmp).asJava, tx, inputIndex, inputs.map(scala2kmp).asJava, publicKeys.map(scala2kmp).asJava, publicNonces.map(n => new musig2.IndividualNonce(n.data.toArrayUnsafe)).asJava, scriptTree_opt.map(scala2kmp).orNull).map(kmp2scala)
   }
 
 }

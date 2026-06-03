@@ -10,11 +10,25 @@
 
     <distributionManagement>
         <snapshotRepository>
-            <id>central-snapshots</id>
+            <id>central_portal</id>
             <url>https://central.sonatype.com/repository/maven-snapshots</url>
         </snapshotRepository>
     </distributionManagement>
 
+    <repositories>
+        <repository>
+            <id>central_portal</id>
+            <name>Sonatype Central Portal (snapshots)</name>
+            <url>https://central.sonatype.com/repository/maven-snapshots</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    
     <properties>
         <project.build.outputTimestamp>2020-01-01T00:00:00Z</project.build.outputTimestamp>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -146,7 +160,7 @@
         <dependency>
             <groupId>fr.acinq.bitcoin</groupId>
             <artifactId>bitcoin-kmp-jvm</artifactId>
-            <version>0.30.0</version>
+            <version>0.31.0</version>
         </dependency>
         <dependency>
             <groupId>fr.acinq.secp256k1</groupId>
@@ -206,23 +220,9 @@
                         <version>0.8.0</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <publishingServerId>central</publishingServerId>
+                            <publishingServerId>central_portal</publishingServerId>
                             <centralSnapshotsUrl>https://central.sonatype.com/repository/maven-snapshots</centralSnapshotsUrl>
                         </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.6</version>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>

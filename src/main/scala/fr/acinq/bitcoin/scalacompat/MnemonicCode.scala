@@ -15,7 +15,7 @@ object MnemonicCode {
    * @param entropy input entropy
    * @return a list of mnemonic words that encodes the input entropy
    */
-  def toMnemonics(entropy: ByteVector): List[String] = bitcoin.MnemonicCode.toMnemonics(entropy.toArray).asScala.toList
+  def toMnemonics(entropy: ByteVector): List[String] = bitcoin.MnemonicCode.toMnemonics(entropy.toArrayUnsafe).asScala.toList
 
   /**
    * BIP39 entropy encoding.
@@ -24,7 +24,7 @@ object MnemonicCode {
    * @param wordlist word list (must be 2048 words long)
    * @return a list of mnemonic words that encodes the input entropy
    */
-  def toMnemonics(entropy: ByteVector, wordlist: Seq[String]): List[String] = bitcoin.MnemonicCode.toMnemonics(entropy.toArray, wordlist.asJava).asScala.toList
+  def toMnemonics(entropy: ByteVector, wordlist: Seq[String]): List[String] = bitcoin.MnemonicCode.toMnemonics(entropy.toArrayUnsafe, wordlist.asJava).asScala.toList
 
   /**
    * Verify that a mnemonic seed is valid using default BIP39 word list.
