@@ -116,4 +116,10 @@ class Musig2Spec extends FunSuite {
     assert(nonce.publicNonce.data == hex"0271efb262c0535e921efacacd30146fa93f193689e4974d5348fa9d909d90000702a049680ef3f6acfb12320297df31d3a634214491cbeebacef5acdf13f8f61cc2")
   }
 
+  test("musig2 nonces can only be used once") {
+    val sk = PrivateKey(ByteVector.fromValidHex("EEC1CB7D1B7254C5CAB0D9C61AB02E643D464A59FE6C96A7EFE871F07C5AEF54"))
+    val nonce = Musig2.generateNonceWithCounter(0, sk, Seq(sk.publicKey), None, None)
+    assert(nonce.secretNonce.consume(a => Crypto.sha256(ByteVector.view(a))).isRight)
+    assert(nonce.secretNonce.consume(a => Crypto.sha256(ByteVector.view(a))).isLeft)
+  }
 }
