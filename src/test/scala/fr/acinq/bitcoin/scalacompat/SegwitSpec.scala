@@ -73,6 +73,7 @@ class SegwitSpec extends FunSuite {
 
     // this is a standard tx that sends 0.04 BTC to mp4eLFx7CpifAJxnvCZ3FmqKsh9dQmi5dA
     val tx1 = Transaction.read("02000000000101516508384a3e006340f1ea700eb3635330beed5d94c7b460b6b495eb1593d55c0100000023220020a5fdf5b5f2c592362b78a50997821964b39dd90476c6e1f3e97e79acb134ca3bfdffffff0200093d00000000001976a9145dbf52b8d7af4fb5f9b75b808f0a8284493531b388aca005071d0000000017a914d77e5f7ca4d9f05dc4f25dc0aa1391f0e901bdfc87040047304402207bfb18327be173512f38bd4120b8f02545321ecc6105a852cbc25b1de687ba570220705a1225d8a8e0fbd4b35f3bc38a2840706f8524e8dc6f0151746aeff14033ce014730440220486925fb0495442e4ccb1b711692af7057d4db24f8775b5dfa3f8c74992081f102203beae7d96423e0c66b7b5f8919a5f3ad89a42dc4303f37201e4e596909478357014752210245119449d07c16992c148e3b33f1395ee05c936fc510d9fae83417f8e1901f922103eb03f67b56c88bccff90b76182c08556eac9ebc5a0efee8669bef69ae6d4ea5752ae75bb2300", pversion)
+    assert(Script.pay2trOutputKey(tx1.txOut.head.publicKeyScript).isEmpty)
 
     // now let's create a simple tx that spends tx1 and send 0.039 BTC to P2WPK output
     val tx2 = {
@@ -86,6 +87,7 @@ class SegwitSpec extends FunSuite {
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx2.txid == TxId.fromValidHex("f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3"))
+    assert(Script.pay2trOutputKey(tx2.txOut.head.publicKeyScript).isEmpty)
     // this tx was published on testnet as f25b3fecc9652466926237d96e4bc7ee2c984051fe48e61417aba218af5570c3
 
     // and now we create a testnet tx that spends the P2WPK output
@@ -123,6 +125,7 @@ class SegwitSpec extends FunSuite {
 
     // this is a standard tx that sends 0.05 BTC to mkNdbutRYE3me7wvbwvvJ8XQwbzi56sneZ
     val tx1 = Transaction.read("020000000001016ecc08b535a0c774234419dee508867ace1535a0d256d6b2aa19942441777336000000002322002073bb471aa121fbdd95942eabb5e665d66e71542e6e075c8392cd0df72a075b72fdffffff02803823030000000017a914d3c15be7951c9de644bdf9e22dcbcb77550c4ae487404b4c00000000001976a9143545b2a6659dbe5bdf841d1158135be184d81d3688ac0400473044022041cac92405e4e3215c2f9c27a67ff0792c8fb76e4182023fed081f541f4563e002203bd04d4d810ef8074aeb26a19e01e1ee1a40ad83e4d0ac2c614b8cb22825d2ae0147304402204c947b46ea480419c04098a56a5219bb1f491b07e12926fb6f304132a1f1e29e022078cc9f004c74d6c3c2b2dfcca6385d2fabe44d4eadb027a0d764e1ab9d7f09190147522102be608bf8904326b4d0ec9346aa348773fe51ee70338849acd2dd710b73bf611a2103627c19e40f67c5ee8b44df85ee911b7e978869fa5a3de1d972a461f47ea349e452ae90bb2300", pversion)
+    assert(Script.pay2trOutputKey(tx1.txOut.head.publicKeyScript).isEmpty)
 
     // now let's create a simple tx that spends tx1 and send 0.5 BTC to a P2WSH output
     val tx2 = {
@@ -139,6 +142,7 @@ class SegwitSpec extends FunSuite {
     }
     Transaction.correctlySpends(tx2, Seq(tx1), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
     assert(tx2.txid == TxId.fromValidHex("2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9"))
+    assert(Script.pay2trOutputKey(tx2.txOut.head.publicKeyScript).isEmpty)
     // this tx was published on testnet as 2f8360a06a31ca642d717b1857aa86b3306fc554fa9c437d88b4bc61b7f2b3e9
 
     // and now we create a testnet tx that spends the P2WSH output

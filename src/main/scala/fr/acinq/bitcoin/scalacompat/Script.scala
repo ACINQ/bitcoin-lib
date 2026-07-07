@@ -173,17 +173,24 @@ object Script {
 
   /**
    * @param internalKey internal public key that will be tweaked with the [scripts] provided.
-   * @param scripts spending scripts that can be used instead of key-path spending.
+   * @param scripts     spending scripts that can be used instead of key-path spending.
    */
   def pay2tr(internalKey: XonlyPublicKey, scripts: ScriptTree): Seq[ScriptElt] = pay2tr(internalKey, scripts.hash())
 
   /**
-   * @param internalKey internal public key that will be tweaked with the provided [taprootTweak].
+   * @param internalKey  internal public key that will be tweaked with the provided [taprootTweak].
    * @param taprootTweak tweak to apply to [internalKey].
    */
   def pay2tr(internalKey: XonlyPublicKey, taprootTweak: Crypto.TaprootTweak): Seq[ScriptElt] = bitcoin.Script.pay2tr(internalKey.pub, taprootTweak).asScala.map(kmp2scala).toList
 
   def isPay2tr(script: Seq[ScriptElt]): Boolean = bitcoin.Script.isPay2tr(script.map(scala2kmp).asJava)
+
+  def pay2trOutputKey(script: Seq[ScriptElt]): Option[XonlyPublicKey] = bitcoin.Script.pay2trOutputKey(script.map(scala2kmp).asJava) match {
+    case null => None
+    case outputKey => Some(kmp2scala(outputKey))
+  }
+
+  def pay2trOutputKey(script: ByteVector): Option[XonlyPublicKey] = pay2trOutputKey(parse(script))
 
   /** NB: callers must ensure that they use the correct taproot tweak when generating their signature. */
   def witnessKeyPathPay2tr(sig: ByteVector64, sighash: Int = bitcoin.SigHash.SIGHASH_DEFAULT): ScriptWitness = bitcoin.Script.witnessKeyPathPay2tr(sig, sighash)
