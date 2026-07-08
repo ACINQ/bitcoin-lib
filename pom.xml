@@ -3,7 +3,7 @@
     <groupId>fr.acinq</groupId>
     <artifactId>bitcoin-lib_2.13</artifactId>
     <packaging>jar</packaging>
-    <version>0.48</version>
+    <version>0.49-SNAPSHOT</version>
     <description>Simple Scala Bitcoin library</description>
     <url>https://github.com/ACINQ/bitcoin-lib</url>
     <name>bitcoin-lib</name>
@@ -30,7 +30,7 @@
     </repositories>
     
     <properties>
-        <project.build.outputTimestamp>2026-07-08T07:07:45Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-07-08T07:08:42Z</project.build.outputTimestamp>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.version>2.13.11</scala.version>
         <scala.version.short>2.13</scala.version.short>
@@ -49,7 +49,7 @@
         <connection>scm:git:git@github.com:ACINQ/bitcoin-lib.git</connection>
         <developerConnection>scm:git:git@github.com:ACINQ/bitcoin-lib.git</developerConnection>
         <url>git@github.com:ACINQ/bitcoin-lib.git</url>
-        <tag>bitcoin-lib_2.13-0.48</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <developers>
