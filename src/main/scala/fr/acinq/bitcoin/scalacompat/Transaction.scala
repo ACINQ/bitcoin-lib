@@ -361,7 +361,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   lazy val kmp: fr.acinq.bitcoin.Transaction = new fr.acinq.bitcoin.Transaction(version, txIn.map(scala2kmp).asJava, txOut.map(scala2kmp).asJava, lockTime)
 
   // standard transaction hash, used to identify transactions (in transactions outputs for example)
-  lazy val hash: TxHash = kmp.hash
+  lazy val hash: TxHash = kmp.getHash
   lazy val txid: TxId = TxId(hash)
   // witness transaction hash that includes witness data. used to compute the witness commitment included in the coinbase
   // transaction of segwit blocks

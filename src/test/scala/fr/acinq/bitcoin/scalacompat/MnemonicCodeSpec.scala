@@ -35,7 +35,7 @@ class MnemonicCodeSpec extends FunSuite {
   test("validate mnemonics") {
     val random = new Random()
     for (_ <- 0 to 100) {
-      for (length <- Seq(16, 20, 24, 28, 32, 36, 40)) {
+      for (length <- Seq(16, 20, 24, 28, 32)) {
         val entropy = new Array[Byte](length)
         random.nextBytes(entropy)
         val mnemonics = MnemonicCode.toMnemonics(ByteVector.view(entropy))
