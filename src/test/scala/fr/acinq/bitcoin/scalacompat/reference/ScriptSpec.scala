@@ -91,13 +91,18 @@ object ScriptSpec {
   def runTest(witnessText: Seq[String], scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedText: String): Unit =
     runTest(witnessText, 0 btc, scriptSigText, scriptPubKeyText, flags, comments, expectedText)
 
-  def runTest(witnessText: Seq[String], amount: Btc, scriptSigText: String, scriptPubKeyText: String, flags: String, comments: Option[String], expectedText: String): Unit = {
+  def runTest(witnessText: Seq[String], amount: Btc, scriptSigText: String, scriptPubKeyText: String, scriptFlags: String, comments: Option[String], expectedText: String): Unit = {
     val witness = ScriptWitness(witnessText.map(ByteVector.fromValidHex(_)))
     val scriptPubKey = parseFromText(scriptPubKeyText)
     val scriptSig = parseFromText(scriptSigText)
     val tx = spendingTx(scriptSig, creditTx(scriptPubKey, amount)).updateWitness(0, witness)
     val ctx = Script.Context(tx, 0, amount)
-    val runner = new Script.Runner(ctx, parseScriptFlags(flags))
+    var flags = parseScriptFlags(scriptFlags)
+    if ((flags & SCRIPT_VERIFY_CLEANSTACK) != 0) {
+      flags = flags | SCRIPT_VERIFY_P2SH
+      flags = flags | SCRIPT_VERIFY_WITNESS
+    }
+    val runner = new Script.Runner(ctx, flags)
 
     val result = Try(runner.verifyScripts(scriptSig, scriptPubKey, witness)).getOrElse(false)
     val expected = expectedText == "OK"
