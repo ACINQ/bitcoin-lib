@@ -157,7 +157,7 @@ class DeterministicWalletSpec extends FlatSpec {
       random.nextBytes(seed)
       val master = DeterministicWallet.generate(ByteVector.view(seed))
       for (_ <- 0 until 50) {
-        val index = random.nextLong()
+        val index = random.nextLong(0xFFFFFFFFL)
         val priv = master.derivePrivateKey(index)
 
         val encoded = priv.encode(DeterministicWallet.tprv)
