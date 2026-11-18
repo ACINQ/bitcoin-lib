@@ -121,6 +121,15 @@ class CryptoSpec extends FlatSpec {
     assert(Crypto.verifySignatureSchnorr(data, sig, publicKey))
   }
 
+  it should "treat unparseable or invalid signature as verification failures" in {
+    val privateKey = PrivateKey.fromBase58("cRp4uUnreGMZN8vB7nQFX6XWMHU5Lc73HMAhmcDEwHfbgRS66Cqp", Base58.Prefix.SecretKeyTestnet)._1
+    val publicKey = privateKey.publicKey
+    val data = Crypto.sha256(ByteVector("this is a test".getBytes("UTF-8")))
+    val sig = ByteVector64.fromValidHex("ff" * 64)
+    assert(!Crypto.verifySignature(data, sig, publicKey))
+    assert(!Crypto.verifySignatureSchnorr(data, sig, publicKey.xOnly))
+  }
+
   it should "generate deterministic signatures" in {
     // dataset from https://bitcointalk.org/index.php?topic=285142.msg3299061#msg3299061
     val dataset = Seq(
