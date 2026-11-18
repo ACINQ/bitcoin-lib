@@ -246,7 +246,11 @@ object Crypto {
    * @param publicKey public key
    * @return true is signature is valid for this data with this public key
    */
-  def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = bitcoin.Crypto.verifySignature(data.toArrayUnsafe, signature, publicKey.pub)
+  def verifySignature(data: ByteVector, signature: ByteVector64, publicKey: PublicKey): Boolean = try {
+    bitcoin.Crypto.verifySignature(data.toArrayUnsafe, signature, publicKey.pub)
+  } catch {
+    case _: Throwable => false
+  }
 
   /**
    * @param data      data
@@ -254,8 +258,10 @@ object Crypto {
    * @param publicKey public key
    * @return true is signature is valid for this data with this public key
    */
-  def verifySignatureSchnorr(data: ByteVector32, signature: ByteVector64, publicKey: XonlyPublicKey): Boolean = {
+  def verifySignatureSchnorr(data: ByteVector32, signature: ByteVector64, publicKey: XonlyPublicKey): Boolean = try {
     bitcoin.Crypto.verifySignatureSchnorr(data, signature, publicKey.pub)
+  } catch {
+    case _: Throwable => false
   }
 
   /**
